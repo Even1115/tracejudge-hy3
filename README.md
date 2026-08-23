@@ -64,14 +64,15 @@ TraceJudge-Hy3 不只判断代码是否通过测试，还尝试验证它是否"�
 - Pydantic v2 严格数据模型：`ProblemSpec`、`SolutionTrace`、`ExecutionSummary`、`StaticEvidence`、`ProcessAssessment`、`ErrorCertificate` 等（[`src/tracejudge_hy3/schemas/`](src/tracejudge_hy3/schemas/)）。
 - 确定性 Mock Provider，内置真实、完整、符合 Schema 的示例解答（不是占位字符串），**无需真实 API Key 即可跑通端到端链路**（[`src/tracejudge_hy3/providers/mock.py`](src/tracejudge_hy3/providers/mock.py)）。
 - 可选的 Hy3 OpenAI-compatible Provider：环境变量配置、超时与可配置的有限重试、JSON Schema/上下文引用校验后的修复重试、耗时记录、日志中不暴露密钥片段（[`src/tracejudge_hy3/providers/hy3_openai.py`](src/tracejudge_hy3/providers/hy3_openai.py)）。
+- 阶段一基线生成器：为每次运行创建唯一 `run_id`，逐题原子持久化原始输出与解析后 `SolutionTrace`，支持断点续跑、单题失败隔离和非敏感实验元数据（[`src/tracejudge_hy3/baseline/`](src/tracejudge_hy3/baseline/)）。
 - 基于 `ast` 的静态分析：`if` / `for` / `while` 分类计数、输入相关循环、最大嵌套深度、比较运算符、数据结构、函数调用、返回行号、空输入与可疑硬编码启发式（[`src/tracejudge_hy3/static_analysis/ast_analyzer.py`](src/tracejudge_hy3/static_analysis/ast_analyzer.py)）。
 - 沙盒执行：`DockerSandbox`（默认，用于真实模型代码，仅提供基础隔离）与 `TrustedLocalSandbox`（默认仅允许仓库内置且精确匹配的 Mock Fixture；其他代码需显式 `--allow-unsafe-local-exec`）（[`src/tracejudge_hy3/sandbox/`](src/tracejudge_hy3/sandbox/)）。
 - 测试运行器：位置/关键字参数从 JSON 加载，不使用 `eval()`；父进程为每个用例创建新子进程并强制超时，有界捕获 stdout/stderr，独立记录输出、异常、超时和退出码（[`src/tracejudge_hy3/sandbox/test_runner.py`](src/tracejudge_hy3/sandbox/test_runner.py)）。
 - 规则证据 + LLM 判断的四层评估：空输入声明—代码不一致、集合声明—代码不一致、单次遍历声明—嵌套循环不一致、复杂度声明不一致、执行失败归因（[`src/tracejudge_hy3/evaluator/`](src/tracejudge_hy3/evaluator/)）。
 - 反例生成：优先复用与当前违反需求条款相关的 challenge/hidden 测试失败结果，其次基于相关测试的参数形状生成有限边界候选并与参考实现差分执行，并对列表参数做简单 delta-debugging 最小化（[`src/tracejudge_hy3/counterexample/`](src/tracejudge_hy3/counterexample/)）。
 - 可执行错误证书聚合：新疑似问题直接产生 `confirmed_bug` / `strongly_supported` / `unverified_suspicion` 三种裁决。普通首次运行正确时不产生证书；`cleared` 仅用于显式传入既有证书后，复核的完整执行证据表明原疑似问题不再成立的状态转移（[`src/tracejudge_hy3/evaluator/evidence.py`](src/tracejudge_hy3/evaluator/evidence.py)）。
-- CLI（Typer + Rich）：`doctor` / `demo` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
-- 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`），来源标记为 `self_constructed_mvp_fixture`（见 §12）。
+- CLI（Typer + Rich）：`doctor` / `demo` / `baseline` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
+- 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`），来源标记为 `self_constructed_mvp_fixture`（见 §10 和 §15）。
 - 指标计算：10 个纯函数指标，缺少人工标注时返回 `not_computable` 而不是伪造数值（[`src/tracejudge_hy3/reporting/metrics.py`](src/tracejudge_hy3/reporting/metrics.py)）。
 - 单元测试与集成测试（`pytest`），Lint（`ruff`）。
 
@@ -97,7 +98,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-## 6. 运行 Mock Demo（无需真实 API Key）
+## 6. 运行 Mock Demo 与阶段一实验（Mock 无需真实 API Key）
 
 ```bash
 tracejudge doctor
@@ -125,6 +126,55 @@ tracejudge batch --dataset data/sample_problems.jsonl --provider mock \
 
 > **v0.1 的样例数据（`data/sample_problems.jsonl`、`data/demo_annotations.jsonl`）仅用于验证系统链路是否可靠运行，不代表正式 Hy3 benchmark 评测结果，也不是 HumanEval/MBPP 等公开 benchmark 的替代。**
 
+### 阶段一：生成基线解答
+
+先用确定性 Mock Provider 做一次不访问网络的 dry run：
+
+```bash
+tracejudge baseline \
+  --dataset data/sample_problems.jsonl \
+  --provider mock \
+  --output-dir artifacts/experiments/phase1
+```
+
+配置好 Hy3 后，使用同一入口运行真实生成：
+
+```bash
+tracejudge baseline \
+  --dataset data/sample_problems.jsonl \
+  --provider hy3 \
+  --output-dir artifacts/experiments/phase1
+```
+
+新运行会自动生成唯一 `run_id`，并在第一次模型调用前显示 `run_id` 和产物目录。若一次运行中断，可在数据集 SHA256、Provider 公开配置、TraceJudge Git commit/工作树指纹以及 Python/直接依赖环境未变的前提下续跑：
+
+```bash
+tracejudge baseline \
+  --dataset data/sample_problems.jsonl \
+  --provider mock \
+  --output-dir artifacts/experiments/phase1 \
+  --resume-run-id <run_id>
+```
+
+续跑会为历史上已成功的 `problem_id` 追加 `skipped` 事件，并重试上次为 `parse_error` 或 `provider_error` 的题目；上一个遗留为 `running` 的 invocation 会标记为 `interrupted`。内置 Mock 输出是仓库手工维护的确定性离线 Fixture，**不是真实模型结果**；匹配只使用公开 Prompt 视图，修改 `reference_code`/隐藏/challenge 字段不会影响它。未知题或公开题面已改的内置题会明确失败，不会退化为使用 `reference_code`。批次仍会处理完其他题目并保留产物；若最终存在失败题，CLI 以非零状态退出。
+
+该命令只进行 Solver 生成和结构化解析：**不导入或执行候选代码，不运行可见/隐藏/challenge 测试，不做四层评估、反例生成、人工标注或指标对比**。发给 Solver 的题目上下文仅包含 `problem_id`、`requirement`、`function_signature`、公开需求条款的 `requirement_id`/`content`，以及可见测试的 `args`/`kwargs`/`expected`；不包含 `reference_code`、隐藏测试、challenge 测试或人工标注。`SolutionTrace` 中的说明是面向用户、可审查的需求理解、设计摘要和实现计划，不要求或保存模型私有思维链。
+
+每次运行的产物为：
+
+```text
+<output-dir>/<run_id>/
+├── manifest.json
+├── responses.jsonl
+└── summary.json
+```
+
+- `manifest.json` 记录数据集绝对路径、SHA256 与摘要，Git commit/分支/工作树状态与指纹，Python 和直接依赖版本，以及 Provider、模型、`reasoning_effort`、超时和最大重试次数等显式允许的非敏感配置。Hy3 会先从 endpoint 剔除 userinfo、query 和 fragment，再保存规范化 endpoint 的 SHA256 以便一致性校验，不保存 endpoint 本身；API Key、Authorization Header、完整请求头和其他凭据均不写入。
+- `responses.jsonl` 是 UTF-8 事件日志，每题记录 `started_at` / `ended_at` / `duration_seconds`、尝试与重试次数、`raw_output_attempt` / `parse_attempted` / `parse_status`和结构化错误，并将凭据安全脱敏后的 `raw_output` 与解析后的 `solution_trace` 分开保存。解析错误摘要不包含 Pydantic `input_value`，修复轮也只回传脱敏后的旧输出。状态仅为 `success` / `parse_error` / `provider_error` / `skipped`。每条记录都先写入同目录临时文件，再原子替换；单题失败或非法 Unicode 字符不会中止后续题目。
+- `summary.json` 的“最终结果”按每个题目最后一条非 `skipped` 事件统计成功数、解析失败数、Provider 失败数、失败总数、待处理数和平均耗时。`parse_success_rate = parsed / (parsed + failed)`；根本没有可解析输出的 Provider 失败不进入分母，但“先解析失败、后续请求又失败”的混合序列会进入分母。它另外保留全部事件数与本次续跑的 `skipped` 计数，但不计算功能正确率、错误检测率或其他阶段二及以后的指标。
+
+`data/sample_problems.jsonl` 在基线产物中固定标记为 `self_constructed_mvp_fixture_pilot`。这是自建工程 Fixture 的小规模 pilot，不是 HumanEval+、MBPP+ 或任何正式 benchmark 结果。
+
 ## 7. 配置真实 Hy3
 
 复制 `.env.example` 为 `.env` 并填入真实值：
@@ -144,10 +194,15 @@ HY3_ENABLE_REASONING_EFFORT=true
 ```
 
 ```bash
-tracejudge run --dataset data/sample_problems.jsonl --problem-id safe_mean --provider hy3 --sandbox docker
+tracejudge baseline --dataset data/sample_problems.jsonl --provider hy3 \
+  --output-dir artifacts/experiments/phase1
+
+# 现有的完整评估链路（会执行代码）
+tracejudge run --dataset data/sample_problems.jsonl --problem-id safe_mean \
+  --provider hy3 --sandbox docker
 ```
 
-真实 Hy3 调用仅作为**可选模式**，从不是本地 Demo 或单元测试的前置条件——单元测试不会调用真实 API。
+真实 Hy3 调用仅作为**可选模式**，使用 `HY3_TIMEOUT_SECONDS` 和 `HY3_MAX_RETRIES` 限定单次超时与总尝试次数，不会无限重试。它不是 Mock dry run 或普通单元测试的前置条件；普通测试使用 Mock/替身，不访问真实 Hy3 API。真实 pilot 是否完成应以当次实验报告和实际产物为准。
 
 ## 8. 环境变量说明
 
@@ -181,6 +236,7 @@ tracejudge run --dataset data/sample_problems.jsonl --problem-id safe_mean --pro
 - `TestCase.expected` 支持一种特殊约定：`{"raises": "ValueError"}` 表示该用例期望抛出指定异常（用于 `clamp` 的非法区间测试），其余情况下 `expected` 就是普通 JSON 值。
 - `data/mock_responses/*.json`：`SolutionTrace` 格式的确定性 Mock 解答。
 - `data/demo_annotations.jsonl`：为内置 Mock Fixture 提供的少量人工标注 Ground Truth，**仅用于测试指标函数，不是正式人工标注研究**。
+- `artifacts/experiments/phase1/<run_id>/`：阶段一基线生成的 `manifest.json` / `responses.jsonl` / `summary.json`；详见 [`docs/data_format.md`](docs/data_format.md)。
 
 ## 11. 测试
 
@@ -190,7 +246,7 @@ ruff check .
 ruff format --check .
 ```
 
-测试不调用真实 Hy3 API；Docker 相关单元测试通过替身验证可用性探测、强化参数和超时后的强制清理，不要求本机 Docker 一定可用。
+测试不调用真实 Hy3 API；阶段一测试会验证 Prompt 公开信息白名单、Mock 无网络、原子 JSONL、单题失败隔离、续跑及非敏感 manifest。Docker 相关单元测试通过替身验证可用性探测、强化参数和超时后的强制清理，不要求本机 Docker 一定可用。
 
 ## 12. 输出 JSON 示例
 
@@ -236,7 +292,8 @@ tracejudge-hy3/
 ├── Makefile
 ├── IMPLEMENTATION_STATUS.md
 ├── src/tracejudge_hy3/
-│   ├── cli.py                 # Typer CLI: doctor / demo / run / batch
+│   ├── cli.py                 # Typer CLI: doctor / demo / baseline / run / batch
+│   ├── baseline/              # 阶段一生成、断点续跑与产物持久化
 │   ├── config.py               # 环境变量配置 (pydantic-settings)
 │   ├── schemas/                 # 所有 Pydantic v2 数据模型
 │   ├── providers/               # LLMProvider 抽象接口、Mock、Hy3 OpenAI-compatible

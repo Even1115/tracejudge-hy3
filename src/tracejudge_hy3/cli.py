@@ -1,4 +1,4 @@
-"""Typer CLI: doctor / demo / run / batch."""
+"""Typer CLI: doctor / baseline / demo / run / batch."""
 
 from __future__ import annotations
 
@@ -13,6 +13,11 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
+from tracejudge_hy3.baseline import (
+    BaselineExperimentError,
+    new_baseline_run_id,
+    run_baseline_experiment,
+)
 from tracejudge_hy3.config import get_settings
 from tracejudge_hy3.dataset.loader import load_problem_by_id, load_problems
 from tracejudge_hy3.exceptions import TraceJudgeError
@@ -146,6 +151,71 @@ def doctor() -> None:
             "[yellow]提示：未检测到完整的 Hy3 环境变量配置，--provider hy3 暂不可用；"
             "可使用 --provider mock 运行完整链路。[/yellow]"
         )
+
+
+@app.command()
+def baseline(
+    dataset: str = typer.Option(DEFAULT_DATASET, "--dataset", help="ProblemSpec JSONL 数据集"),
+    provider: str = typer.Option("mock", "--provider", help="'mock' 或 'hy3'"),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase1",
+        "--output-dir",
+        help="运行目录的父目录；每次新运行会在其下创建唯一 run_id 子目录",
+    ),
+    resume_run_id: str | None = typer.Option(
+        None,
+        "--resume-run-id",
+        help="续跑既有 run_id：跳过已成功题目，并重试此前失败或未完成题目",
+    ),
+) -> None:
+    """阶段一：仅生成并原子保存基线解答，不执行候选代码或任何测试/评估。"""
+
+    try:
+        effective_run_id = resume_run_id or new_baseline_run_id()
+        run_path = Path(output_dir).expanduser().resolve() / effective_run_id
+        action = "续跑" if resume_run_id is not None else "新建"
+        # Print recovery coordinates before the first model call so an
+        # interrupted invocation can always be resumed without directory
+        # discovery or log inspection.
+        console.print(f"[cyan]阶段一 {action} run_id: {effective_run_id}[/cyan]")
+        console.print(f"[dim]产物目录: {run_path}[/dim]")
+        llm_provider = _make_provider(provider)
+        result = asyncio.run(
+            run_baseline_experiment(
+                dataset_path=dataset,
+                provider=llm_provider,
+                output_dir=output_dir,
+                run_id=effective_run_id,
+                resume=resume_run_id is not None,
+            )
+        )
+    except (BaselineExperimentError, TraceJudgeError, OSError) as exc:
+        console.print(f"[red]基线生成失败：{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    summary = result.summary
+    parse_rate = summary.get("parse_success_rate")
+    parse_rate_text = "N/A" if parse_rate is None else f"{parse_rate:.2%}"
+    average_duration = summary.get("average_duration_seconds")
+    average_duration_text = "N/A" if average_duration is None else f"{average_duration:.3f}s"
+
+    table = Table(title=f"阶段一基线生成：{result.run_id}")
+    table.add_column("统计")
+    table.add_column("结果")
+    table.add_row("题目总数", str(summary["total_problem_count"]))
+    table.add_row("成功", str(summary["success_count"]))
+    table.add_row("解析失败", str(summary["parse_error_count"]))
+    table.add_row("Provider 失败", str(summary["provider_error_count"]))
+    table.add_row("本次跳过", str(summary["skipped_count"]))
+    table.add_row("解析成功率", parse_rate_text)
+    table.add_row("平均耗时（跳过项除外）", average_duration_text)
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]responses: {result.responses_path}[/dim]")
+    console.print(f"[dim]summary: {result.summary_path}[/dim]")
+
+    if summary["failure_count"]:
+        raise typer.Exit(code=1)
 
 
 def _render_result(result: PipelineResult) -> None:

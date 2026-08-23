@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -74,8 +76,62 @@ async def test_hy3_provider_disables_sdk_retries_and_closes(monkeypatch):
     provider = Hy3OpenAIProvider(_settings())
     assert captured["max_retries"] == 0
     assert captured["api_key"] == "test-secret-not-real"
+    public_config = provider.public_generation_config()
+    assert public_config["endpoint_sha256"] == hashlib.sha256(b"https://hy3.invalid/v1").hexdigest()
+    assert "https://hy3.invalid/v1" not in str(public_config)
+    assert "test-secret-not-real" not in str(public_config)
     await provider.aclose()
     assert fake_client.closed is True
+
+
+async def test_hy3_endpoint_fingerprint_strips_userinfo_query_and_fragment(monkeypatch):
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    userinfo_canary = "URL_PASSWORD_CANARY"
+    query_canary = "URL_QUERY_TOKEN_CANARY"
+    provider = Hy3OpenAIProvider(
+        _settings(
+            hy3_base_url=(
+                f"https://user:{userinfo_canary}@HY3.invalid/v1/"
+                f"?api_key={query_canary}#private-fragment"
+            )
+        )
+    )
+
+    config = provider.public_generation_config()
+
+    expected = hashlib.sha256(b"https://hy3.invalid/v1").hexdigest()
+    assert config["endpoint_sha256"] == expected
+    assert userinfo_canary not in str(config)
+    assert query_canary not in str(config)
+    await provider.aclose()
+
+
+async def test_hy3_public_config_and_initial_log_redact_key_even_inside_model_knobs(
+    monkeypatch,
+    caplog,
+):
+    configured_key = "CONFIG_KEY_INSIDE_MODEL_CANARY"
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    settings = _settings(
+        hy3_api_key=configured_key,
+        hy3_model=f"model-{configured_key}",
+        hy3_reasoning_effort=f"effort-{configured_key}",
+    )
+
+    with caplog.at_level(logging.INFO):
+        provider = Hy3OpenAIProvider(settings)
+
+    assert configured_key not in str(provider.public_generation_config())
+    assert configured_key not in caplog.text
+    await provider.aclose()
 
 
 async def test_hy3_provider_repairs_invalid_json_once(monkeypatch):
@@ -134,6 +190,29 @@ async def test_hy3_provider_timeout_exhaustion_uses_custom_error(monkeypatch):
     with pytest.raises(ProviderTimeoutError, match="2 attempt"):
         await provider.generate_solution(problem)
     assert provider._call_model.await_count == 2
+
+
+async def test_hy3_mixed_parse_then_timeout_preserves_raw_attempt_metadata(monkeypatch):
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    provider = Hy3OpenAIProvider(_settings(hy3_max_retries=1))
+    provider._call_model = AsyncMock(
+        side_effect=["not JSON", ProviderTimeoutError("second attempt timed out")]
+    )
+    problem = load_problem_by_id(DATASET, "safe_mean")
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "provider_error"
+    assert generation.raw_output == "not JSON"
+    assert generation.raw_output_attempt == 1
+    assert generation.parse_attempted is True
+    assert generation.attempt_count == 2
+    assert generation.retry_count == 1
+    assert isinstance(generation.error, ProviderTimeoutError)
 
 
 @pytest.mark.parametrize(

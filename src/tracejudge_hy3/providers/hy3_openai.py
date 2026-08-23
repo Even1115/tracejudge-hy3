@@ -9,9 +9,11 @@ result.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import openai
 
@@ -19,6 +21,7 @@ from tracejudge_hy3.config import Settings, get_settings
 from tracejudge_hy3.exceptions import (
     ParsingError,
     ProviderAuthError,
+    ProviderParseError,
     ProviderResponseError,
     ProviderTimeoutError,
 )
@@ -34,7 +37,13 @@ from tracejudge_hy3.prompts.solver import (
     build_solver_json_schema,
     build_solver_user_prompt,
 )
-from tracejudge_hy3.providers.base import LLMProvider
+from tracejudge_hy3.providers.base import (
+    GenerationStatus,
+    LLMProvider,
+    SolutionGeneration,
+    validate_solution_for_problem,
+)
+from tracejudge_hy3.redaction import redact_sensitive_text
 from tracejudge_hy3.schemas.evaluation import ProcessAssessment
 from tracejudge_hy3.schemas.execution import ExecutionSummary, StaticEvidence
 from tracejudge_hy3.schemas.problem import ProblemSpec
@@ -54,9 +63,8 @@ class Hy3OpenAIProvider(LLMProvider):
                 "(see .env.example). Use --provider mock to run without real credentials."
             )
         logger.info(
-            "Hy3OpenAIProvider configured: base_url=%s model=%s api_key=%s",
-            self.settings.hy3_base_url,
-            self.settings.hy3_model,
+            "Hy3OpenAIProvider configured: base_url=<configured> model=%s api_key=%s",
+            self._redact_configured_secret(self.settings.hy3_model),
             redact_secret(self.settings.hy3_api_key),
         )
         self._client = openai.AsyncOpenAI(
@@ -64,6 +72,54 @@ class Hy3OpenAIProvider(LLMProvider):
             api_key=self.settings.hy3_api_key,
             max_retries=0,
         )
+
+    def public_generation_config(self) -> dict[str, Any]:
+        """Return only the non-sensitive knobs needed to reproduce generation."""
+
+        return {
+            "provider": self.name,
+            "model": self._redact_configured_secret(self.settings.hy3_model),
+            "reasoning_effort": (
+                self._redact_configured_secret(self.settings.hy3_reasoning_effort)
+                if self.settings.hy3_enable_reasoning_effort
+                else None
+            ),
+            "reasoning_effort_enabled": self.settings.hy3_enable_reasoning_effort,
+            "timeout_seconds": self.settings.hy3_timeout_seconds,
+            "max_retries": self.settings.hy3_max_retries,
+            # Keep endpoint identity reproducible without persisting a URL that
+            # may contain private hostnames, userinfo, or query credentials.
+            "endpoint_sha256": self._endpoint_fingerprint(),
+        }
+
+    def _endpoint_fingerprint(self) -> str:
+        """Fingerprint endpoint identity without URL credentials or query data."""
+
+        try:
+            parsed = urlsplit(self.settings.hy3_base_url)
+            hostname = (parsed.hostname or "").lower()
+            if ":" in hostname and not hostname.startswith("["):
+                hostname = f"[{hostname}]"
+            port = parsed.port
+            netloc = f"{hostname}:{port}" if port is not None else hostname
+            path = parsed.path.rstrip("/") or "/"
+            canonical = urlunsplit((parsed.scheme.lower(), netloc, path, "", ""))
+        except (TypeError, ValueError):
+            canonical = "unparseable-endpoint"
+        return hashlib.sha256(canonical.encode("utf-8", errors="replace")).hexdigest()
+
+    def _redact_configured_secret(self, value: str) -> str:
+        """Remove the configured API key from any provider-controlled text."""
+
+        secret = self.settings.hy3_api_key
+        if secret:
+            return value.replace(secret, "<redacted>")
+        return value
+
+    def _artifact_safe_model_text(self, value: str) -> str:
+        """Scrub credentials before text is persisted or sent back for repair."""
+
+        return redact_sensitive_text(value, known_secrets=(self.settings.hy3_api_key,))
 
     async def _call_model(self, messages: list[dict[str, str]]) -> str:
         extra_body: dict[str, Any] = {}
@@ -79,13 +135,11 @@ class Hy3OpenAIProvider(LLMProvider):
                 extra_body=extra_body or None,
             )
         except openai.AuthenticationError as exc:
-            raise ProviderAuthError(f"Hy3 authentication failed: {exc}") from exc
+            raise ProviderAuthError(f"Hy3 authentication failed ({type(exc).__name__})") from exc
         except (openai.APITimeoutError, TimeoutError) as exc:
-            raise ProviderTimeoutError(f"Hy3 call timed out: {exc}") from exc
+            raise ProviderTimeoutError(f"Hy3 call timed out ({type(exc).__name__})") from exc
         except (openai.APIConnectionError, openai.RateLimitError, openai.APIStatusError) as exc:
-            raise ProviderResponseError(
-                f"Hy3 API request failed ({type(exc).__name__}): {exc}"
-            ) from exc
+            raise ProviderResponseError(f"Hy3 API request failed ({type(exc).__name__})") from exc
         finally:
             elapsed = time.perf_counter() - start
             logger.info("Hy3 call took %.2fs", elapsed)
@@ -126,28 +180,39 @@ class Hy3OpenAIProvider(LLMProvider):
             except ProviderResponseError as exc:
                 last_error = exc
                 last_was_timeout = False
-                logger.warning("Hy3 call attempt %d/%d failed: %s", attempt, attempts, exc)
+                logger.warning(
+                    "Hy3 call attempt %d/%d failed (%s)",
+                    attempt,
+                    attempts,
+                    type(exc).__name__,
+                )
                 continue
 
+            parse_raw = self._redact_configured_secret(raw)
+            artifact_raw = self._artifact_safe_model_text(parse_raw)
             try:
-                parsed = parse_structured_output(raw, model_cls)
+                parsed = parse_structured_output(parse_raw, model_cls)
                 if extra_check is not None:
                     extra_check(parsed)
                 return parsed
             except (ParsingError, ValueError) as exc:
-                last_error = exc
+                safe_error = self._artifact_safe_model_text(str(exc))
+                last_error = ParsingError(safe_error)
                 last_was_timeout = False
                 logger.warning(
-                    "Hy3 call attempt %d/%d failed schema validation: %s", attempt, attempts, exc
+                    "Hy3 call attempt %d/%d failed schema validation (%s)",
+                    attempt,
+                    attempts,
+                    type(exc).__name__,
                 )
                 messages = [
                     *messages,
-                    {"role": "assistant", "content": raw},
+                    {"role": "assistant", "content": artifact_raw},
                     {
                         "role": "user",
                         "content": (
                             "你上一次的输出未通过 JSON Schema 校验，错误信息如下：\n"
-                            f"{exc}\n"
+                            f"{safe_error}\n"
                             "请修正后重新输出一个完整、严格符合要求的 JSON 对象，"
                             "不要输出 Markdown 代码围栏或 JSON 之外的任何文字。"
                         ),
@@ -162,24 +227,126 @@ class Hy3OpenAIProvider(LLMProvider):
             f"Hy3 response failed schema validation after {attempts} attempt(s): {last_error}"
         )
 
-    async def generate_solution(self, problem: ProblemSpec) -> SolutionTrace:
+    def _solver_messages(self, problem: ProblemSpec) -> list[dict[str, str]]:
         user_prompt = build_solver_user_prompt(problem)
         schema = build_solver_json_schema()
         system_prompt = (
             f"{SOLVER_SYSTEM_PROMPT}\n\nJSON Schema:\n"
             f"{json.dumps(schema, ensure_ascii=False, indent=2)}"
         )
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
 
-        def _check_problem_id(solution: SolutionTrace) -> None:
-            if solution.problem_id != problem.problem_id:
-                raise ValueError(
-                    f"problem_id mismatch: expected '{problem.problem_id}', "
-                    f"got '{solution.problem_id}'"
+    async def generate_solution_with_details(self, problem: ProblemSpec) -> SolutionGeneration:
+        """Generate once with finite repair retries and preserve the final raw text."""
+
+        messages = self._solver_messages(problem)
+        attempts = self.settings.hy3_max_retries + 1
+        last_raw: str | None = None
+        last_raw_attempt: int | None = None
+        last_error: Exception | None = None
+        last_status: GenerationStatus = "provider_error"
+
+        for attempt in range(1, attempts + 1):
+            try:
+                raw = await self._call_model(messages)
+            except ProviderAuthError as exc:
+                safe_error = ProviderAuthError(self._redact_configured_secret(str(exc)))
+                return SolutionGeneration(
+                    status="provider_error",
+                    raw_output=last_raw,
+                    solution=None,
+                    attempt_count=attempt,
+                    error=safe_error,
+                    raw_output_attempt=last_raw_attempt,
+                    parse_attempted=last_raw is not None,
                 )
+            except (ProviderTimeoutError, ProviderResponseError) as exc:
+                safe_message = self._redact_configured_secret(str(exc))
+                last_error = type(exc)(safe_message)
+                last_status = "provider_error"
+                logger.warning(
+                    "Hy3 Solver attempt %d/%d failed (%s)",
+                    attempt,
+                    attempts,
+                    type(exc).__name__,
+                )
+                continue
 
-        return await self._call_with_retries(
-            system_prompt, user_prompt, SolutionTrace, extra_check=_check_problem_id
+            parse_raw = self._redact_configured_secret(raw)
+            artifact_raw = self._artifact_safe_model_text(parse_raw)
+            last_raw = artifact_raw
+            last_raw_attempt = attempt
+            try:
+                solution = parse_structured_output(parse_raw, SolutionTrace)
+                validate_solution_for_problem(problem, solution)
+            except (ParsingError, ValueError) as exc:
+                safe_error = self._artifact_safe_model_text(str(exc))
+                last_error = ParsingError(safe_error)
+                last_status = "parse_error"
+                logger.warning(
+                    "Hy3 Solver attempt %d/%d failed schema/context validation (%s)",
+                    attempt,
+                    attempts,
+                    type(exc).__name__,
+                )
+                messages = [
+                    *messages,
+                    {"role": "assistant", "content": artifact_raw},
+                    {
+                        "role": "user",
+                        "content": (
+                            "你上一次的输出未通过 JSON Schema 校验或公开上下文校验，错误信息如下：\n"
+                            f"{safe_error}\n"
+                            "请修正后重新输出一个完整、严格符合要求的 JSON 对象，"
+                            "不要输出 Markdown 代码围栏或 JSON 之外的任何文字。"
+                        ),
+                    },
+                ]
+                continue
+
+            return SolutionGeneration(
+                status="success",
+                raw_output=artifact_raw,
+                solution=solution,
+                attempt_count=attempt,
+                raw_output_attempt=attempt,
+                parse_attempted=True,
+            )
+
+        assert last_error is not None
+        if last_status == "parse_error":
+            error: Exception = ProviderParseError(
+                f"Hy3 response failed schema/context validation after {attempts} attempt(s): "
+                f"{last_error}"
+            )
+        elif isinstance(last_error, ProviderTimeoutError):
+            error = ProviderTimeoutError(
+                f"Hy3 call did not complete within {attempts} attempt(s): {last_error}"
+            )
+        else:
+            error = ProviderResponseError(
+                f"Hy3 API request failed after {attempts} attempt(s): {last_error}"
+            )
+        return SolutionGeneration(
+            status=last_status,
+            raw_output=last_raw,
+            solution=None,
+            attempt_count=attempts,
+            error=error,
+            raw_output_attempt=last_raw_attempt,
+            parse_attempted=last_raw is not None,
         )
+
+    async def generate_solution(self, problem: ProblemSpec) -> SolutionTrace:
+        generation = await self.generate_solution_with_details(problem)
+        if generation.status == "success":
+            assert generation.solution is not None
+            return generation.solution
+        assert generation.error is not None
+        raise generation.error
 
     async def evaluate_process(
         self,

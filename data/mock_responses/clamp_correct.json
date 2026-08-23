@@ -1,0 +1,35 @@
+{
+  "problem_id": "clamp",
+  "requirement_understanding": "函数接收 value、low、high 三个数值，需要将 value 限制在闭区间 [low, high] 内并返回；若 low > high 说明区间非法，应抛出 ValueError。",
+  "design_summary": "先校验 low 与 high 的大小关系，若 low > high 直接抛出 ValueError；否则依次判断 value 是否小于 low 或大于 high，分别返回边界值，其余情况返回 value 本身。",
+  "edge_cases_considered": ["value 等于 low", "value 等于 high", "low 大于 high 的非法区间"],
+  "implementation_steps": [
+    {
+      "step_id": "S1",
+      "content": "校验区间合法性：若 low > high，抛出 ValueError",
+      "related_requirements": ["R4"],
+      "expected_code_behavior": "代码中应出现 if low > high 与 raise ValueError"
+    },
+    {
+      "step_id": "S2",
+      "content": "若 value 小于 low，返回 low",
+      "related_requirements": ["R1"],
+      "expected_code_behavior": "存在 if value < low: return low 分支"
+    },
+    {
+      "step_id": "S3",
+      "content": "若 value 大于 high，返回 high",
+      "related_requirements": ["R2"],
+      "expected_code_behavior": "存在 if value > high: return high 分支"
+    },
+    {
+      "step_id": "S4",
+      "content": "否则说明 value 已在区间内，直接返回 value",
+      "related_requirements": ["R3"],
+      "expected_code_behavior": "函数以 return value 结尾"
+    }
+  ],
+  "declared_time_complexity": "O(1)",
+  "declared_space_complexity": "O(1)",
+  "code": "def clamp(value: float, low: float, high: float) -> float:\n    if low > high:\n        raise ValueError(\"low must not exceed high\")\n    if value < low:\n        return low\n    if value > high:\n        return high\n    return value\n"
+}

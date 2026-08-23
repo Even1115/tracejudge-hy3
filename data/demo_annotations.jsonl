@@ -1,0 +1,4 @@
+{"response_id": "safe_mean_faulty_demo", "human_process_correct": false, "human_has_error": true, "human_error_type": "A01_PLAN_CODE_MISMATCH", "human_first_faulty_step": "S1", "human_first_faulty_layer": "alignment"}
+{"response_id": "safe_mean_correct_demo", "human_process_correct": true, "human_has_error": false, "human_error_type": null, "human_first_faulty_step": null, "human_first_faulty_layer": null}
+{"response_id": "deduplicate_preserve_order_demo", "human_process_correct": true, "human_has_error": false, "human_error_type": null, "human_first_faulty_step": null, "human_first_faulty_layer": null}
+{"response_id": "clamp_demo", "human_process_correct": true, "human_has_error": false, "human_error_type": null, "human_first_faulty_step": null, "human_first_faulty_layer": null}

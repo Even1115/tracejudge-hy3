@@ -1,0 +1,29 @@
+{
+  "problem_id": "deduplicate_preserve_order",
+  "requirement_understanding": "函数接收一个可哈希元素组成的列表 items，需要返回一个新列表：去除重复元素，且保留每个元素首次出现的相对顺序。",
+  "design_summary": "使用一个集合 seen 记录已经出现过的元素，遍历输入列表；只有当元素未出现在 seen 中时，才将其加入结果列表并记录到 seen 中，从而在一次遍历中完成去重并保序。",
+  "edge_cases_considered": ["空列表", "所有元素相同", "所有元素互不相同"],
+  "implementation_steps": [
+    {
+      "step_id": "S1",
+      "content": "初始化一个空集合 seen 用于 O(1) 查重，以及一个空列表 result 用于保存结果",
+      "related_requirements": ["R2"],
+      "expected_code_behavior": "代码中应出现 set() 初始化"
+    },
+    {
+      "step_id": "S2",
+      "content": "依次遍历 items 中的每个元素，若该元素不在 seen 中，则加入 seen 并追加到 result",
+      "related_requirements": ["R1", "R3"],
+      "expected_code_behavior": "单次 for 循环，包含 in 判断与 append"
+    },
+    {
+      "step_id": "S3",
+      "content": "返回保序去重后的 result 列表",
+      "related_requirements": ["R1"],
+      "expected_code_behavior": "函数以 return result 结尾"
+    }
+  ],
+  "declared_time_complexity": "O(n)",
+  "declared_space_complexity": "O(n)",
+  "code": "def deduplicate_preserve_order(items: list) -> list:\n    seen = set()\n    result = []\n    for item in items:\n        if item not in seen:\n            seen.add(item)\n            result.append(item)\n    return result\n"
+}

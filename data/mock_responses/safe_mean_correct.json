@@ -1,0 +1,23 @@
+{
+  "problem_id": "safe_mean",
+  "requirement_understanding": "函数接收一个数值列表 nums，需要返回其算术平均值。当列表为空时，为避免除以零错误，应直接返回 0.0；当列表非空时，返回 sum(nums) / len(nums)。",
+  "design_summary": "先检查输入列表是否为空，若为空直接返回 0.0；否则对列表中的所有元素求和，再除以元素个数得到平均值。",
+  "edge_cases_considered": ["空列表", "单元素列表", "包含负数的列表"],
+  "implementation_steps": [
+    {
+      "step_id": "S1",
+      "content": "检查 nums 是否为空列表；如果为空，直接返回 0.0，避免后续除以零",
+      "related_requirements": ["R1"],
+      "expected_code_behavior": "代码中应存在针对空输入的显式判断分支并提前返回 0.0"
+    },
+    {
+      "step_id": "S2",
+      "content": "对非空列表，使用内置函数计算 sum(nums) / len(nums) 作为平均值并返回",
+      "related_requirements": ["R2"],
+      "expected_code_behavior": "使用 sum 与 len 计算并返回平均值"
+    }
+  ],
+  "declared_time_complexity": "O(n)",
+  "declared_space_complexity": "O(1)",
+  "code": "def safe_mean(nums: list[float]) -> float:\n    if not nums:\n        return 0.0\n    return sum(nums) / len(nums)\n"
+}

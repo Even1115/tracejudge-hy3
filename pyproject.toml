@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tracejudge-hy3"
+version = "0.1.0"
+description = "TraceJudge-Hy3: 基于四层对齐与可执行错误证书的代码生成过程评估系统 (v0.1 MVP)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "TraceJudge-Hy3 contributors" }]
+keywords = ["code-generation", "evaluation", "llm", "process-evaluation"]
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "openai>=1.30",
+    "typer>=0.12",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+tracejudge = "tracejudge_hy3.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tracejudge_hy3"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"data" = "tracejudge_hy3/data"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

@@ -14,6 +14,20 @@
 5. **反例生成**：仅当 `process_assessment.error_type is not None` 时才触发；优先复用与 `violated_requirement` 相关的 challenge/hidden 失败结果，其次从相关测试的参数形状派生边界候选并差分执行，找到后对列表参数做最小化。不会用只关联其他需求条款的失败来确认当前判断。
 6. **错误证书**：`evaluator/evidence.py` 根据"是否有相关可执行反例 / 是否有已执行且关联同一需求条款的隐藏或挑战测试证据 / 是否只有规则命中 / 是否只有 LLM 意见"决定新问题的 `verdict`。首次正确运行无证书；只有显式携带既有证书进行复核，且完整执行证据已排除原问题时，才转移为 `cleared`。
 
+## HumanEval+ 阶段二独立执行边界
+
+`src/tracejudge_hy3/evalplus/runner.py:run_evalplus_experiment()` 是一条与上述全链路完全独立的编排入口。它不导入 Provider，不调用 `run_pipeline()`，不进行 AST/四层判断、LLM Judge、反例生成或参考实现差分执行。固定流程为：
+
+1. `exporter.py` 在任何输出目录或 Docker 进程创建前，完整校验阶段一 manifest/summary/responses、数据集 manifest 和相邻公开 `problems.jsonl`；只提取每题唯一历史 `success` 记录的 `solution_trace.code`。
+2. `runner.py` 将最小 `task_id` / `solution` samples 原子写入私有运行目录，记录来源记录哈希、代码哈希和组合续跑指纹。
+3. `docker_runner.py` 先校验固定镜像 digest、linux/amd64 平台、EvalPlus/Python/HumanEval+ release 身份和 10 题公开 prompt/entry-point 身份，再为每题启动一次受限容器。
+4. `container_entrypoint.py` 只在容器内加载官方 EvalPlus-native release 数据，从 164 题中生成当前单题的 evaluation-only override，然后调用固定参数的官方 `evalplus.evaluate`。
+5. task 只读挂载单题 control，并只把两个预创建宿主文件作为精确 RW bind；宿主等待容器完全退出后才验证/读取结果，清理容器后复制为新的私有 inode，不把仓库或宿主可写目录交给候选。
+6. `parser.py` 严格绑定 EvalPlus v0.3.1 raw schema；候选代码仅保存 SHA256，失败输入只计数，实值仅存在权限 `0600` 的原始 bundle。
+7. 主调度器逐题保存 raw/safe checkpoint；完成题可安全跳过，任何来源、代码、镜像、官方数据身份、执行参数或实现指纹变化都拒绝续跑。
+
+Mock executor 只验证这条输入与产物链；它不调用 `run_task()`，不启动 Docker，并将所有题显式记为 `mocked` 而非通过、失败或基础设施错误。
+
 ## 为什么规则证据优先于 LLM 判断
 
 设计文档的问题四明确指出，单纯依赖 LLM-as-judge 会产生误报、无法复现的缺陷描述、结果不稳定等问题。v0.1 的应对方式是：
@@ -35,4 +49,5 @@
 | `evaluator/` | 四层对齐判断 + 证书聚合 | 反例搜索本身 |
 | `counterexample/` | 差分执行、最小化 | 判断"是否算错误" |
 | `pipeline/` | 固定编排顺序 | 具体算法细节 |
+| `evalplus/` | 阶段一严格导出、官方 EvalPlus 容器执行、脱敏与续跑 | Provider/LLM、宿主执行、四层评估 |
 | `reporting/` | 指标计算、结果序列化 | 数据采集 |

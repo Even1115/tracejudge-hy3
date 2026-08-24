@@ -28,6 +28,15 @@ from tracejudge_hy3.dataset.humanevalplus import (
     validate_problem_dataset,
 )
 from tracejudge_hy3.dataset.loader import load_problem_by_id, load_problems
+from tracejudge_hy3.evalplus import (
+    DockerLimits,
+    EvalPlusDockerRunner,
+    EvalPlusExperimentError,
+    EvalPlusExportError,
+    MockEvalPlusExecutor,
+    new_evalplus_run_id,
+    run_evalplus_experiment,
+)
 from tracejudge_hy3.exceptions import DatasetError, TraceJudgeError
 from tracejudge_hy3.pipeline.runner import PipelineResult, run_pipeline, select_backend
 from tracejudge_hy3.providers.base import LLMProvider
@@ -60,8 +69,8 @@ DEFAULT_DATASET = str(data_path("sample_problems.jsonl"))
 def _reject_phase1_projection_execution(problems: list[ProblemSpec]) -> None:
     if any(problem.source == HUMANEVALPLUS_DATASET_SOURCE for problem in problems):
         raise DatasetError(
-            "HumanEval+ 公共投影仅支持 `tracejudge baseline`；"
-            "阶段二官方 EvalPlus 执行适配尚未实现，不能使用 run/batch"
+            "HumanEval+ 公共投影阶段一仅支持 baseline，不能使用 run/batch；"
+            "请对已完成的阶段一产物使用独立的 `tracejudge evalplus`"
         )
 
 
@@ -343,6 +352,139 @@ def baseline(
     console.print(f"[dim]summary: {result.summary_path}[/dim]")
 
     if summary["failure_count"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("evalplus")
+def evalplus_command(
+    baseline_run: str = typer.Option(
+        ...,
+        "--baseline-run",
+        help="已完成的阶段一 HumanEval+ 10 题 run 目录",
+    ),
+    dataset_manifest: str = typer.Option(
+        ...,
+        "--dataset-manifest",
+        help="与阶段一绑定的 10 题 dataset_manifest.json",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase2",
+        "--output-dir",
+        help="仓库内且被 .gitignore 覆盖的阶段二运行目录父目录",
+    ),
+    executor: str = typer.Option(
+        "docker",
+        "--executor",
+        help="'docker' 执行官方 EvalPlus，'mock' 仅验证产物链路且不执行候选代码",
+    ),
+    resume_run_id: str | None = typer.Option(
+        None,
+        "--resume-run-id",
+        help="续跑既有 run_id；输入、provenance、镜像或限制变化时会拒绝",
+    ),
+    parallel: int = typer.Option(
+        2,
+        "--parallel",
+        min=1,
+        max=16,
+        help="宿主同时运行的单题容器数（官方容器内 parallel 固定为 1）",
+    ),
+    per_task_timeout: float = typer.Option(
+        180.0,
+        "--per-task-timeout",
+        min=1.0,
+        help="每题容器的外层超时秒数",
+    ),
+    batch_timeout: float = typer.Option(
+        900.0,
+        "--batch-timeout",
+        min=1.0,
+        help="整批调度超时秒数",
+    ),
+) -> None:
+    """阶段二：从阶段一安全导出代码，使用隔离的官方 EvalPlus 执行器评测。"""
+
+    if executor not in {"docker", "mock"}:
+        raise typer.BadParameter("--executor 必须是 'docker' 或 'mock'")
+    if batch_timeout < per_task_timeout:
+        raise typer.BadParameter("--batch-timeout 不能小于 --per-task-timeout")
+
+    effective_run_id = resume_run_id or new_evalplus_run_id()
+    run_path = Path(output_dir).expanduser().resolve() / effective_run_id
+    action = "续跑" if resume_run_id is not None else "新建"
+    console.print(f"[cyan]阶段二 {action} run_id: {effective_run_id}[/cyan]")
+    console.print(f"[dim]产物目录: {run_path}[/dim]")
+
+    selected_executor = (
+        MockEvalPlusExecutor()
+        if executor == "mock"
+        else EvalPlusDockerRunner(limits=DockerLimits(per_task_timeout_seconds=per_task_timeout))
+    )
+    try:
+        result = run_evalplus_experiment(
+            baseline_run_dir=baseline_run,
+            dataset_manifest_path=dataset_manifest,
+            output_dir=output_dir,
+            executor=selected_executor,
+            run_id=effective_run_id,
+            resume=resume_run_id is not None,
+            max_workers=parallel,
+            per_task_timeout_seconds=per_task_timeout,
+            batch_timeout_seconds=batch_timeout,
+        )
+    except (EvalPlusExportError, EvalPlusExperimentError, OSError, ValueError) as exc:
+        # EvalPlus failures may originate while handling candidate source or
+        # evaluation-only data.  Never echo exception text to the terminal;
+        # public artifacts and bounded allowlisted logs carry safe diagnostics.
+        console.print(
+            "[red]阶段二 EvalPlus 运行失败；为避免泄露候选或隐藏测试，未输出原始异常详情。[/red]"
+        )
+        raise typer.Exit(code=1) from exc
+
+    summary = result.summary
+    actual = int(summary["actual_execution_count"])
+    base_rate = summary.get("base_pass_rate")
+    plus_rate = summary.get("base_plus_pass_rate")
+    average_duration = summary.get("average_duration_seconds")
+
+    def rate(value: object) -> str:
+        return "N/A" if value is None else f"{float(value):.2%}"
+
+    duration = "N/A" if average_duration is None else f"{float(average_duration):.3f}s"
+
+    table = Table(title=f"阶段二 EvalPlus：{result.run_id}")
+    table.add_column("统计")
+    table.add_column("结果")
+    table.add_row("固定题目总数", str(summary["total_problem_count"]))
+    table.add_row("实际执行数", str(actual))
+    table.add_row(
+        "Base 通过",
+        f"{summary['base_pass_count']}/{actual} ({rate(base_rate)})" if actual else "N/A",
+    )
+    table.add_row(
+        "Base+Extra 通过",
+        f"{summary['base_plus_pass_count']}/{actual} ({rate(plus_rate)})" if actual else "N/A",
+    )
+    table.add_row("Timeout", str(summary["timeout_count"]))
+    table.add_row(
+        "错误答案/候选异常（官方状态不可细分）",
+        str(summary["wrong_answer_or_candidate_exception_count"]),
+    )
+    table.add_row("可单独观测的 execution error", "N/A（EvalPlus v0.3.1 不提供）")
+    table.add_row("基础设施错误", str(summary["infrastructure_error_count"]))
+    table.add_row("平均逐题容器耗时", duration)
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]samples: {result.samples_path}[/dim]")
+    console.print(f"[dim]safe results: {result.results_path}[/dim]")
+    console.print(f"[dim]summary: {result.summary_path}[/dim]")
+    console.print(
+        "[yellow]这是固定 10 题、单样本的 generation→execution 工程 pilot，"
+        "不是完整 HumanEval+ 成绩或正式 benchmark 排名。[/yellow]"
+    )
+    if executor == "mock":
+        console.print("[yellow]Mock dry run 未执行任何候选代码或官方测试。[/yellow]")
+    if summary["infrastructure_error_count"]:
         raise typer.Exit(code=1)
 
 

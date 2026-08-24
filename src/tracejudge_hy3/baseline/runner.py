@@ -26,7 +26,46 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from tracejudge_hy3.dataset.humanevalplus import (
+    ADAPTER_NAME as HUMANEVALPLUS_ADAPTER_NAME,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    ADAPTER_VERSION as HUMANEVALPLUS_ADAPTER_VERSION,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    DATASET_ID as HUMANEVALPLUS_DATASET_ID,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    DATASET_SOURCE as HUMANEVALPLUS_DATASET_SOURCE,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    EXPECTED_RECORD_COUNT as HUMANEVALPLUS_RECORD_COUNT,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    FULL_EXPERIMENT_LABEL as HUMANEVALPLUS_FULL_LABEL,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    FULL_SELECTION_ALGORITHM as HUMANEVALPLUS_FULL_SELECTION,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    KNOWN_WITHHELD_FIELDS as HUMANEVALPLUS_WITHHELD_FIELDS,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    PILOT_EXPERIMENT_LABEL as HUMANEVALPLUS_PILOT_LABEL,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    PILOT_LIMITATIONS as HUMANEVALPLUS_PILOT_LIMITATIONS,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    SELECTION_ALGORITHM as HUMANEVALPLUS_SELECTION_ALGORITHM,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    ordered_problem_ids_sha256,
+    select_humanevalplus_problem_ids,
+    validate_humanevalplus_public_problems,
+)
 from tracejudge_hy3.dataset.loader import load_problems
+from tracejudge_hy3.exceptions import DatasetError
 from tracejudge_hy3.redaction import (
     is_sensitive_key as _is_sensitive_key,
 )
@@ -43,6 +82,8 @@ ResponseStatus = Literal["success", "parse_error", "provider_error", "skipped"]
 _ALLOWED_PROVIDER_STATUSES = {"success", "parse_error", "provider_error"}
 _DIRECT_DEPENDENCIES = ("pydantic", "pydantic-settings", "openai", "typer", "rich")
 _RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_EXPERIMENT_LABEL_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
+_SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
 class GenerationDetails(Protocol):
@@ -320,6 +361,247 @@ def _experiment_label(problems: Sequence[ProblemSpec]) -> str:
     if sources == {"self_constructed_mvp_fixture"}:
         return "self_constructed_mvp_fixture_pilot"
     return "phase1_baseline_generation"
+
+
+def _manifest_text(payload: Mapping[str, Any], field: str) -> str:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value or len(value) > 512:
+        raise BaselineExperimentError(f"dataset manifest field {field!r} must be a safe string")
+    return _redact_text(value)
+
+
+def _manifest_sha256(payload: Mapping[str, Any], field: str) -> str:
+    value = _manifest_text(payload, field)
+    if not _SHA256_PATTERN.fullmatch(value):
+        raise BaselineExperimentError(f"dataset manifest field {field!r} must be SHA256")
+    return value
+
+
+def _load_dataset_provenance(
+    manifest_path: str | Path,
+    *,
+    dataset_hash: str,
+    problems: Sequence[ProblemSpec],
+) -> tuple[str, dict[str, Any]]:
+    """Validate and allowlist a public-projection manifest for phase one.
+
+    The baseline artifact stores identity metadata and cryptographic hashes,
+    never arbitrary manifest fields or evaluation material.
+    """
+
+    resolved = Path(manifest_path).expanduser().resolve()
+    try:
+        manifest_bytes = resolved.read_bytes()
+        payload = json.loads(manifest_bytes.decode("utf-8"))
+    except FileNotFoundError as exc:
+        raise BaselineExperimentError(f"dataset manifest not found: {resolved}") from exc
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        raise BaselineExperimentError("dataset manifest is not valid UTF-8 JSON") from None
+    if not isinstance(payload, Mapping):
+        raise BaselineExperimentError("dataset manifest must contain a JSON object")
+    if payload.get("schema_version") != 1:
+        raise BaselineExperimentError("dataset manifest schema_version must be 1")
+
+    experiment_label = _manifest_text(payload, "experiment_label")
+    if not _EXPERIMENT_LABEL_PATTERN.fullmatch(experiment_label):
+        raise BaselineExperimentError("dataset manifest experiment_label is invalid")
+    if payload.get("metrics_scope") != "generation_and_parsing_only":
+        raise BaselineExperimentError(
+            "dataset manifest metrics_scope must be 'generation_and_parsing_only'"
+        )
+    kind = _manifest_text(payload, "kind")
+    if kind not in {
+        "tracejudge_humanevalplus_public_projection",
+        "tracejudge_dataset_selection",
+    }:
+        raise BaselineExperimentError("dataset manifest kind is not supported by baseline")
+    common_fields = {
+        "schema_version",
+        "kind",
+        "experiment_label",
+        "metrics_scope",
+        "dataset_id",
+        "source",
+        "revision",
+        "split",
+        "license",
+        "adapter",
+        "source_manifest_sha256",
+        "raw_snapshot",
+        "public_projection",
+        "selection",
+        "withheld_fields",
+    }
+    expected_fields = (
+        common_fields
+        if kind == "tracejudge_humanevalplus_public_projection"
+        else common_fields | {"parent_manifest_sha256", "limitations"}
+    )
+    if set(payload) != expected_fields:
+        raise BaselineExperimentError("dataset manifest contains fields outside its schema")
+
+    projection = payload.get("public_projection")
+    selection = payload.get("selection")
+    adapter = payload.get("adapter")
+    raw_snapshot = payload.get("raw_snapshot")
+    if not all(
+        isinstance(item, Mapping) for item in (projection, selection, adapter, raw_snapshot)
+    ):
+        raise BaselineExperimentError("dataset manifest is missing structured provenance fields")
+    assert isinstance(projection, Mapping)
+    assert isinstance(selection, Mapping)
+    assert isinstance(adapter, Mapping)
+    assert isinstance(raw_snapshot, Mapping)
+    if set(projection) != {
+        "path",
+        "sha256",
+        "record_count",
+        "ordered_problem_ids_sha256",
+    }:
+        raise BaselineExperimentError("dataset manifest projection fields are invalid")
+    expected_selection_fields = (
+        {"algorithm", "count", "selected_problem_ids"}
+        if kind == "tracejudge_humanevalplus_public_projection"
+        else {"algorithm", "seed", "count", "selected_problem_ids"}
+    )
+    if set(selection) != expected_selection_fields:
+        raise BaselineExperimentError("dataset manifest selection fields are invalid")
+    if set(raw_snapshot) != {"aggregate_sha256", "test_jsonl_sha256", "record_count"}:
+        raise BaselineExperimentError("dataset manifest raw snapshot fields are invalid")
+
+    try:
+        validate_humanevalplus_public_problems(
+            problems,
+            require_complete_snapshot=(kind == "tracejudge_humanevalplus_public_projection"),
+        )
+    except DatasetError as exc:
+        raise BaselineExperimentError(str(exc)) from None
+
+    if _manifest_sha256(projection, "sha256") != dataset_hash:
+        raise BaselineExperimentError(
+            "dataset manifest public projection SHA256 differs from --dataset"
+        )
+    if projection.get("record_count") != len(problems):
+        raise BaselineExperimentError(
+            "dataset manifest public projection count differs from --dataset"
+        )
+    if projection.get("path") != "problems.jsonl":
+        raise BaselineExperimentError("dataset manifest public projection path is invalid")
+    problem_ids = [problem.problem_id for problem in problems]
+    expected_order_hash = ordered_problem_ids_sha256(problem_ids)
+    if _manifest_sha256(projection, "ordered_problem_ids_sha256") != expected_order_hash:
+        raise BaselineExperimentError(
+            "dataset manifest ordered problem ID hash differs from --dataset"
+        )
+    selected_ids = selection.get("selected_problem_ids")
+    if selected_ids != problem_ids or selection.get("count") != len(problems):
+        raise BaselineExperimentError(
+            "dataset manifest selected problem IDs differ from --dataset order"
+        )
+
+    dataset_id = _manifest_text(payload, "dataset_id")
+    revision = _manifest_text(payload, "revision")
+    source = _manifest_text(payload, "source")
+    license_name = _manifest_text(payload, "license")
+    adapter_name = _manifest_text(adapter, "name")
+    adapter_version = adapter.get("version")
+    if dataset_id != HUMANEVALPLUS_DATASET_ID or source != HUMANEVALPLUS_DATASET_SOURCE:
+        raise BaselineExperimentError("dataset manifest HumanEval+ identity is invalid")
+    if re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise BaselineExperimentError("dataset manifest HumanEval+ revision is invalid")
+    if license_name != "apache-2.0" or payload.get("split") != "test":
+        raise BaselineExperimentError("dataset manifest HumanEval+ split/license is invalid")
+    if (
+        adapter_name != HUMANEVALPLUS_ADAPTER_NAME
+        or adapter_version != HUMANEVALPLUS_ADAPTER_VERSION
+    ):
+        raise BaselineExperimentError("dataset manifest HumanEval+ adapter identity is invalid")
+    raw_aggregate = _manifest_sha256(raw_snapshot, "aggregate_sha256")
+    raw_test_jsonl = _manifest_sha256(raw_snapshot, "test_jsonl_sha256")
+    if raw_snapshot.get("record_count") != HUMANEVALPLUS_RECORD_COUNT:
+        raise BaselineExperimentError("HumanEval+ raw snapshot must record 164 tasks")
+
+    algorithm = _manifest_text(selection, "algorithm")
+    seed = selection.get("seed")
+    if kind == "tracejudge_humanevalplus_public_projection":
+        expected_label = HUMANEVALPLUS_FULL_LABEL
+        if len(problems) != HUMANEVALPLUS_RECORD_COUNT:
+            raise BaselineExperimentError("full HumanEval+ projection must contain 164 tasks")
+        if algorithm != HUMANEVALPLUS_FULL_SELECTION or seed is not None:
+            raise BaselineExperimentError("full HumanEval+ selection identity is invalid")
+    else:
+        expected_label = (
+            HUMANEVALPLUS_PILOT_LABEL
+            if len(problems) == 10
+            else f"humanevalplus_{len(problems)}_public_prompt_generation_pilot"
+        )
+        if algorithm != HUMANEVALPLUS_SELECTION_ALGORITHM or not isinstance(seed, int):
+            raise BaselineExperimentError("HumanEval+ pilot selection identity is invalid")
+        try:
+            expected_selected_ids = list(
+                select_humanevalplus_problem_ids(count=len(problems), seed=seed)
+            )
+        except DatasetError as exc:
+            raise BaselineExperimentError(str(exc)) from None
+        if problem_ids != expected_selected_ids:
+            raise BaselineExperimentError(
+                "HumanEval+ pilot selection does not match its deterministic seed"
+            )
+    if experiment_label != expected_label:
+        raise BaselineExperimentError(
+            "dataset manifest experiment label does not match its selection"
+        )
+    if kind == "tracejudge_dataset_selection" and payload.get("limitations") != list(
+        HUMANEVALPLUS_PILOT_LIMITATIONS
+    ):
+        raise BaselineExperimentError("HumanEval+ pilot limitations identity is invalid")
+    withheld_fields = payload.get("withheld_fields")
+    if (
+        not isinstance(withheld_fields, list)
+        or not all(isinstance(field, str) and field for field in withheld_fields)
+        or not {"canonical_solution", "test"} <= set(withheld_fields)
+        or not set(withheld_fields) <= set(HUMANEVALPLUS_WITHHELD_FIELDS)
+    ):
+        raise BaselineExperimentError("dataset manifest withheld_fields must be a string list")
+
+    source_manifest_hash = _manifest_sha256(payload, "source_manifest_sha256")
+    parent_manifest_hash = (
+        _manifest_sha256(payload, "parent_manifest_sha256")
+        if kind == "tracejudge_dataset_selection"
+        else None
+    )
+
+    identity: dict[str, Any] = {
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "kind": kind,
+        "dataset_id": dataset_id,
+        "revision": revision,
+        "source": source,
+        "license": license_name,
+        "adapter": {"name": adapter_name, "version": adapter_version},
+        "raw_snapshot": {
+            "aggregate_sha256": raw_aggregate,
+            "test_jsonl_sha256": raw_test_jsonl,
+            "record_count": raw_snapshot.get("record_count"),
+        },
+        "public_projection": {
+            "sha256": dataset_hash,
+            "record_count": len(problems),
+            "ordered_problem_ids_sha256": expected_order_hash,
+        },
+        "selection": {
+            "algorithm": algorithm,
+            "seed": seed,
+            "count": len(problems),
+            "selected_problem_ids": [_redact_text(problem_id) for problem_id in problem_ids],
+        },
+        "withheld_fields": sorted(_redact_text(field) for field in withheld_fields),
+        "metrics_scope": "generation_and_parsing_only",
+        "source_manifest_sha256": source_manifest_hash,
+    }
+    if parent_manifest_hash is not None:
+        identity["parent_manifest_sha256"] = parent_manifest_hash
+    return experiment_label, identity
 
 
 def _git_command(repository_hint: Path, *arguments: str) -> str | None:
@@ -722,6 +1004,7 @@ def _successful_problem_ids(records: Sequence[Mapping[str, Any]]) -> set[str]:
 def _summary_payload(
     *,
     run_id: str,
+    experiment_label: str,
     problems: Sequence[ProblemSpec],
     records: Sequence[Mapping[str, Any]],
     invocation_id: str,
@@ -761,7 +1044,7 @@ def _summary_payload(
     )
     return {
         "run_id": run_id,
-        "experiment_label": _experiment_label(problems),
+        "experiment_label": experiment_label,
         "updated_at": _iso_utc(completed_or_updated),
         "completed_at": (
             _iso_utc(invocation_completed_at) if invocation_completed_at is not None else None
@@ -807,6 +1090,8 @@ def _initial_manifest(
     run_id: str,
     dataset_path: Path,
     dataset_hash: str,
+    dataset_provenance: Mapping[str, Any] | None,
+    experiment_label: str,
     problems: Sequence[ProblemSpec],
     provider_config: Mapping[str, Any],
     git_metadata: Mapping[str, Any],
@@ -817,7 +1102,7 @@ def _initial_manifest(
     return {
         "schema_version": 1,
         "phase": "phase1_baseline_generation",
-        "experiment_label": _experiment_label(problems),
+        "experiment_label": experiment_label,
         "run_id": run_id,
         "created_at": _iso_utc(started_at),
         "status": "running",
@@ -826,6 +1111,7 @@ def _initial_manifest(
             "path": _redact_text(str(dataset_path)),
             "sha256": dataset_hash,
             **_dataset_summary(problems),
+            **({"provenance": dict(dataset_provenance)} if dataset_provenance is not None else {}),
         },
         "git": dict(git_metadata),
         "environment": dict(environment_metadata),
@@ -849,6 +1135,8 @@ def _validate_resume(
     manifest: Mapping[str, Any],
     run_id: str,
     dataset_hash: str,
+    dataset_provenance: Mapping[str, Any] | None,
+    experiment_label: str,
     provider_config: Mapping[str, Any],
     git_metadata: Mapping[str, Any],
     environment_metadata: Mapping[str, Any],
@@ -860,6 +1148,17 @@ def _validate_resume(
     if recorded_hash != dataset_hash:
         raise BaselineExperimentError(
             "cannot resume: dataset SHA256 differs from the existing manifest"
+        )
+    recorded_provenance = dataset.get("provenance") if isinstance(dataset, Mapping) else None
+    if recorded_provenance != (
+        dict(dataset_provenance) if dataset_provenance is not None else None
+    ):
+        raise BaselineExperimentError(
+            "cannot resume: dataset provenance manifest differs from the existing manifest"
+        )
+    if manifest.get("experiment_label") != experiment_label:
+        raise BaselineExperimentError(
+            "cannot resume: experiment label differs from the existing manifest"
         )
     if manifest.get("provider_config") != dict(provider_config):
         raise BaselineExperimentError(
@@ -952,6 +1251,7 @@ async def _run_baseline_experiment_open_provider(
     output_dir: str | Path,
     run_id: str | None = None,
     resume: bool = False,
+    dataset_manifest_path: str | Path | None = None,
 ) -> BaselineRunResult:
     """Generate and persist phase-one baselines without executing candidate code.
 
@@ -963,6 +1263,7 @@ async def _run_baseline_experiment_open_provider(
         run_id: Optional explicit identifier.  Required when ``resume`` is true.
         resume: Resume an existing run, skipping every problem that has any
             historical ``success`` event.
+        dataset_manifest_path: Optional, hash-bound public provenance manifest.
 
     Raises:
         BaselineExperimentError: If creation/resume validation is unsafe.
@@ -982,6 +1283,22 @@ async def _run_baseline_experiment_open_provider(
     except FileNotFoundError as exc:
         raise BaselineExperimentError(f"dataset file not found: {resolved_dataset_path}") from exc
     problems = load_problems(resolved_dataset_path)
+    contains_humanevalplus = any(
+        problem.source == HUMANEVALPLUS_DATASET_SOURCE for problem in problems
+    )
+    if contains_humanevalplus and dataset_manifest_path is None:
+        raise BaselineExperimentError(
+            "HumanEval+ public projections require --dataset-manifest before provider calls"
+        )
+    if dataset_manifest_path is None:
+        experiment_label = _experiment_label(problems)
+        dataset_provenance: dict[str, Any] | None = None
+    else:
+        experiment_label, dataset_provenance = _load_dataset_provenance(
+            dataset_manifest_path,
+            dataset_hash=dataset_hash,
+            problems=problems,
+        )
     paths = _run_paths(output_dir, effective_run_id)
     provider_config = _public_provider_config(provider)
     git_metadata = _git_metadata(
@@ -1000,6 +1317,8 @@ async def _run_baseline_experiment_open_provider(
             manifest=manifest,
             run_id=effective_run_id,
             dataset_hash=dataset_hash,
+            dataset_provenance=dataset_provenance,
+            experiment_label=experiment_label,
             provider_config=provider_config,
             git_metadata=git_metadata,
             environment_metadata=environment_metadata,
@@ -1024,6 +1343,8 @@ async def _run_baseline_experiment_open_provider(
             run_id=effective_run_id,
             dataset_path=resolved_dataset_path,
             dataset_hash=dataset_hash,
+            dataset_provenance=dataset_provenance,
+            experiment_label=experiment_label,
             problems=problems,
             provider_config=provider_config,
             git_metadata=git_metadata,
@@ -1037,6 +1358,7 @@ async def _run_baseline_experiment_open_provider(
 
     initial_summary = _summary_payload(
         run_id=effective_run_id,
+        experiment_label=experiment_label,
         problems=problems,
         records=records,
         invocation_id=invocation_id,
@@ -1087,6 +1409,7 @@ async def _run_baseline_experiment_open_provider(
         records.append(record)
         current_summary = _summary_payload(
             run_id=effective_run_id,
+            experiment_label=experiment_label,
             problems=problems,
             records=records,
             invocation_id=invocation_id,
@@ -1098,6 +1421,7 @@ async def _run_baseline_experiment_open_provider(
     completed_at = _utc_now()
     summary = _summary_payload(
         run_id=effective_run_id,
+        experiment_label=experiment_label,
         problems=problems,
         records=records,
         invocation_id=invocation_id,
@@ -1128,6 +1452,7 @@ async def run_baseline_experiment(
     output_dir: str | Path,
     run_id: str | None = None,
     resume: bool = False,
+    dataset_manifest_path: str | Path | None = None,
 ) -> BaselineRunResult:
     """Run phase-one generation and always release the supplied provider.
 
@@ -1143,6 +1468,7 @@ async def run_baseline_experiment(
             output_dir=output_dir,
             run_id=run_id,
             resume=resume,
+            dataset_manifest_path=dataset_manifest_path,
         )
     finally:
         await provider.aclose()

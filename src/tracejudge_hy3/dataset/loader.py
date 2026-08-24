@@ -30,7 +30,25 @@ def load_problems(path: str | Path) -> list[ProblemSpec]:
             try:
                 problem = ProblemSpec.model_validate(payload)
             except ValidationError as exc:
-                raise DatasetError(f"{path}:{lineno}: schema validation failed: {exc}") from exc
+                # Pydantic's default error rendering includes ``input_value``.
+                # Dataset rows may contain withheld benchmark answers, tests, or
+                # credentials under an unexpected field, so never echo the
+                # validation exception (or retain it as a traceback cause).
+                issue_types = sorted(
+                    {
+                        str(issue.get("type", "validation_error"))
+                        for issue in exc.errors(
+                            include_url=False,
+                            include_context=False,
+                            include_input=False,
+                        )
+                    }
+                )
+                safe_types = ", ".join(issue_types[:5]) or "validation_error"
+                raise DatasetError(
+                    f"{path}:{lineno}: schema validation failed "
+                    f"({exc.error_count()} issue(s); types: {safe_types})"
+                ) from None
             if problem.problem_id in seen_ids:
                 raise DatasetError(f"{path}:{lineno}: duplicate problem_id '{problem.problem_id}'")
             seen_ids.add(problem.problem_id)

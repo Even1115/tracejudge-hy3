@@ -71,7 +71,8 @@ TraceJudge-Hy3 不只判断代码是否通过测试，还尝试验证它是否"�
 - 规则证据 + LLM 判断的四层评估：空输入声明—代码不一致、集合声明—代码不一致、单次遍历声明—嵌套循环不一致、复杂度声明不一致、执行失败归因（[`src/tracejudge_hy3/evaluator/`](src/tracejudge_hy3/evaluator/)）。
 - 反例生成：优先复用与当前违反需求条款相关的 challenge/hidden 测试失败结果，其次基于相关测试的参数形状生成有限边界候选并与参考实现差分执行，并对列表参数做简单 delta-debugging 最小化（[`src/tracejudge_hy3/counterexample/`](src/tracejudge_hy3/counterexample/)）。
 - 可执行错误证书聚合：新疑似问题直接产生 `confirmed_bug` / `strongly_supported` / `unverified_suspicion` 三种裁决。普通首次运行正确时不产生证书；`cleared` 仅用于显式传入既有证书后，复核的完整执行证据表明原疑似问题不再成立的状态转移（[`src/tracejudge_hy3/evaluator/evidence.py`](src/tracejudge_hy3/evaluator/evidence.py)）。
-- CLI（Typer + Rich）：`doctor` / `demo` / `baseline` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
+- CLI（Typer + Rich）：`doctor` / `demo` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
+- HumanEval+ 阶段一公开投影适配器：校验本地固定 revision 快照及其受控来源 manifest，把 164 道公开题面转换为不含答案/测试的 `ProblemSpec`，并仅依据公开 `problem_id` 生成固定种子 10 题 Pilot（[`src/tracejudge_hy3/dataset/humanevalplus.py`](src/tracejudge_hy3/dataset/humanevalplus.py)）。
 - 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`），来源标记为 `self_constructed_mvp_fixture`（见 §10 和 §15）。
 - 指标计算：10 个纯函数指标，缺少人工标注时返回 `not_computable` 而不是伪造数值（[`src/tracejudge_hy3/reporting/metrics.py`](src/tracejudge_hy3/reporting/metrics.py)）。
 - 单元测试与集成测试（`pytest`），Lint（`ruff`）。
@@ -80,7 +81,7 @@ TraceJudge-Hy3 不只判断代码是否通过测试，还尝试验证它是否"�
 
 见 [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) 的完整分类，摘要如下：
 
-- HumanEval / MBPP 等公开 benchmark 的自动下载与大规模评测；
+- HumanEval+ 数据的自动下载、官方 EvalPlus 测试执行和功能评分，以及 MBPP+ 接入与大规模评测；
 - 反事实配对挑战集、人工标注集、消融实验、对照实验；
 - Web 前端、多 Agent 编排；
 - 仓库级代码修改、多文件生成、多语言执行；
@@ -146,7 +147,7 @@ tracejudge baseline \
   --output-dir artifacts/experiments/phase1
 ```
 
-新运行会自动生成唯一 `run_id`，并在第一次模型调用前显示 `run_id` 和产物目录。若一次运行中断，可在数据集 SHA256、Provider 公开配置、TraceJudge Git commit/工作树指纹以及 Python/直接依赖环境未变的前提下续跑：
+新运行会自动生成唯一 `run_id`，并在第一次模型调用前显示 `run_id` 和产物目录。若一次运行中断，可在数据集 SHA256、数据集 provenance/实验标签（传入 manifest 时）、Provider 公开配置、TraceJudge Git commit/工作树指纹以及 Python/直接依赖环境未变的前提下续跑：
 
 ```bash
 tracejudge baseline \
@@ -169,11 +170,69 @@ tracejudge baseline \
 └── summary.json
 ```
 
-- `manifest.json` 记录数据集绝对路径、SHA256 与摘要，Git commit/分支/工作树状态与指纹，Python 和直接依赖版本，以及 Provider、模型、`reasoning_effort`、超时和最大重试次数等显式允许的非敏感配置。Hy3 会先从 endpoint 剔除 userinfo、query 和 fragment，再保存规范化 endpoint 的 SHA256 以便一致性校验，不保存 endpoint 本身；API Key、Authorization Header、完整请求头和其他凭据均不写入。
+- `manifest.json` 记录数据集绝对路径、SHA256 与摘要，Git commit/分支/工作树状态与指纹，Python 和直接依赖版本，以及 Provider、模型、`reasoning_effort`、超时和最大重试次数等显式允许的非敏感配置。传入受支持的 `--dataset-manifest` 时，还会保存经白名单筛选的 revision、许可证、适配器、原始快照/公开投影哈希、确定性选择参数和 manifest SHA256。Hy3 会先从 endpoint 剔除 userinfo、query 和 fragment，再保存规范化 endpoint 的 SHA256 以便一致性校验，不保存 endpoint 本身；API Key、Authorization Header、完整请求头和其他凭据均不写入。
 - `responses.jsonl` 是 UTF-8 事件日志，每题记录 `started_at` / `ended_at` / `duration_seconds`、尝试与重试次数、`raw_output_attempt` / `parse_attempted` / `parse_status`和结构化错误，并将凭据安全脱敏后的 `raw_output` 与解析后的 `solution_trace` 分开保存。解析错误摘要不包含 Pydantic `input_value`，修复轮也只回传脱敏后的旧输出。状态仅为 `success` / `parse_error` / `provider_error` / `skipped`。每条记录都先写入同目录临时文件，再原子替换；单题失败或非法 Unicode 字符不会中止后续题目。
 - `summary.json` 的“最终结果”按每个题目最后一条非 `skipped` 事件统计成功数、解析失败数、Provider 失败数、失败总数、待处理数和平均耗时。`parse_success_rate = parsed / (parsed + failed)`；根本没有可解析输出的 Provider 失败不进入分母，但“先解析失败、后续请求又失败”的混合序列会进入分母。它另外保留全部事件数与本次续跑的 `skipped` 计数，但不计算功能正确率、错误检测率或其他阶段二及以后的指标。
 
 `data/sample_problems.jsonl` 在基线产物中固定标记为 `self_constructed_mvp_fixture_pilot`。这是自建工程 Fixture 的小规模 pilot，不是 HumanEval+、MBPP+ 或任何正式 benchmark 结果。
+
+### HumanEval+ 固定 10 题阶段一 Pilot
+
+本仓库提交了受控来源 manifest [`data/manifests/evalplus_humanevalplus_d32357cf.json`](data/manifests/evalplus_humanevalplus_d32357cf.json)，但**不提交也不自动下载**原始 HumanEval+ 内容。先把指定 revision 的完整 Hugging Face 快照放到已被 Git 忽略的 `artifacts/datasets/raw/humanevalplus/`。例如，已安装 `hf` CLI 时可执行：
+
+```bash
+hf download evalplus/humanevalplus \
+  --repo-type dataset \
+  --revision d32357cf319e50e9c8d8dab5ea876c72b0fd321b \
+  --local-dir artifacts/datasets/raw/humanevalplus
+```
+
+项目转换命令本身是离线的，并会在发布任何输出前核对 revision、许可证、164 条题目，以及来源 manifest 中列出的完整原始快照大小和 SHA256。随后依次转换公开投影、按固定种子抽取 10 题并校验：
+
+```bash
+tracejudge dataset convert-humanevalplus \
+  --input artifacts/datasets/raw/humanevalplus/test.jsonl \
+  --revision d32357cf319e50e9c8d8dab5ea876c72b0fd321b \
+  --manifest data/manifests/evalplus_humanevalplus_d32357cf.json \
+  --output-dir artifacts/datasets/processed/humanevalplus-full
+
+tracejudge dataset sample \
+  --dataset artifacts/datasets/processed/humanevalplus-full/problems.jsonl \
+  --manifest artifacts/datasets/processed/humanevalplus-full/dataset_manifest.json \
+  --count 10 \
+  --seed 20260824 \
+  --output-dir artifacts/datasets/processed/humanevalplus-pilot-10
+
+tracejudge dataset validate \
+  --dataset artifacts/datasets/processed/humanevalplus-pilot-10/problems.jsonl
+```
+
+该选择算法只组合固定种子与公开 `problem_id`；当前固定结果按数值顺序为 `HumanEval/8`、`HumanEval/26`、`HumanEval/41`、`HumanEval/51`、`HumanEval/70`、`HumanEval/81`、`HumanEval/95`、`HumanEval/96`、`HumanEval/105`、`HumanEval/120`。转换目录与 Pilot 目录都采用完整目录原子发布：同内容重跑幂等，已有目录内容不同时会拒绝覆盖。
+
+真实 Hy3 阶段一生成必须同时传入 Pilot manifest：
+
+```bash
+tracejudge baseline \
+  --dataset artifacts/datasets/processed/humanevalplus-pilot-10/problems.jsonl \
+  --dataset-manifest artifacts/datasets/processed/humanevalplus-pilot-10/dataset_manifest.json \
+  --provider hy3 \
+  --output-dir artifacts/experiments/phase1
+```
+
+HumanEval+ 公开投影的 `visible_test_cases`、`hidden_test_cases`、`challenge_test_cases` 均为空，`reference_code` 是固定的 withheld sentinel，`difficulty` 为 `unknown`。只有公开的 `task_id`、`prompt` 和 `entry_point` 参与投影；`canonical_solution` 和官方 `test` 不会复制到投影、Pilot bundle、Solver Prompt 或基线产物中，仍只存在于被 Git 忽略的本地原始快照。缺少 `--dataset-manifest` 或 manifest 与数据集哈希、题目顺序/选择、revision、许可证、适配器等不一致时，`baseline` 会在 Provider 调用前拒绝运行。
+
+若需续跑，应原样提供同一数据集和同一 manifest：
+
+```bash
+tracejudge baseline \
+  --dataset artifacts/datasets/processed/humanevalplus-pilot-10/problems.jsonl \
+  --dataset-manifest artifacts/datasets/processed/humanevalplus-pilot-10/dataset_manifest.json \
+  --provider hy3 \
+  --output-dir artifacts/experiments/phase1 \
+  --resume-run-id <run_id>
+```
+
+续跑除通用运行环境外还会精确比较已记录的 provenance（包括 manifest SHA256）和 `experiment_label`。该 10 题运行的标签固定为 `humanevalplus_10_public_prompt_generation_pilot`，统计范围固定为 `generation_and_parsing_only`：它只报告生成/解析成功、失败和耗时，**不执行候选代码或官方测试，不产生功能正确率、HumanEval+ 分数或 pass@k，也不是正式 benchmark 结果**。`run` / `batch` 会明确拒绝这类公开投影，直到阶段二实现独立的 EvalPlus 执行适配器。内置 Mock Provider 没有这 10 题的离线答案 Fixture；真实 Pilot 应使用 `--provider hy3`，普通单元测试仍不依赖网络或真实 Hy3。
 
 ## 7. 配置真实 Hy3
 
@@ -236,6 +295,8 @@ tracejudge run --dataset data/sample_problems.jsonl --problem-id safe_mean \
 - `TestCase.expected` 支持一种特殊约定：`{"raises": "ValueError"}` 表示该用例期望抛出指定异常（用于 `clamp` 的非法区间测试），其余情况下 `expected` 就是普通 JSON 值。
 - `data/mock_responses/*.json`：`SolutionTrace` 格式的确定性 Mock 解答。
 - `data/demo_annotations.jsonl`：为内置 Mock Fixture 提供的少量人工标注 Ground Truth，**仅用于测试指标函数，不是正式人工标注研究**。
+- `data/manifests/evalplus_humanevalplus_d32357cf.json`：固定 HumanEval+ revision、许可证和原始快照哈希的受控来源 manifest；不含答案或测试正文。
+- `artifacts/datasets/`：本地 HumanEval+ 原始快照、公开投影和固定 10 题 Pilot bundle；整个 `artifacts/` 目录均被 Git 忽略。
 - `artifacts/experiments/phase1/<run_id>/`：阶段一基线生成的 `manifest.json` / `responses.jsonl` / `summary.json`；详见 [`docs/data_format.md`](docs/data_format.md)。
 
 ## 11. 测试
@@ -246,7 +307,7 @@ ruff check .
 ruff format --check .
 ```
 
-测试不调用真实 Hy3 API；阶段一测试会验证 Prompt 公开信息白名单、Mock 无网络、原子 JSONL、单题失败隔离、续跑及非敏感 manifest。Docker 相关单元测试通过替身验证可用性探测、强化参数和超时后的强制清理，不要求本机 Docker 一定可用。
+测试不调用真实 Hy3 API；阶段一测试会验证 Prompt 公开信息白名单、Mock 无网络、原子 JSONL、单题失败隔离、续跑及非敏感 manifest。HumanEval+ 接入测试使用本地合成快照验证答案/官方测试隔离、受控哈希、固定抽样、原子发布、provenance 绑定、`run`/`batch` 拒绝及 baseline 只生成不执行。Docker 相关单元测试通过替身验证可用性探测、强化参数和超时后的强制清理，不要求本机 Docker 一定可用。
 
 ## 12. 输出 JSON 示例
 
@@ -292,14 +353,14 @@ tracejudge-hy3/
 ├── Makefile
 ├── IMPLEMENTATION_STATUS.md
 ├── src/tracejudge_hy3/
-│   ├── cli.py                 # Typer CLI: doctor / demo / baseline / run / batch
+│   ├── cli.py                 # Typer CLI: dataset / baseline / run / batch 等
 │   ├── baseline/              # 阶段一生成、断点续跑与产物持久化
 │   ├── config.py               # 环境变量配置 (pydantic-settings)
 │   ├── schemas/                 # 所有 Pydantic v2 数据模型
 │   ├── providers/               # LLMProvider 抽象接口、Mock、Hy3 OpenAI-compatible
 │   ├── prompts/                 # Solver / Evaluator Prompt 构造
 │   ├── parsing/                  # 结构化输出解析（含围栏/多余文本容错）
-│   ├── dataset/                  # JSONL 数据集加载
+│   ├── dataset/                  # JSONL 加载 + HumanEval+ 阶段一公开投影
 │   ├── static_analysis/          # AST 静态分析
 │   ├── sandbox/                  # Docker / TrustedLocal 沙盒 + 测试运行器
 │   ├── evaluator/                # 规则证据 + LLM 判断 + 组合 + 错误证书
@@ -309,6 +370,7 @@ tracejudge-hy3/
 ├── data/
 │   ├── sample_problems.jsonl     # 3 道内置示例题
 │   ├── demo_annotations.jsonl    # Mock Fixture 的人工标注 Fixture
+│   ├── manifests/                # 公开数据固定 revision/哈希来源清单
 │   └── mock_responses/           # 确定性 Mock 解答
 ├── tests/
 ├── docs/
@@ -321,7 +383,7 @@ tracejudge-hy3/
 
 ## 14. 后续路线（v0.2+ 优先级参考）
 
-1. 接入 HumanEval+ / MBPP+ 的子集并做人工标注，替换/补充自建 Fixture；
+1. 为 HumanEval+ 增加独立的官方 EvalPlus 测试执行/评分适配器，接入 MBPP+，并构造研究级人工标注子集；
 2. 构建真实的反事实配对样本（reasoning 反事实、code 反事实、shortcut 反事实、equivalent 反事实、boundary 反事实）；
 3. 引入模块级消融实验（Test-only / Direct Judge / +四层对齐 / +静态分析 / 完整方法）；
 4. 扩展反例生成为更通用的属性测试与更完整的 delta-debugging；
@@ -330,5 +392,6 @@ tracejudge-hy3/
 ## 15. 许可证与数据来源
 
 - 代码许可证见 [`LICENSE`](LICENSE)（MIT）。
-- `data/sample_problems.jsonl`、`data/mock_responses/`、`data/demo_annotations.jsonl` 均为本项目自建的工程验证 Fixture（`source: "self_constructed_mvp_fixture"`），不包含 HumanEval / MBPP 等公开数据集内容。
+- `data/sample_problems.jsonl`、`data/mock_responses/`、`data/demo_annotations.jsonl` 均为本项目自建的工程验证 Fixture（`source: "self_constructed_mvp_fixture"`），不包含 HumanEval / MBPP 等公开题目正文。
+- 仓库只提交 HumanEval+ 来源 manifest 和公开投影适配器；原始快照、生成出的 164 题投影、10 题 Pilot 与实验结果均位于被 Git 忽略的 `artifacts/`。HumanEval+ 来源及许可证记录见 [`data/manifests/evalplus_humanevalplus_d32357cf.json`](data/manifests/evalplus_humanevalplus_d32357cf.json)。
 - 本项目不训练或微调模型；模型能力调用通过用户自行配置的 Hy3（OpenAI-compatible）服务完成，仓库不包含任何真实密钥。

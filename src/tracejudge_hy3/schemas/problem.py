@@ -53,7 +53,10 @@ class ProblemSpec(BaseModel):
     hidden_test_cases: list[TestCase] = Field(default_factory=list)
     challenge_test_cases: list[TestCase] = Field(default_factory=list)
     reference_code: str
-    difficulty: Literal["easy", "medium", "hard"]
+    # Public benchmarks such as HumanEval+ do not publish a difficulty label.
+    # ``unknown`` avoids fabricating one from private tests, solutions, or
+    # subjective adapter heuristics.
+    difficulty: Literal["easy", "medium", "hard", "unknown"]
     source: str
     tags: list[str] = Field(default_factory=list)
 

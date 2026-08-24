@@ -30,7 +30,50 @@
 - `args`/`kwargs` 是结构化 JSON 值，**从不使用可执行的表达式字符串**（测试运行器不调用 `eval()`）。
 - `expected` 通常是普通 JSON 值。有一个特殊约定：`{"raises": "<ExceptionClassName>"}` 表示该用例期望抛出指定类型的异常（见 `clamp` 题的 `R4` 非法区间测试）。测试运行器在比较时会识别这种结构。
 - Solver Prompt 使用显式白名单：`problem_id`、`requirement`、`function_signature`、每个公开需求条款的 `requirement_id`/`content`，以及可见测试的 `args`/`kwargs`/`expected`。`verification_hint`、`reference_code`、`hidden_test_cases`、`challenge_test_cases`、其期望值和人工标注都不会出现在 Solver Prompt 中。现有完整评估链路可在之后的执行阶段使用隐藏/challenge 数据，但 `baseline` 命令到生成与解析即停止，不运行任何测试。
-- `source` 字段目前统一为 `self_constructed_mvp_fixture`。对这份数据运行阶段一时，manifest 的 `experiment_label` 为 `self_constructed_mvp_fixture_pilot`；这是自建工程 Fixture 小规模试运行，不是 HumanEval+、MBPP+ 或正式 benchmark。如接入真实公开数据，应替换为对应来源标记并保留原始许可证信息（v0.1 尚未实现该接入，见 `IMPLEMENTATION_STATUS.md`）。
+- 内置样例的 `source` 为 `self_constructed_mvp_fixture`，阶段一 `experiment_label` 为 `self_constructed_mvp_fixture_pilot`。HumanEval+ 阶段一公开投影使用 `source: "evalplus_humanevalplus"`，其来源、revision、许可证和选择信息由 bundle manifest 绑定；两者都不能被表述为正式 benchmark 分数。
+
+## HumanEval+ 阶段一公开投影 bundle
+
+仓库提交 [`data/manifests/evalplus_humanevalplus_d32357cf.json`](../data/manifests/evalplus_humanevalplus_d32357cf.json) 作为受控来源 manifest。原始固定 revision 快照必须由用户放在 `artifacts/datasets/raw/humanevalplus/`；`artifacts/` 被 Git 忽略，因此原始 `canonical_solution`、官方 `test` 以及转换/实验产物都不会提交到仓库。转换器会核对来源 manifest 中每个原始文件的大小和 SHA256、完整 40 位 revision、Apache-2.0 许可证、`test` split 和 `HumanEval/0` 至 `HumanEval/163` 的完整题号集合。
+
+`tracejudge dataset convert-humanevalplus` 只读取以下公开字段来构造 `ProblemSpec`：
+
+| `ProblemSpec` 字段 | HumanEval+ 公开来源/固定值 |
+|---|---|
+| `problem_id` | `task_id` |
+| `title` | `task_id` 与 `entry_point` 组成的可审查标题 |
+| `requirement` | 原始公开 `prompt` |
+| `function_signature` | 从公开 `prompt` 中解析并规范化的 `entry_point` 签名 |
+| `requirements` | `R1`，内容为公开函数 docstring，`verification_hint: null` |
+| `visible_test_cases` / `hidden_test_cases` / `challenge_test_cases` | 均为 `[]` |
+| `reference_code` | `# EVALPLUS_REFERENCE_CODE_WITHHELD_FROM_PHASE1\n` 固定 sentinel |
+| `difficulty` | `unknown`，不根据答案或测试猜测难度 |
+| `source` | `evalplus_humanevalplus` |
+
+`canonical_solution` 和官方 `test` 只用于验证原始行具备固定 schema；其正文不进入上述任何字段，也不复制到转换 bundle、抽样 bundle、Solver Prompt 或基线产物。原始快照整体哈希与 withheld 字段名称会进入 provenance，但不保存这些字段的内容。完整转换结果为：
+
+```text
+artifacts/datasets/processed/humanevalplus-full/
+├── problems.jsonl
+└── dataset_manifest.json
+```
+
+目录以临时目录加一次原子替换完整发布；相同内容重跑幂等，现有目录内容不同时拒绝覆盖。`dataset_manifest.json` 记录：
+
+- 数据集 ID、固定 revision、split、许可证和适配器名称/版本；
+- 受控来源 manifest SHA256，以及原始快照聚合 SHA256、原始 JSONL SHA256 和记录数；
+- 公开 `problems.jsonl` SHA256、记录数、按顺序题号 SHA256；
+- 选择算法、题数、按顺序的公开 `problem_id` 和 withheld 字段名称；
+- `metrics_scope: "generation_and_parsing_only"`。
+
+`tracejudge dataset sample --count 10 --seed 20260824` 只用 `sha256(seed\0problem_id)` 对公开题号排序取前 10 个，再按 HumanEval 数值题号顺序输出。当前固定题号为：
+
+```text
+HumanEval/8, HumanEval/26, HumanEval/41, HumanEval/51, HumanEval/70,
+HumanEval/81, HumanEval/95, HumanEval/96, HumanEval/105, HumanEval/120
+```
+
+Pilot bundle 同样只有 `problems.jsonl` 和 `dataset_manifest.json`；后者额外绑定父 manifest SHA256、固定 seed、选择算法和题号列表，`experiment_label` 固定为 `humanevalplus_10_public_prompt_generation_pilot`。`tracejudge dataset validate` 只离线验证 `ProblemSpec` JSONL 的 schema/重复 ID 等通用约束，不调用 Provider，也不执行任何代码或测试。完整的可复现命令见 README 的“HumanEval+ 固定 10 题阶段一 Pilot”。
 
 ## `data/mock_responses/*.json`
 
@@ -112,7 +155,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 }
 ```
 
-`status` 在处理中为 `running`，批次正常处理完后原子更新为 `completed` 并写入 `completed_at`。`provider_config` 是 Provider 显式返回的白名单，不会通过枚举 Provider 内部属性来采集配置。Hy3 先剔除 endpoint 的 userinfo/query/fragment，再记录规范化 endpoint SHA256，不记录 endpoint 原文。敏感键会被过滤，常见凭据形式会被脱敏；API Key、Authorization Header、完整请求头、Cookie 和密码不得写入产物。续跑会在 `invocations` 中追加带当时 Git/环境快照的 `resume: true` 记录，将遗留的 `running` invocation 标记为 `interrupted` 并写入 `interrupted_at`，但不改变初始 `run_id`。工作树不干净时，`working_tree_sha256` 只保存变更内容的指纹，不保存 diff 或未跟踪文件内容；本 run 自身产物目录从该指纹中排除。
+`status` 在处理中为 `running`，批次正常处理完后原子更新为 `completed` 并写入 `completed_at`。`provider_config` 是 Provider 显式返回的白名单，不会通过枚举 Provider 内部属性来采集配置。Hy3 先剔除 endpoint 的 userinfo/query/fragment，再记录规范化 endpoint SHA256，不记录 endpoint 原文。敏感键会被过滤，常见凭据形式会被脱敏；API Key、Authorization Header、完整请求头、Cookie 和密码不得写入产物。传入 HumanEval+ `--dataset-manifest` 时，`dataset.provenance` 只保存经白名单校验的身份信息：manifest SHA256、revision、许可证、适配器、原始快照/公开投影哈希、题号顺序与确定性选择参数、withheld 字段名和 `generation_and_parsing_only` 边界；不会原样复制任意 manifest 字段或私有测试内容。续跑会在 `invocations` 中追加带当时 Git/环境快照的 `resume: true` 记录，将遗留的 `running` invocation 标记为 `interrupted` 并写入 `interrupted_at`，但不改变初始 `run_id`。工作树不干净时，`working_tree_sha256` 只保存变更内容的指纹，不保存 diff 或未跟踪文件内容；本 run 自身产物目录从该指纹中排除。
 
 ### `responses.jsonl`
 
@@ -170,7 +213,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 
 `parse_status` 独立标记解析结果：`success` 对应 `parsed`，`parse_error` 对应 `failed`，从未得到可解析文本的 `provider_error` 与 `skipped` 对应 `not_attempted`。若早期尝试已对一份原始输出解析失败，但后续尝试又发生超时/服务错误，最终 `status` 是 `provider_error`、`parse_status` 仍是 `failed`，`raw_output_attempt` 指明保存的 `raw_output` 来自第几次调用。`error_type` 是便于汇总的顶层错误类型；`error` 为 `null` 或 `{"type": "<exception class>", "message": "<redacted message>"}`。失败记录不会保留过期的 `solution_trace`；如 Provider 已返回文本，安全脱敏后仍可在 `raw_output` 中保留它。所有持久化字符串中无法表示为 UTF-8 标量值的孤立 surrogate 会统一替换为 `U+FFFD`，以确保单题异常不中止整批持久化且续跑 ID 语义一致。
 
-使用 `--resume-run-id <run_id>` 续跑时，数据集 SHA256、Provider 公开配置、TraceJudge Git commit/工作树指纹以及 Python/直接依赖环境必须与 manifest 一致。历史上任意一次成功的 `problem_id` 追加 `skipped`，未成功题目重新调用 Provider。
+使用 `--resume-run-id <run_id>` 续跑时，数据集 SHA256、Provider 公开配置、TraceJudge Git commit/工作树指纹以及 Python/直接依赖环境必须与 manifest 一致。若初始运行传入数据集 manifest，续跑还必须传入同一份 manifest，并精确匹配已记录的 provenance（含 manifest SHA256）和 `experiment_label`；更换 revision、选择 seed/题号、适配器或重写 manifest 都会拒绝续跑。历史上任意一次成功的 `problem_id` 追加 `skipped`，未成功题目重新调用 Provider。
 
 ### `summary.json`
 
@@ -190,3 +233,5 @@ summary **不包含**功能正确率、测试通过率、错误检测率、四�
 ## 流水线输出 JSON（`artifacts/*.json`）
 
 这是 `run` / `batch` / `demo` 现有完整评估链路的格式，**与上述阶段一基线产物不同**。它由 `reporting/serializer.py:pipeline_result_to_dict()` 生成，顶层字段：`problem` / `solution` / `static_evidence` / `execution_result` / `llm_assessment` / `process_assessment` / `counterexample` / `error_certificate`，均为对应 Pydantic 模型的 `model_dump(mode="json")`。`batch` 命令将多条这样的记录以 JSONL 形式写入同一个文件。
+
+HumanEval+ 阶段一公开投影没有测试或参考实现，`run` / `batch` 会在 Provider/沙盒执行前明确拒绝它；只能使用带匹配 `--dataset-manifest` 的 `baseline`。在独立 EvalPlus 执行适配器落地前，任何生成/解析统计都不是功能分数或正式 HumanEval+ 结果。

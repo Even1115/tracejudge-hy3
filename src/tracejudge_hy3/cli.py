@@ -19,8 +19,16 @@ from tracejudge_hy3.baseline import (
     run_baseline_experiment,
 )
 from tracejudge_hy3.config import get_settings
+from tracejudge_hy3.dataset.humanevalplus import (
+    DATASET_SOURCE as HUMANEVALPLUS_DATASET_SOURCE,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    convert_humanevalplus,
+    sample_humanevalplus,
+    validate_problem_dataset,
+)
 from tracejudge_hy3.dataset.loader import load_problem_by_id, load_problems
-from tracejudge_hy3.exceptions import TraceJudgeError
+from tracejudge_hy3.exceptions import DatasetError, TraceJudgeError
 from tracejudge_hy3.pipeline.runner import PipelineResult, run_pipeline, select_backend
 from tracejudge_hy3.providers.base import LLMProvider
 from tracejudge_hy3.providers.hy3_openai import Hy3OpenAIProvider
@@ -39,9 +47,22 @@ from tracejudge_hy3.schemas.problem import ProblemSpec
 app = typer.Typer(
     add_completion=False, help="TraceJudge-Hy3: 需求-推理-代码-执行证据四层对齐评估系统 (v0.1)"
 )
+dataset_app = typer.Typer(
+    add_completion=False,
+    help="离线数据集转换、确定性抽样与 ProblemSpec 校验（不执行数据集代码）",
+)
+app.add_typer(dataset_app, name="dataset")
 console = Console()
 
 DEFAULT_DATASET = str(data_path("sample_problems.jsonl"))
+
+
+def _reject_phase1_projection_execution(problems: list[ProblemSpec]) -> None:
+    if any(problem.source == HUMANEVALPLUS_DATASET_SOURCE for problem in problems):
+        raise DatasetError(
+            "HumanEval+ 公共投影仅支持 `tracejudge baseline`；"
+            "阶段二官方 EvalPlus 执行适配尚未实现，不能使用 run/batch"
+        )
 
 
 def _make_provider(provider_name: str, case: str | None = None) -> LLMProvider:
@@ -153,9 +174,115 @@ def doctor() -> None:
         )
 
 
+@dataset_app.command("convert-humanevalplus")
+def dataset_convert_humanevalplus(
+    input_path: str = typer.Option(
+        "artifacts/datasets/raw/humanevalplus/test.jsonl",
+        "--input",
+        help="固定 HumanEval+ Hugging Face JSONL 快照",
+    ),
+    revision: str = typer.Option(..., "--revision", help="固定的完整 Hugging Face commit SHA"),
+    source_manifest: str = typer.Option(
+        ...,
+        "--manifest",
+        help="记录官方 revision、许可证和原始文件 SHA256 的受控 manifest",
+    ),
+    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的公共投影目录"),
+) -> None:
+    """将完整 HumanEval+ 快照转换为阶段一公开投影；不执行或复制答案/测试。"""
+
+    try:
+        result = convert_humanevalplus(
+            input_path=input_path,
+            revision=revision,
+            source_manifest_path=source_manifest,
+            output_dir=output_dir,
+        )
+    except (TraceJudgeError, OSError) as exc:
+        console.print(f"[red]HumanEval+ 转换失败：{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="HumanEval+ 阶段一公共投影")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("原始题目", str(result.record_count))
+    table.add_row("公开投影 SHA256", result.dataset_sha256)
+    table.add_row("Bundle manifest SHA256", result.manifest_sha256)
+    table.add_row("执行数据集代码", "否")
+    table.add_row("复制 canonical_solution/test", "否")
+    console.print(table)
+    console.print(f"[dim]dataset: {result.dataset_path}[/dim]")
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+
+
+@dataset_app.command("sample")
+def dataset_sample(
+    dataset: str = typer.Option(..., "--dataset", help="完整的 ProblemSpec JSONL 公共投影"),
+    source_manifest: str = typer.Option(
+        ..., "--manifest", help="完整公共投影的 dataset_manifest.json"
+    ),
+    count: int = typer.Option(10, "--count", min=1, help="确定性抽样题数"),
+    seed: int = typer.Option(20260824, "--seed", help="只与公开 problem_id 组合使用的固定种子"),
+    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的 Pilot bundle 目录"),
+) -> None:
+    """仅依据公开 problem_id 生成确定性的 Pilot 子集。"""
+
+    try:
+        result = sample_humanevalplus(
+            dataset_path=dataset,
+            source_manifest_path=source_manifest,
+            count=count,
+            seed=seed,
+            output_dir=output_dir,
+        )
+    except (TraceJudgeError, OSError) as exc:
+        console.print(f"[red]数据集抽样失败：{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="HumanEval+ 确定性 Pilot 子集")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("题目数", str(len(result.selected_problem_ids)))
+    table.add_row("公开投影 SHA256", result.dataset_sha256)
+    table.add_row("Bundle manifest SHA256", result.manifest_sha256)
+    table.add_row("problem_id", ", ".join(result.selected_problem_ids))
+    console.print(table)
+    console.print(f"[dim]dataset: {result.dataset_path}[/dim]")
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print("[yellow]该子集仅用于生成与解析 Pilot，不代表 HumanEval+ 功能分数。[/yellow]")
+
+
+@dataset_app.command("validate")
+def dataset_validate(
+    dataset: str = typer.Option(..., "--dataset", help="待校验的 ProblemSpec JSONL"),
+) -> None:
+    """离线校验 ProblemSpec JSONL；不调用 Provider、不执行候选或测试代码。"""
+
+    try:
+        result = validate_problem_dataset(dataset)
+    except (TraceJudgeError, OSError) as exc:
+        console.print(f"[red]数据集校验失败：{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="ProblemSpec 数据集校验")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("题目数", str(result.problem_count))
+    table.add_row("SHA256", result.dataset_sha256)
+    table.add_row("来源", ", ".join(result.sources))
+    table.add_row("难度标签", ", ".join(result.difficulties))
+    table.add_row("执行代码/测试", "否")
+    console.print(table)
+
+
 @app.command()
 def baseline(
     dataset: str = typer.Option(DEFAULT_DATASET, "--dataset", help="ProblemSpec JSONL 数据集"),
+    dataset_manifest: str | None = typer.Option(
+        None,
+        "--dataset-manifest",
+        help="可选：与数据集哈希绑定的公开 provenance manifest（HumanEval+ Pilot 必填）",
+    ),
     provider: str = typer.Option("mock", "--provider", help="'mock' 或 'hy3'"),
     output_dir: str = typer.Option(
         "artifacts/experiments/phase1",
@@ -187,6 +314,7 @@ def baseline(
                 output_dir=output_dir,
                 run_id=effective_run_id,
                 resume=resume_run_id is not None,
+                dataset_manifest_path=dataset_manifest,
             )
         )
     except (BaselineExperimentError, TraceJudgeError, OSError) as exc:
@@ -384,6 +512,7 @@ def run(
     settings = get_settings()
     try:
         problem = load_problem_by_id(dataset, problem_id)
+        _reject_phase1_projection_execution([problem])
         backend = select_backend(
             provider_name=provider,
             sandbox_choice=sandbox or settings.tracejudge_sandbox,
@@ -425,6 +554,7 @@ def batch(
     settings = get_settings()
     try:
         problems = load_problems(dataset)
+        _reject_phase1_projection_execution(problems)
     except TraceJudgeError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc

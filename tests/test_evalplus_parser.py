@@ -148,7 +148,7 @@ def test_timeout_has_a_distinct_classification_even_when_other_suite_fails():
 
 @pytest.mark.parametrize("field", ["base_status", "plus_status"])
 @pytest.mark.parametrize("invalid_status", [None, "error", "passed", "TIMEOUT", 1])
-def test_only_official_v031_statuses_are_accepted(field, invalid_status):
+def test_only_pinned_official_statuses_are_accepted(field, invalid_status):
     raw = _official_raw()
     raw["eval"]["HumanEval/8"][0][field] = invalid_status
 

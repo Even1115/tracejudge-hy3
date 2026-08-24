@@ -23,10 +23,12 @@ from tracejudge_hy3.evalplus.docker_runner import (
     DEFAULT_EVALPLUS_IMAGE,
     DEFAULT_PLATFORM,
     EVALPLUS_COMMIT,
+    EVALPLUS_EVALUATE_PY_SHA256,
     EVALPLUS_VERSION,
     HUMANEVAL_PLUS_VERSION,
     IMAGE_PYTHON_VERSION,
     DockerLimits,
+    DockerRunnerError,
     EvalPlusDockerRunner,
     PublicTaskIdentity,
 )
@@ -55,6 +57,9 @@ def _runtime_payload(*, machine: str = "x86_64") -> dict[str, Any]:
         "status": "ok",
         "evalplus_version": EVALPLUS_VERSION,
         "evalplus_commit": EVALPLUS_COMMIT,
+        "evalplus_commit_basis": "git_C_evalplus_rev_parse_HEAD",
+        "evalplus_evaluate_py_sha256": EVALPLUS_EVALUATE_PY_SHA256,
+        "evalplus_evaluate_py_sha256_basis": "installed_evalplus_evaluate_py_exact_bytes",
         "humaneval_plus_version": HUMANEVAL_PLUS_VERSION,
         "official_dataset_hash": DATASET_MD5,
         "official_dataset_file_sha256": DATASET_FILE_SHA256,
@@ -307,8 +312,10 @@ def test_public_identity_records_exact_reproducibility_and_isolation_pins():
     assert identity["image"] == DEFAULT_EVALPLUS_IMAGE
     assert identity["image_digest"] in DEFAULT_EVALPLUS_IMAGE
     assert identity["requested_platform"] == "linux/amd64"
-    assert identity["evalplus_version"] == "0.3.1"
+    assert identity["evalplus_version"] == "0.4.0.dev2"
     assert identity["evalplus_commit"] == EVALPLUS_COMMIT
+    assert identity["evalplus_commit_basis"] == "git_C_evalplus_rev_parse_HEAD"
+    assert identity["evalplus_evaluate_py_sha256"] == EVALPLUS_EVALUATE_PY_SHA256
     assert identity["humaneval_plus_version"] == "v0.1.10"
     assert identity["python_version"] == "3.11.10"
     assert identity["official_dataset_hash"] is None
@@ -890,9 +897,28 @@ def test_missing_docker_preflight_returns_stable_safe_runtime_identity(tmp_path:
 
     assert result.ready is False
     assert result.infrastructure_error_type == "docker_unavailable"
+    assert result.runtime["inspection_status"] == "unavailable"
     assert result.runtime["image"] == DEFAULT_EVALPLUS_IMAGE
     assert result.runtime["evalplus_commit"] == EVALPLUS_COMMIT
+    assert result.runtime["evalplus_evaluate_py_sha256"] == EVALPLUS_EVALUATE_PY_SHA256
     assert result.runtime["native_dataset_canonical_sha256"] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "drifted"),
+    [
+        ("evalplus_commit", "0" * 40),
+        ("evalplus_commit_basis", "unverified_constant"),
+        ("evalplus_evaluate_py_sha256", "0" * 64),
+        ("evalplus_evaluate_py_sha256_basis", "unverified_constant"),
+    ],
+)
+def test_host_rejects_runtime_source_identity_drift(field: str, drifted: str):
+    payload = _runtime_payload()
+    payload[field] = drifted
+
+    with pytest.raises(DockerRunnerError, match="does not match the pin"):
+        EvalPlusDockerRunner._runtime_metadata(payload, expected_task_count=10)
 
 
 @pytest.mark.parametrize(
@@ -938,6 +964,64 @@ def test_container_entrypoint_hashes_exact_ready_release_file_bytes(tmp_path: Pa
     assert size == len(release_bytes)
 
 
+def test_container_entrypoint_verifies_exact_installed_evaluator_source(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    source = tmp_path / "evaluate.py"
+    source_bytes = b"def evaluate(**kwargs):\n    return None\n"
+    source.write_bytes(source_bytes)
+    expected = hashlib.sha256(source_bytes).hexdigest()
+    module = types.SimpleNamespace(__file__=str(source))
+    monkeypatch.setattr(container_entrypoint, "EVALPLUS_EVALUATE_PY_SHA256", expected)
+
+    assert container_entrypoint._evalplus_evaluate_source_sha256(module) == expected
+
+    source.write_bytes(source_bytes + b"# drift\n")
+    with pytest.raises(container_entrypoint._EntrypointError, match="runtime_identity_mismatch"):
+        container_entrypoint._evalplus_evaluate_source_sha256(module)
+
+
+def test_container_entrypoint_verifies_embedded_git_head(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    observed: dict[str, Any] = {}
+
+    def fake_run(command: list[str], **kwargs: Any):
+        observed["command"] = command
+        observed["kwargs"] = kwargs
+        return _completed(command, EVALPLUS_COMMIT + "\n")
+
+    monkeypatch.setattr(container_entrypoint.subprocess, "run", fake_run)
+
+    assert container_entrypoint._evalplus_git_head() == EVALPLUS_COMMIT
+    assert observed["command"] == [
+        "git",
+        "-C",
+        "/evalplus",
+        "rev-parse",
+        "--verify",
+        "HEAD",
+    ]
+    assert observed["kwargs"]["env"] == {
+        "LANG": "C.UTF-8",
+        "PATH": container_entrypoint._SAFE_PATH,
+    }
+
+
+def test_container_entrypoint_rejects_embedded_git_head_drift(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        container_entrypoint.subprocess,
+        "run",
+        lambda command, **kwargs: _completed(command, "0" * 40 + "\n"),
+    )
+
+    with pytest.raises(container_entrypoint._EntrypointError, match="runtime_identity_mismatch"):
+        container_entrypoint._evalplus_git_head()
+
+
 def test_container_inspect_verifies_ten_public_identities_without_disclosure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -977,6 +1061,8 @@ def test_container_inspect_verifies_ten_public_identities_without_disclosure(
             DATASET_FILE_SHA256,
             DATASET_FILE_SIZE,
             DATASET_SHA256,
+            EVALPLUS_COMMIT,
+            EVALPLUS_EVALUATE_PY_SHA256,
         ),
     )
 
@@ -989,6 +1075,8 @@ def test_container_inspect_verifies_ten_public_identities_without_disclosure(
     assert payload["verified_task_count"] == 10
     assert payload["native_dataset_canonical_sha256"] == DATASET_SHA256
     assert payload["official_dataset_file_sha256"] == DATASET_FILE_SHA256
+    assert payload["evalplus_commit"] == EVALPLUS_COMMIT
+    assert payload["evalplus_evaluate_py_sha256"] == EVALPLUS_EVALUATE_PY_SHA256
     assert "PROMPT_CANARY" not in captured.out
     assert "HIDDEN_DATA" not in captured.out
 
@@ -1049,6 +1137,8 @@ def test_container_run_filters_one_native_task_and_invokes_fixed_official_cli(
             DATASET_FILE_SHA256,
             DATASET_FILE_SIZE,
             DATASET_SHA256,
+            EVALPLUS_COMMIT,
+            EVALPLUS_EVALUATE_PY_SHA256,
         ),
     )
     monkeypatch.setenv("OPENAI_API_KEY", "HOST_SECRET_MUST_NOT_BE_FORWARDED")
@@ -1183,6 +1273,21 @@ def evaluate(**kwargs):
         return original_import(name)
 
     monkeypatch.setattr(container_entrypoint.importlib, "import_module", fake_import)
+    monkeypatch.setattr(
+        container_entrypoint.importlib.metadata,
+        "version",
+        lambda package: EVALPLUS_VERSION,
+    )
+    monkeypatch.setattr(
+        container_entrypoint,
+        "_evalplus_evaluate_source_sha256",
+        lambda module: EVALPLUS_EVALUATE_PY_SHA256,
+    )
+    monkeypatch.setattr(
+        container_entrypoint,
+        "_evalplus_git_head",
+        lambda: EVALPLUS_COMMIT,
+    )
 
     exit_code = container_entrypoint._guarded_official_evaluate(
         sample_path,
@@ -1283,7 +1388,10 @@ def test_real_pinned_image_preflight_is_explicitly_opt_in(tmp_path: Path):
     assert result.ready, result.infrastructure_error_type
     runtime = result.runtime["runtime"]
     assert result.runtime["image"]["platform"] == "linux/amd64"
-    assert runtime["evalplus_version"] == "0.3.1"
+    assert runtime["evalplus_version"] == "0.4.0.dev2"
+    assert runtime["evalplus_commit"] == EVALPLUS_COMMIT
+    assert runtime["evalplus_commit_basis"] == "git_C_evalplus_rev_parse_HEAD"
+    assert runtime["evalplus_evaluate_py_sha256"] == EVALPLUS_EVALUATE_PY_SHA256
     assert runtime["humaneval_plus_version"] == "v0.1.10"
     assert runtime["python_version"] == "3.11.10"
     assert runtime["verified_task_count"] == 10

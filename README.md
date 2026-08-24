@@ -73,7 +73,7 @@ TraceJudge-Hy3 不只判断代码是否通过测试，还尝试验证它是否"�
 - 可执行错误证书聚合：新疑似问题直接产生 `confirmed_bug` / `strongly_supported` / `unverified_suspicion` 三种裁决。普通首次运行正确时不产生证书；`cleared` 仅用于显式传入既有证书后，复核的完整执行证据表明原疑似问题不再成立的状态转移（[`src/tracejudge_hy3/evaluator/evidence.py`](src/tracejudge_hy3/evaluator/evidence.py)）。
 - CLI（Typer + Rich）：`doctor` / `demo` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `evalplus` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
 - HumanEval+ 阶段一公开投影适配器：校验本地固定 revision 快照及其受控来源 manifest，把 164 道公开题面转换为不含答案/测试的 `ProblemSpec`，并仅依据公开 `problem_id` 生成固定种子 10 题 Pilot（[`src/tracejudge_hy3/dataset/humanevalplus.py`](src/tracejudge_hy3/dataset/humanevalplus.py)）。
-- HumanEval+ 阶段二官方执行适配器：严格验证阶段一产物后只导出 `solution_trace.code`，在固定 digest 的官方 EvalPlus v0.3.1 镜像中逐题运行 Base 和 Extra 测试，并生成脱敏的 10 题单样本工程 Pilot 结果（[`src/tracejudge_hy3/evalplus/`](src/tracejudge_hy3/evalplus/)）。
+- HumanEval+ 阶段二官方执行适配器：严格验证阶段一产物后只导出 `solution_trace.code`，在固定 digest 的官方镜像（EvalPlus package `0.4.0.dev2`、源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`）中逐题运行 Base 和 Extra 测试，并生成脱敏的 10 题单样本工程 Pilot 结果（[`src/tracejudge_hy3/evalplus/`](src/tracejudge_hy3/evalplus/)）。
 - 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`），来源标记为 `self_constructed_mvp_fixture`（见 §10 和 §15）。
 - 指标计算：10 个纯函数指标，缺少人工标注时返回 `not_computable` 而不是伪造数值（[`src/tracejudge_hy3/reporting/metrics.py`](src/tracejudge_hy3/reporting/metrics.py)）。
 - 单元测试与集成测试（`pytest`），Lint（`ruff`）。
@@ -237,13 +237,15 @@ tracejudge baseline \
 
 ### HumanEval+ 固定 10 题阶段二 EvalPlus Pilot
 
-阶段二不调用 Provider、Hy3、LLM Judge 或现有全链路 pipeline，也不在宿主机导入或执行候选代码。它固定使用 EvalPlus `v0.3.1`（commit `e5d0ed0bab96280b60b637ec7f15b5e4841b0cb2`）、HumanEval+ release `v0.1.10`、Python `3.11.10`和 Linux/amd64 镜像：
+阶段二不调用 Provider、Hy3、LLM Judge 或现有全链路 pipeline，也不在宿主机导入或执行候选代码。它固定使用下面的官方 Linux/amd64 镜像；该 digest 内实测 EvalPlus package 版本为 `0.4.0.dev2`，镜像源码 commit 为 `f11cfb92c1d52896a87f988cbebbd74727d56c7e`，并固定 HumanEval+ release `v0.1.10` 与 Python `3.11.10`：
 
 ```text
 ganler/evalplus@sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740
 ```
 
-执行器固定为每题一个容器、容器内 `--parallel 1 --min-time-limit 4.0 --gt-time-limit-factor 4.0 --test-details`。EvalPlus v0.3.1 没有 `--output-file`，官方原始文件名是根据 samples 路径自动生成的 `sample_eval_results.json`。固定 10 题也不能直接对 164 题全量数据执行；适配器会在容器内从镜像自带的官方 release 数据构造单题、evaluation-only 的 `HUMANEVAL_OVERRIDE_PATH`，并先核对 10 题的公开 prompt 哈希和 entry point。
+接口与执行语义以[镜像对应的固定源码 commit](https://github.com/evalplus/evalplus/commit/f11cfb92c1d52896a87f988cbebbd74727d56c7e)、其中的 [`evaluate.py`](https://github.com/evalplus/evalplus/blob/f11cfb92c1d52896a87f988cbebbd74727d56c7e/evalplus/evaluate.py)、[CLI 文档](https://github.com/evalplus/evalplus/blob/f11cfb92c1d52896a87f988cbebbd74727d56c7e/docs/cli.md)和[执行文档](https://github.com/evalplus/evalplus/blob/f11cfb92c1d52896a87f988cbebbd74727d56c7e/docs/execution.md)为准。
+
+执行器固定为每题一个容器，调用该固定 commit 的官方接口时显式设置 `parallel=1`、`min_time_limit=4.0`、`gt_time_limit_factor=4.0` 和 `test_details=true`。该接口没有 `--output-file`；官方原始文件名由 samples 路径生成，当前单题输入对应 `sample_eval_results.json`。固定 10 题也不能直接对 164 题全量数据执行；适配器会在容器内从镜像自带的官方 release 数据构造单题、evaluation-only 的 `HUMANEVAL_OVERRIDE_PATH`，并先核对 10 题的公开 prompt 哈希和 entry point。
 
 镜像不会在运行时自动拉取；首次运行前显式获取固定 digest：
 
@@ -279,11 +281,11 @@ tracejudge evalplus \
 
 产物位于 `<output-dir>/<run_id>/`：`manifest.json`、`samples.jsonl`、`evalplus_raw_results.json`、`results.jsonl`、`summary.json` 和 `execution.log`。执行器只接受仓库内且经 `git check-ignore` 确认已忽略的输出位置；目录权限为 `0700`，文件为 `0600`。原始结果可能包含候选代码和失败测试输入，不得打印、提交或发送给模型。`results.jsonl` 仅保留状态、已观测失败数和哈希。
 
-Docker task 使用只读 control、只读根文件系统、无网络、资源/PID/文件大小限制，并且只额外暴露两个预创建的精确输出文件，不挂载宿主可写目录。宿主等待容器完全退出后才读取结果。官方镜像中候选与 wrapper 仍共享 UID，因此这是面向本 Pilot 的基础非对抗隔离，不是对主动恶意候选的完整防篡改证明；高对抗执行应升级到独立 UID 和 VM/microVM。
+Docker task 使用只读 control、只读根文件系统、无网络、资源/PID/文件大小限制，并且只将两个预创建的宿主输出文件作为精确 RW bind，不挂载任何宿主可写目录。宿主等待容器完全退出后才读取结果。官方镜像中候选与 wrapper 仍共享 UID，因此 manifest 将安全边界明确标为 `basic_non_adversarial`：这是面向本 Pilot 的基础非对抗隔离，不是对主动恶意候选的完整防篡改证明；高对抗执行应升级到独立 UID 和 VM/microVM。
 
 `--batch-timeout` 是候选任务调度截止，不包含前置镜像/数据 preflight；到期后执行器会并行请求容器清理，并给 worker 固定 5 秒确认尾段。仍未确认退出或 Docker 清理失败的题会记录为 `container_cleanup_failed` 基础设施错误，summary/CLI 因而不会把该 run 当成功实验。阶段一/数据静态输入另有 128 MiB 文件上限，单题候选代码上限为 2 MiB UTF-8 字节。
 
-EvalPlus v0.3.1 只报告 `pass` / `fail` / `timeout`；`fail` 同时包含错误答案、语法错误、缺失入口和普通候选异常，因此 summary 不伪造可细分的 execution-error 数。Base+Extra 通过只在 Base 和 Plus 状态都为 `pass` 时成立；通过率分母是实际完成官方执行的题数，不把基础设施失败当作代码失败。
+该固定 EvalPlus commit 的官方 raw 只报告 `pass` / `fail` / `timeout`；`fail` 同时包含错误答案、语法错误、缺失入口和普通候选异常，因此 summary 不伪造可细分的 execution-error 数。Base+Extra 通过只在 Base 和 Plus 状态都为 `pass` 时成立；通过率分母是实际完成官方执行的题数，不把基础设施失败当作代码失败。
 
 ## 7. 配置真实 Hy3
 

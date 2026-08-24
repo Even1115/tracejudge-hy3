@@ -109,7 +109,7 @@ _LIMITATIONS = [
     "not_an_official_benchmark_ranking",
     "public_benchmark_training_contamination_or_memorization_is_possible",
     "phase1_parse_success_is_not_phase2_functional_success",
-    "evalplus_v0.3.1_fail_combines_wrong_answers_and_candidate_exceptions",
+    "pinned_evalplus_fail_combines_wrong_answers_and_candidate_exceptions",
 ]
 
 

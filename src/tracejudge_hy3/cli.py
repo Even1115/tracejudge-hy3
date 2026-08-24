@@ -470,7 +470,7 @@ def evalplus_command(
         "错误答案/候选异常（官方状态不可细分）",
         str(summary["wrong_answer_or_candidate_exception_count"]),
     )
-    table.add_row("可单独观测的 execution error", "N/A（EvalPlus v0.3.1 不提供）")
+    table.add_row("可单独观测的 execution error", "N/A（固定 EvalPlus raw schema 不提供）")
     table.add_row("基础设施错误", str(summary["infrastructure_error_count"]))
     table.add_row("平均逐题容器耗时", duration)
     console.print(table)

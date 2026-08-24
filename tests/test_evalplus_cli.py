@@ -133,7 +133,7 @@ def test_docker_cli_wires_explicit_limits_and_reports_safe_counts(tmp_path, monk
     assert kwargs["batch_timeout_seconds"] == 456.0
     assert "8/10" in result.output
     assert "6/10" in result.output
-    assert "N/A（EvalPlus v0.3.1 不提供）" in result.output
+    assert "固定 EvalPlus raw schema" in result.output
 
 
 def test_evalplus_cli_rejects_unknown_executor_before_creating_a_run(tmp_path):

@@ -25,8 +25,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-EVALPLUS_VERSION = "0.3.1"
-EVALPLUS_COMMIT = "e5d0ed0bab96280b60b637ec7f15b5e4841b0cb2"
+EVALPLUS_VERSION = "0.4.0.dev2"
+EVALPLUS_COMMIT = "f11cfb92c1d52896a87f988cbebbd74727d56c7e"
+EVALPLUS_EVALUATE_PY_SHA256 = "6fcd78d262eae6eff8af4ef6eb00b22909d37beebd90dc37b84b756053e981dd"
 HUMANEVAL_PLUS_VERSION = "v0.1.10"
 EXPECTED_DATASET_TASK_COUNT = 164
 EXPECTED_PREFLIGHT_TASK_COUNT = 10
@@ -36,9 +37,11 @@ _MAX_REQUEST_BYTES = 64 * 1024
 _MAX_SAMPLE_BYTES = 2 * 1024 * 1024
 _MAX_NATIVE_DATASET_BYTES = 512 * 1024 * 1024
 _MAX_RESULT_BYTES = 128 * 1024 * 1024
+_MAX_RUNTIME_SOURCE_BYTES = 4 * 1024 * 1024
 _TASK_ID_RE = re.compile(r"^HumanEval/(?:0|[1-9][0-9]*)$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _MD5_RE = re.compile(r"^[0-9a-f]{32}$")
+_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _SAFE_PATH = "/usr/local/bin:/usr/bin:/bin"
 _OFFICIAL_STATUSES = {"pass", "fail", "timeout"}
 _INTERNAL_EVALUATE_MODE = "__tracejudge_guarded_evalplus__"
@@ -203,14 +206,82 @@ def _official_file_sha256(path_value: Any) -> tuple[str, int]:
     return digest.hexdigest(), metadata.st_size
 
 
-def _load_official_dataset() -> tuple[dict[str, dict[str, Any]], str, str, int, str]:
+def _evalplus_evaluate_source_sha256(module: Any) -> str:
+    """Hash and verify the installed evaluator source selected by Python.
+
+    The immutable image digest identifies the filesystem, while this check
+    additionally binds the imported evaluator implementation to the exact
+    ``evalplus/evaluate.py`` bytes observed in that image.
+    """
+
+    path_value = getattr(module, "__file__", None)
+    if not isinstance(path_value, str) or not path_value:
+        raise _EntrypointError("runtime_identity_mismatch")
+    path = Path(path_value)
+    try:
+        metadata = path.lstat()
+        if (
+            path.name != "evaluate.py"
+            or path.is_symlink()
+            or not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_size <= 0
+            or metadata.st_size > _MAX_RUNTIME_SOURCE_BYTES
+        ):
+            raise _EntrypointError("runtime_identity_mismatch")
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+    except _EntrypointError:
+        raise
+    except OSError:
+        raise _EntrypointError("runtime_identity_mismatch") from None
+    actual = digest.hexdigest()
+    if actual != EVALPLUS_EVALUATE_PY_SHA256:
+        raise _EntrypointError("runtime_identity_mismatch")
+    return actual
+
+
+def _evalplus_git_head() -> str:
+    """Resolve and verify the source checkout HEAD embedded in the image."""
+
+    try:
+        completed = subprocess.run(
+            ["git", "-C", "/evalplus", "rev-parse", "--verify", "HEAD"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            check=False,
+            timeout=5.0,
+            cwd="/",
+            env={"LANG": "C.UTF-8", "PATH": _SAFE_PATH},
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError):
+        raise _EntrypointError("runtime_identity_mismatch") from None
+    lines = completed.stdout.splitlines()
+    if (
+        completed.returncode != 0
+        or len(lines) != 1
+        or not _GIT_COMMIT_RE.fullmatch(lines[0])
+        or lines[0] != EVALPLUS_COMMIT
+    ):
+        raise _EntrypointError("runtime_identity_mismatch")
+    return lines[0]
+
+
+def _load_official_dataset() -> tuple[dict[str, dict[str, Any]], str, str, int, str, str, str]:
     """Load the image-preinstalled native dataset without emitting its values."""
 
     try:
         with _silence_output():
             data_module = importlib.import_module("evalplus.data")
             humaneval_module = importlib.import_module("evalplus.data.humaneval")
+            evaluator_module = importlib.import_module("evalplus.evaluate")
             version = importlib.metadata.version("evalplus")
+            evaluate_source_sha256 = _evalplus_evaluate_source_sha256(evaluator_module)
+            evalplus_commit = _evalplus_git_head()
             dataset_version = getattr(humaneval_module, "HUMANEVAL_PLUS_VERSION", None)
             problems = data_module.get_human_eval_plus()
             dataset_hash = data_module.get_human_eval_plus_hash()
@@ -223,7 +294,12 @@ def _load_official_dataset() -> tuple[dict[str, dict[str, Any]], str, str, int, 
     except Exception:
         raise _EntrypointError("runtime_unavailable") from None
 
-    if version != EVALPLUS_VERSION or dataset_version != HUMANEVAL_PLUS_VERSION:
+    if (
+        version != EVALPLUS_VERSION
+        or evalplus_commit != EVALPLUS_COMMIT
+        or evaluate_source_sha256 != EVALPLUS_EVALUATE_PY_SHA256
+        or dataset_version != HUMANEVAL_PLUS_VERSION
+    ):
         raise _EntrypointError("runtime_identity_mismatch")
     expected_ids = {f"HumanEval/{index}" for index in range(EXPECTED_DATASET_TASK_COUNT)}
     if (
@@ -240,6 +316,8 @@ def _load_official_dataset() -> tuple[dict[str, dict[str, Any]], str, str, int, 
         dataset_file_sha256,
         dataset_file_size,
         _canonical_dataset_sha256(problems),
+        evalplus_commit,
+        evaluate_source_sha256,
     )
 
 
@@ -265,6 +343,8 @@ def _safe_runtime_metadata(
     dataset_file_sha256: str,
     dataset_file_size: int,
     dataset_canonical_sha256: str,
+    evalplus_commit: str,
+    evaluate_source_sha256: str,
     *,
     verified_task_count: int,
 ) -> dict[str, Any]:
@@ -273,7 +353,10 @@ def _safe_runtime_metadata(
         "mode": "inspect",
         "status": "ok",
         "evalplus_version": EVALPLUS_VERSION,
-        "evalplus_commit": EVALPLUS_COMMIT,
+        "evalplus_commit": evalplus_commit,
+        "evalplus_commit_basis": "git_C_evalplus_rev_parse_HEAD",
+        "evalplus_evaluate_py_sha256": evaluate_source_sha256,
+        "evalplus_evaluate_py_sha256_basis": "installed_evalplus_evaluate_py_exact_bytes",
         "humaneval_plus_version": HUMANEVAL_PLUS_VERSION,
         # This is the MD5 of the complete pinned HumanEval+ release.  It is
         # intentionally distinct from the per-task override hash emitted by
@@ -307,6 +390,8 @@ def _inspect(request_path: Path) -> dict[str, Any]:
         dataset_file_sha256,
         dataset_file_size,
         dataset_canonical_sha256,
+        evalplus_commit,
+        evaluate_source_sha256,
     ) = _load_official_dataset()
     _verify_tasks(problems, tasks)
     return _safe_runtime_metadata(
@@ -314,6 +399,8 @@ def _inspect(request_path: Path) -> dict[str, Any]:
         dataset_file_sha256,
         dataset_file_size,
         dataset_canonical_sha256,
+        evalplus_commit,
+        evaluate_source_sha256,
         verified_task_count=len(tasks),
     )
 
@@ -333,7 +420,7 @@ class _PinnedResultPathProxy:
         except (OSError, TypeError, ValueError):
             return os.path.isfile(value)
         if candidate == self._target:
-            # EvalPlus 0.3.1 checks twice and otherwise trusts a pre-existing
+            # The pinned evaluator checks twice and otherwise trusts a pre-existing
             # document.  Force the official parent down its final write path.
             return False
         return os.path.isfile(value)
@@ -449,6 +536,15 @@ def _guarded_official_evaluate(
         if not stat.S_ISDIR(protected_directory.st_mode):
             raise _EntrypointError("result_integrity_failed")
         evaluator_module = importlib.import_module("evalplus.evaluate")
+        version = importlib.metadata.version("evalplus")
+        evaluate_source_sha256 = _evalplus_evaluate_source_sha256(evaluator_module)
+        evalplus_commit = _evalplus_git_head()
+        if (
+            version != EVALPLUS_VERSION
+            or evaluate_source_sha256 != EVALPLUS_EVALUATE_PY_SHA256
+            or evalplus_commit != EVALPLUS_COMMIT
+        ):
+            raise _EntrypointError("runtime_identity_mismatch")
         official_evaluate = getattr(evaluator_module, "evaluate", None)
         if not callable(official_evaluate):
             raise _EntrypointError("runtime_identity_mismatch")
@@ -858,6 +954,8 @@ def _run(
         _dataset_file_sha256,
         _dataset_file_size,
         _dataset_canonical_sha256,
+        _evalplus_commit,
+        _evaluate_source_sha256,
     ) = _load_official_dataset()
     _verify_tasks(problems, tasks)
     problem = problems[expected["task_id"]]

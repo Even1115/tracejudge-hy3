@@ -20,10 +20,10 @@
 
 1. `exporter.py` 在任何输出目录或 Docker 进程创建前，完整校验阶段一 manifest/summary/responses、数据集 manifest 和相邻公开 `problems.jsonl`；只提取每题唯一历史 `success` 记录的 `solution_trace.code`。
 2. `runner.py` 将最小 `task_id` / `solution` samples 原子写入私有运行目录，记录来源记录哈希、代码哈希和组合续跑指纹。
-3. `docker_runner.py` 先校验固定镜像 digest、linux/amd64 平台、EvalPlus/Python/HumanEval+ release 身份和 10 题公开 prompt/entry-point 身份，再为每题启动一次受限容器。
+3. `docker_runner.py` 先校验固定镜像 digest、linux/amd64 平台、镜像内 EvalPlus package `0.4.0.dev2` 与源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、Python/HumanEval+ release 身份和 10 题公开 prompt/entry-point 身份，再为每题启动一次受限容器。
 4. `container_entrypoint.py` 只在容器内加载官方 EvalPlus-native release 数据，从 164 题中生成当前单题的 evaluation-only override，然后调用固定参数的官方 `evalplus.evaluate`。
 5. task 只读挂载单题 control，并只把两个预创建宿主文件作为精确 RW bind；宿主等待容器完全退出后才验证/读取结果，清理容器后复制为新的私有 inode，不把仓库或宿主可写目录交给候选。
-6. `parser.py` 严格绑定 EvalPlus v0.3.1 raw schema；候选代码仅保存 SHA256，失败输入只计数，实值仅存在权限 `0600` 的原始 bundle。
+6. `parser.py` 严格绑定该固定 EvalPlus commit 实际产生的 raw schema；候选代码仅保存 SHA256，失败输入只计数，实值仅存在权限 `0600` 的原始 bundle。
 7. 主调度器逐题保存 raw/safe checkpoint；完成题可安全跳过，任何来源、代码、镜像、官方数据身份、执行参数或实现指纹变化都拒绝续跑。
 
 Mock executor 只验证这条输入与产物链；它不调用 `run_task()`，不启动 Docker，并将所有题显式记为 `mocked` 而非通过、失败或基础设施错误。

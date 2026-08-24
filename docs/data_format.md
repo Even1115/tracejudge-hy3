@@ -253,8 +253,8 @@ manifest 的 `phase` 固定为 `phase2_evalplus_execution`，`experiment_label` 
 - `phase1_source`：阶段一 run ID、manifest/summary/responses SHA256、Git commit/分支/工作树状态、Provider 和模型；
 - `dataset`：Hugging Face 数据 revision、许可证、受控 manifest/原始快照/公开投影/题号顺序 SHA256、选择算法/种子/题号；
 - `input`：samples SHA256、记录数、有序题号、每题代码 SHA256，以及按同一顺序记录的 `problem_id` / 公开 prompt SHA256 / entry point；
-- `executor`：EvalPlus v0.3.1/version commit、官方镜像 RepoDigest、linux/amd64、Python 3.11.10、HumanEval+ release v0.1.10、官方参数、资源/隔离/超时策略；
-- `executor_runtime`：运行前镜像 ID/平台检查、EvalPlus 数据集官方 MD5、已加载 164 题 native corpus 的确定性 canonical SHA256 及算法、题数与 10 题公开身份核对数；
+- `executor`：镜像内 EvalPlus package `0.4.0.dev2`、源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、官方镜像 RepoDigest、linux/amd64、Python 3.11.10、HumanEval+ release v0.1.10、官方参数、资源/隔离/超时策略；
+- `executor_runtime`：运行前镜像 ID/平台检查、镜像内 `git -C /evalplus rev-parse HEAD` 的实际 commit、Python 最终导入的 `evalplus/evaluate.py` 精确字节 SHA256、EvalPlus 数据集官方 MD5、已加载 164 题 native corpus 的确定性 canonical SHA256 及算法、题数与 10 题公开身份核对数；
 - `execution_config`：宿主单题容器并发数、容器内官方 parallel=1、单题/整批调度超时、固定 5 秒 batch cleanup grace 和官方时限参数；
 - `resume_fingerprint`：以上来源、候选字节、执行器/数据身份、参数和实现 SHA256 的组合指纹；
 - `git` / `environment` / `invocations` / `preflight` / `output` 及明确的 Pilot 限制。
@@ -271,7 +271,7 @@ Hugging Face revision 和 EvalPlus 代码/release 是两套独立 provenance，m
 
 该序列化器只做严格 UTF-8/JSON 编码，不对阶段一已脱敏的代码再次替换文本，避免静默改写候选语义。
 
-`evalplus_raw_results.json` 是 TraceJudge 逐题调用官方 EvalPlus v0.3.1 后的版本化 raw bundle。其内部官方文档仍保留 `date` / `hash` / `eval`，以及候选 `solution`、`base_status`、`plus_status`、`base_fail_tests`、`plus_fail_tests`。这是 evaluation-only 私有文件；不得打印、提交、加入普通日志或传递给后续模型。
+`evalplus_raw_results.json` 是 TraceJudge 逐题调用固定官方镜像内 EvalPlus package `0.4.0.dev2`（源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`）后的版本化 raw bundle。其内部官方文档仍保留 `date` / `hash` / `eval`，以及候选 `solution`、`base_status`、`plus_status`、`base_fail_tests`、`plus_fail_tests`。这是 evaluation-only 私有文件；不得打印、提交、加入普通日志或传递给后续模型。
 
 容器传输期间只把两个预创建的宿主临时文件精确挂载为 raw/control 目标，不挂载输出目录；容器 PID 1 以状态 0 完全退出并清理后，宿主才把经身份/大小/哈希校验的 raw 复制为运行目录中的新 `0600` inode。临时文件模式不是最终 artifact 权限。
 
@@ -311,11 +311,11 @@ Hugging Face revision 和 EvalPlus 代码/release 是两套独立 provenance，m
 
 `passed_plus` 表示 Base 和 Extra 都通过，不是只看 `plus_status`。`*_fail_test_count` 只是官方 `--test-details` 在当次执行中已记录的失败数；尤其 timeout 时不保证它等于全部理论失败测试数。具体失败输入不进入该文件。
 
-EvalPlus v0.3.1 只有 `pass` / `fail` / `timeout`；`fail` 不能可靠区分 wrong answer、语法/入口错误或候选运行异常，所以统一使用 `wrong_answer_or_candidate_exception`。基础设施错误的 base/plus status 为 `null`、`infrastructure_status: "error"`，不会被计为代码失败。Mock dry run 使用 `infrastructure_status: "mocked"` / `error_type: "mock_not_executed"`，同样不表示功能结果。
+该固定 EvalPlus commit 的官方 raw 状态只有 `pass` / `fail` / `timeout`；其中 `fail` 不能可靠区分 wrong answer、语法/入口错误或候选运行异常，所以统一使用 `wrong_answer_or_candidate_exception`。基础设施错误的 base/plus status 为 `null`、`infrastructure_status: "error"`，不会被计为代码失败。Mock dry run 使用 `infrastructure_status: "mocked"` / `error_type: "mock_not_executed"`，同样不表示功能结果。
 
 ### `summary.json` 与 `execution.log`
 
-summary 从脱敏逐题记录重建，主要包含总题数、实际执行数、Base 通过数/率、Base+Extra 通过数/率、timeout、`wrong_answer_or_candidate_exception`、基础设施错误、已观测失败数和平均逐题容器耗时。通过率分母是 `actual_execution_count`；基础设施失败不进分母。批次截止另以 `batch_timeout_count`、`batch_deadline_not_started_count` 和 `container_cleanup_failed_count` 区分已启动超时、尚未启动及清理失败/未确认的题；续跑以 `resume_skipped_count` 和本次 invocation 的结果/基础设施计数说明复用边界。`execution_error_count` 为 `null`，并用 `not_available_in_evalplus_v0.3.1` 说明无法从官方状态精确细分。
+summary 从脱敏逐题记录重建，主要包含总题数、实际执行数、Base 通过数/率、Base+Extra 通过数/率、timeout、`wrong_answer_or_candidate_exception`、基础设施错误、已观测失败数和平均逐题容器耗时。通过率分母是 `actual_execution_count`；基础设施失败不进分母。批次截止另以 `batch_timeout_count`、`batch_deadline_not_started_count` 和 `container_cleanup_failed_count` 区分已启动超时、尚未启动及清理失败/未确认的题；续跑以 `resume_skipped_count` 和本次 invocation 的结果/基础设施计数说明复用边界。`execution_error_count` 为 `null`，并用 `not_available_in_pinned_evalplus_raw_schema` 说明无法从官方状态精确细分。
 
 `execution.log` 只是最多 64 KiB 的基础设施事件 JSONL；不保存 Docker/EvalPlus stdout/stderr 原文或失败输入，仅允许时间、题号、耗时、安全错误类别、输出字节数/SHA256、退出码和清理状态等白名单字段。
 

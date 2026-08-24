@@ -171,8 +171,13 @@ class _FakeDockerExecutor:
         return ExecutorPreflight(
             ready=self.ready,
             runtime={
-                "evalplus_version": "0.3.1",
-                "evalplus_commit": "e5d0ed0bab96280b60b637ec7f15b5e4841b0cb2",
+                "evalplus_version": "0.4.0.dev2",
+                "evalplus_commit": "f11cfb92c1d52896a87f988cbebbd74727d56c7e",
+                "evalplus_commit_basis": "git_C_evalplus_rev_parse_HEAD",
+                "evalplus_evaluate_py_sha256": (
+                    "6fcd78d262eae6eff8af4ef6eb00b22909d37beebd90dc37b84b756053e981dd"
+                ),
+                "evalplus_evaluate_py_sha256_basis": ("installed_evalplus_evaluate_py_exact_bytes"),
                 "humaneval_plus_version": "v0.1.10",
                 "python_version": "3.11.10",
                 "runtime_marker": self.runtime_marker,

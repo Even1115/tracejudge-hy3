@@ -10,7 +10,7 @@
 - 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`）；
 - 从本地固定 revision 快照离线生成 164 题 HumanEval+ 阶段一公开投影，并以固定 seed/公开题号生成可复现的 10 题 Pilot；投影不含 `canonical_solution`、官方测试或任何可执行测试；
 - `baseline --dataset-manifest` 对 HumanEval+ provenance、投影哈希、题号顺序和选择参数做绑定，只生成/解析 Solver 输出；
-- 固定 EvalPlus v0.3.1 commit/官方镜像 digest/Python/HumanEval+ release 的独立阶段二执行边界；仅支持上述固定 10 题、每题单候选的 Base 与 Extra 工程 Pilot；
+- 固定官方镜像 digest、镜像内 EvalPlus package `0.4.0.dev2` 与源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、Python/HumanEval+ release 的独立阶段二执行边界；仅支持上述固定 10 题、每题单候选的 Base 与 Extra 工程 Pilot；
 - 基础 AST 静态分析（分支/循环/数据结构/空输入启发式/硬编码启发式）；
 - 可见测试、隐藏测试、挑战测试；
 - 基础需求—步骤—代码对齐（规则命中 + LLM 判断交叉验证）；

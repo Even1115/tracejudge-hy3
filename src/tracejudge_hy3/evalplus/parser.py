@@ -1,4 +1,4 @@
-"""Strict, disclosure-safe parsing for official EvalPlus v0.3.1 results.
+"""Strict, disclosure-safe parsing for the pinned official EvalPlus results.
 
 EvalPlus' raw result contains both the submitted solution and concrete failing
 test inputs.  Both are evaluation-only data.  This module therefore uses a
@@ -6,7 +6,7 @@ positive allowlist: it retains statuses, counts failing-input array entries,
 and hashes the solution, but never copies either sensitive value into normal
 results or summaries.
 
-EvalPlus v0.3.1 reports only ``pass``, ``fail`` and ``timeout``.  In
+The pinned evaluator reports only ``pass``, ``fail`` and ``timeout``.  In
 particular, ``fail`` combines wrong answers and exceptions raised by candidate
 code; downstream code must not pretend that those cases can be separated.
 """
@@ -25,7 +25,7 @@ from typing import Any, Literal
 OfficialStatus = Literal["pass", "fail", "timeout"]
 
 OFFICIAL_STATUSES = frozenset({"pass", "fail", "timeout"})
-RAW_BUNDLE_KIND = "tracejudge_evalplus_v031_per_task_raw_bundle"
+RAW_BUNDLE_KIND = "tracejudge_evalplus_per_task_raw_bundle_v1"
 WRONG_ANSWER_OR_CANDIDATE_EXCEPTION = "wrong_answer_or_candidate_exception"
 TIMEOUT_ERROR = "timeout"
 
@@ -204,7 +204,7 @@ def _failure_kind(base_status: OfficialStatus, plus_status: OfficialStatus) -> s
 
 def _parse_document(document: Mapping[str, Any]) -> dict[str, Any]:
     if set(document) != _OFFICIAL_TOP_LEVEL_FIELDS:
-        raise EvalPlusParseError("official EvalPlus v0.3.1 top-level fields are invalid")
+        raise EvalPlusParseError("pinned official EvalPlus top-level fields are invalid")
     official_date = document.get("date")
     dataset_hash = document.get("hash")
     evaluations = document.get("eval")
@@ -526,11 +526,11 @@ def build_summary(
             result.get("error_type") == "container_cleanup_failed"
             for result in infrastructure_errors
         ),
-        # EvalPlus v0.3.1 folds wrong answers, syntax errors, missing entry
+        # The pinned EvalPlus raw schema folds wrong answers, syntax errors, missing entry
         # points, and ordinary candidate exceptions into the same `fail`
         # status.  A numeric execution-error count would fabricate precision.
         "execution_error_count": None,
-        "execution_error_observability": "not_available_in_evalplus_v0.3.1",
+        "execution_error_observability": "not_available_in_pinned_evalplus_raw_schema",
         "observed_base_failed_test_count": sum(
             int(result["base_fail_test_count"]) for result in executed
         ),
@@ -541,7 +541,7 @@ def build_summary(
         "limitations": [
             "fixed_problem_subset_not_full_humanevalplus",
             "single_sample_engineering_pilot_not_official_benchmark_ranking",
-            "evalplus_v0.3.1_fail_combines_wrong_answers_and_candidate_exceptions",
+            "pinned_evalplus_fail_combines_wrong_answers_and_candidate_exceptions",
             "public_benchmark_training_contamination_is_possible",
         ],
     }

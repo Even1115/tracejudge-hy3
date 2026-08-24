@@ -1,4 +1,4 @@
-"""Pinned, disclosure-safe Docker runner for official EvalPlus v0.3.1.
+"""Pinned, disclosure-safe Docker runner for the official EvalPlus image.
 
 The host never imports or executes candidate source.  Each invocation mounts a
 read-only control directory plus two exact host-owned output files and delegates
@@ -36,8 +36,9 @@ DEFAULT_EVALPLUS_IMAGE = (
     "ganler/evalplus@sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740"
 )
 DEFAULT_PLATFORM = "linux/amd64"
-EVALPLUS_VERSION = "0.3.1"
-EVALPLUS_COMMIT = "e5d0ed0bab96280b60b637ec7f15b5e4841b0cb2"
+EVALPLUS_VERSION = "0.4.0.dev2"
+EVALPLUS_COMMIT = "f11cfb92c1d52896a87f988cbebbd74727d56c7e"
+EVALPLUS_EVALUATE_PY_SHA256 = "6fcd78d262eae6eff8af4ef6eb00b22909d37beebd90dc37b84b756053e981dd"
 HUMANEVAL_PLUS_VERSION = "v0.1.10"
 IMAGE_PYTHON_VERSION = "3.11.10"
 EXPECTED_PILOT_TASK_COUNT = 10
@@ -122,6 +123,9 @@ class ImageInspection:
 class RuntimeMetadata:
     evalplus_version: str
     evalplus_commit: str
+    evalplus_commit_basis: str
+    evalplus_evaluate_py_sha256: str
+    evalplus_evaluate_py_sha256_basis: str
     humaneval_plus_version: str
     official_dataset_hash: str
     official_dataset_file_sha256: str
@@ -245,6 +249,9 @@ class EvalPlusDockerRunner:
             "requested_platform": self.requested_platform,
             "evalplus_version": EVALPLUS_VERSION,
             "evalplus_commit": EVALPLUS_COMMIT,
+            "evalplus_commit_basis": "git_C_evalplus_rev_parse_HEAD",
+            "evalplus_evaluate_py_sha256": EVALPLUS_EVALUATE_PY_SHA256,
+            "evalplus_evaluate_py_sha256_basis": ("installed_evalplus_evaluate_py_exact_bytes"),
             "humaneval_plus_version": HUMANEVAL_PLUS_VERSION,
             "python_version": IMAGE_PYTHON_VERSION,
             "official_dataset_hash": (
@@ -1454,6 +1461,9 @@ class EvalPlusDockerRunner:
         fields = {
             "evalplus_version",
             "evalplus_commit",
+            "evalplus_commit_basis",
+            "evalplus_evaluate_py_sha256",
+            "evalplus_evaluate_py_sha256_basis",
             "humaneval_plus_version",
             "official_dataset_hash",
             "official_dataset_file_sha256",
@@ -1477,6 +1487,10 @@ class EvalPlusDockerRunner:
         if (
             payload.get("evalplus_version") != EVALPLUS_VERSION
             or payload.get("evalplus_commit") != EVALPLUS_COMMIT
+            or payload.get("evalplus_commit_basis") != "git_C_evalplus_rev_parse_HEAD"
+            or payload.get("evalplus_evaluate_py_sha256") != EVALPLUS_EVALUATE_PY_SHA256
+            or payload.get("evalplus_evaluate_py_sha256_basis")
+            != "installed_evalplus_evaluate_py_exact_bytes"
             or payload.get("humaneval_plus_version") != HUMANEVAL_PLUS_VERSION
             or payload.get("dataset_task_count") != 164
             or payload.get("verified_task_count") != expected_task_count
@@ -1518,8 +1532,11 @@ class EvalPlusDockerRunner:
         ):
             raise DockerRunnerError("image_mismatch", "runtime metadata is malformed")
         return RuntimeMetadata(
-            evalplus_version=EVALPLUS_VERSION,
-            evalplus_commit=EVALPLUS_COMMIT,
+            evalplus_version=str(payload["evalplus_version"]),
+            evalplus_commit=str(payload["evalplus_commit"]),
+            evalplus_commit_basis=str(payload["evalplus_commit_basis"]),
+            evalplus_evaluate_py_sha256=str(payload["evalplus_evaluate_py_sha256"]),
+            evalplus_evaluate_py_sha256_basis=str(payload["evalplus_evaluate_py_sha256_basis"]),
             humaneval_plus_version=HUMANEVAL_PLUS_VERSION,
             official_dataset_hash=official_dataset_hash,
             official_dataset_file_sha256=dataset_file_sha256,
@@ -1551,6 +1568,9 @@ class EvalPlusDockerRunner:
             "host_machine": platform.machine(),
             "evalplus_version": EVALPLUS_VERSION,
             "evalplus_commit": EVALPLUS_COMMIT,
+            "evalplus_commit_basis": "git_C_evalplus_rev_parse_HEAD",
+            "evalplus_evaluate_py_sha256": EVALPLUS_EVALUATE_PY_SHA256,
+            "evalplus_evaluate_py_sha256_basis": ("installed_evalplus_evaluate_py_exact_bytes"),
             "humaneval_plus_version": HUMANEVAL_PLUS_VERSION,
             "python_version": IMAGE_PYTHON_VERSION,
             "image": self.image,
@@ -1650,6 +1670,7 @@ __all__ = [
     "DockerRunner",
     "DockerRunnerError",
     "EVALPLUS_COMMIT",
+    "EVALPLUS_EVALUATE_PY_SHA256",
     "EVALPLUS_VERSION",
     "EvalPlusDockerRunner",
     "HUMANEVAL_PLUS_VERSION",

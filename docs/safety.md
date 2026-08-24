@@ -39,7 +39,7 @@
 
 ## 阶段二 EvalPlus 容器边界
 
-`tracejudge evalplus --executor docker` 不复用通用 `DockerSandbox`，而是使用专用的官方 EvalPlus 执行协议。它固定官方镜像 digest 和 `linux/amd64` 平台，运行时使用：
+`tracejudge evalplus --executor docker` 不复用通用 `DockerSandbox`，而是使用专用的官方 EvalPlus 执行协议。它固定官方镜像 digest 和 `linux/amd64` 平台，并校验镜像内 EvalPlus package `0.4.0.dev2`、源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、Python 3.11.10 与 HumanEval+ release v0.1.10 身份。运行时使用：
 
 - `--pull never` 防止执行时静默替换镜像；运行前通过 `docker image inspect` 验证 RepoDigest、OS 和 architecture；
 - `--network none`、`--read-only`、`--cap-drop ALL`、`--security-opt no-new-privileges`；
@@ -52,7 +52,7 @@
 - preflight 使用 `--rm`；超时、取消、启动异常、非零退出或控制协议异常都会按唯一容器名强制清理，创建与取消竞态会在创建成功后再次检查；
 - 每题容器有独立宿主外层超时，批次调度另有总超时；达到批次截止后，清理命令并行执行（每个最多 10 秒），再给 worker 固定 5 秒确认尾段。未确认退出或清理失败会显式记为 `container_cleanup_failed`，不会当作代码失败或静默成功。
 
-官方 EvalPlus 镜像内的执行用户为 root，候选与 wrapper 仍共享容器 UID；这是当前官方镜像/预置 cache 兼容性的已知限制。强制覆写和退出后读取用于防止常见的意外旧文件/提前结果，但不是对主动恶意候选的密码学完整性证明。EvalPlus 的 `reliability_guard` 也不是安全沙盒。容器已丢弃 capabilities、禁止提权、无网络且不暴露宿主目录，但高对抗场景仍应改用一次性 VM/microVM、独立 UID/进程边界和专用宿主。
+官方 EvalPlus 镜像内的执行用户为 root，候选与 wrapper 仍共享容器 UID；这是当前官方镜像/预置 cache 兼容性的已知限制。manifest 将这一级别明确记录为 `basic_non_adversarial`。强制覆写和退出后读取用于防止常见的意外旧文件/提前结果，但不是对主动恶意候选的密码学完整性证明。EvalPlus 的 `reliability_guard` 也不是安全沙盒。容器已丢弃 capabilities、禁止提权、无网络且不暴露宿主目录，但高对抗场景仍应改用一次性 VM/microVM、独立 UID/进程边界和专用宿主。
 
 ### EvalPlus 原始结果的信息分级
 

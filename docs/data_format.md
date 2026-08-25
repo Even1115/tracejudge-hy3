@@ -102,7 +102,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 
 ```jsonc
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "phase1_baseline_generation",
   "experiment_label": "self_constructed_mvp_fixture_pilot",
   "run_id": "phase1_<timestamp>_<random>",
@@ -155,7 +155,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 }
 ```
 
-`status` 在处理中为 `running`，批次正常处理完后原子更新为 `completed` 并写入 `completed_at`。`provider_config` 是 Provider 显式返回的白名单，不会通过枚举 Provider 内部属性来采集配置。Hy3 先剔除 endpoint 的 userinfo/query/fragment，再记录规范化 endpoint SHA256，不记录 endpoint 原文。敏感键会被过滤，常见凭据形式会被脱敏；API Key、Authorization Header、完整请求头、Cookie 和密码不得写入产物。传入 HumanEval+ `--dataset-manifest` 时，`dataset.provenance` 只保存经白名单校验的身份信息：manifest SHA256、revision、许可证、适配器、原始快照/公开投影哈希、题号顺序与确定性选择参数、withheld 字段名和 `generation_and_parsing_only` 边界；不会原样复制任意 manifest 字段或私有测试内容。续跑会在 `invocations` 中追加带当时 Git/环境快照的 `resume: true` 记录，将遗留的 `running` invocation 标记为 `interrupted` 并写入 `interrupted_at`，但不改变初始 `run_id`。工作树不干净时，`working_tree_sha256` 只保存变更内容的指纹，不保存 diff 或未跟踪文件内容；本 run 自身产物目录从该指纹中排除。
+顶层 `schema_version` 是 manifest、responses 和 summary 整个阶段一 artifact bundle 的统一版本。新 writer 固定创建 v2；已有 v1 产物保持原字节只读，阶段二 exporter 仍按 v1 严格验证，但新 writer 会拒绝 resume v1，避免同一 run 静默混写。`status` 在处理中为 `running`，批次正常处理完后原子更新为 `completed` 并写入 `completed_at`。`provider_config` 是 Provider 显式返回的白名单，不会通过枚举 Provider 内部属性来采集配置。Hy3 先剔除 endpoint 的 userinfo/query/fragment，再记录规范化 endpoint SHA256，不记录 endpoint 原文。敏感键会被过滤，常见凭据形式会被脱敏；API Key、Authorization Header、完整请求头、Cookie 和密码不得写入产物。传入 HumanEval+ `--dataset-manifest` 时，`dataset.provenance` 只保存经白名单校验的身份信息：manifest SHA256、revision、许可证、适配器、原始快照/公开投影哈希、题号顺序与确定性选择参数、withheld 字段名和 `generation_and_parsing_only` 边界；不会原样复制任意 manifest 字段或私有测试内容。续跑会在 `invocations` 中追加带当时 Git/环境快照的 `resume: true` 记录，将遗留的 `running` invocation 标记为 `interrupted` 并写入 `interrupted_at`，但不改变初始 `run_id`。工作树不干净时，`working_tree_sha256` 只保存变更内容的指纹，不保存 diff 或未跟踪文件内容；本 run 自身产物目录从该指纹中排除。
 
 ### `responses.jsonl`
 
@@ -175,6 +175,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
   "duration_seconds": 1.234567,
   "attempt_count": 1,
   "retry_count": 0,
+  "attempt_outcomes": ["success"],
   "raw_output_attempt": 1,
   "parse_attempted": true,
   "raw_output": "<provider text after artifact-safety redaction>",
@@ -211,6 +212,8 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 | `provider_error` | 认证、连接、服务端、超时或 Provider 内部异常；同一批次会继续处理后续题目 |
 | `skipped` | 续跑时该 `problem_id` 历史上已有 `success`，本次不再调用 Provider |
 
+`attempt_outcomes` 是按实际调用顺序保存的脱敏枚举序列，元素只允许 `success` / `parse_error` / `provider_error`。它不保存错误详情、原始输出、请求或凭据；`attempt_count` 必须等于其长度，成功必须是最后一次 outcome。`retry_count = attempt_count - 1` 只是“首次之后的全部额外调用数”：`provider_error → success` 是普通 Provider 重试，不是 JSON repair；只有某次 `parse_error` 后确实又发起下一次调用，才发生 repair。最后一次为 `parse_error` 且没有后续调用时，不会虚构 repair。`skipped` 的 `attempt_count` / `retry_count` 为 0，`attempt_outcomes` 为空。
+
 `parse_status` 独立标记解析结果：`success` 对应 `parsed`，`parse_error` 对应 `failed`，从未得到可解析文本的 `provider_error` 与 `skipped` 对应 `not_attempted`。若早期尝试已对一份原始输出解析失败，但后续尝试又发生超时/服务错误，最终 `status` 是 `provider_error`、`parse_status` 仍是 `failed`，`raw_output_attempt` 指明保存的 `raw_output` 来自第几次调用。`error_type` 是便于汇总的顶层错误类型；`error` 为 `null` 或 `{"type": "<exception class>", "message": "<redacted message>"}`。失败记录不会保留过期的 `solution_trace`；如 Provider 已返回文本，安全脱敏后仍可在 `raw_output` 中保留它。所有持久化字符串中无法表示为 UTF-8 标量值的孤立 surrogate 会统一替换为 `U+FFFD`，以确保单题异常不中止整批持久化且续跑 ID 语义一致。
 
 使用 `--resume-run-id <run_id>` 续跑时，数据集 SHA256、Provider 公开配置、TraceJudge Git commit/工作树指纹以及 Python/直接依赖环境必须与 manifest 一致。若初始运行传入数据集 manifest，续跑还必须传入同一份 manifest，并精确匹配已记录的 provenance（含 manifest SHA256）和 `experiment_label`；更换 revision、选择 seed/题号、适配器或重写 manifest 都会拒绝续跑。历史上任意一次成功的 `problem_id` 追加 `skipped`，未成功题目重新调用 Provider。
@@ -223,12 +226,20 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 - `experiment_label`：与 manifest 一致的数据/实验性质标记；
 - `final_outcome_counts` 及 `success_count` / `parse_error_count` / `provider_error_count` / `failure_count` / `pending_count`：每题最后一条非 `skipped` 事件构成的最终结果，其中 `failure = parse_error + provider_error`；
 - `parse_attempted_count` / `parse_success_count` / `parse_failure_count` 以及 `parse_success_rate`：`parsed / (parsed + failed)`；若没有解析尝试则为 `null`，从未取得文本的 Provider 失败不进入分母；
+- `first_attempt_parse_success_count`：第一次实际调用的 outcome 即为 `success` 的题目数；
+- `parse_failure_encountered_count`：最终有效调用序列中至少出现过一次 `parse_error` 的题目数；
+- `repair_attempted_count`：至少一次 `parse_error` 后确实还有下一次实际调用的题目数；
+- `repair_success_count`：此前出现过 `parse_error` 且最终状态为 `success` 的题目数；普通 `provider_error → success` 不计入；
+- `terminal_parse_error_count`：最终阶段一状态为 `parse_error` 的题目数；
+- `average_attempt_count` / `average_retry_count`：每题最终有效非 `skipped` 记录的调用数/额外调用数算术平均；没有最终记录时为 `null`；
 - `average_duration_seconds`：每题最终非 `skipped` 事件耗时的算术平均；
 - `record_count` / `record_status_counts`：包含续跑事件在内的全部日志记录数/状态分布；
 - `invocation` / `skipped_count`：最近一次调用的时间、状态分布和跳过数；
 - `metrics_scope: "generation_and_parsing_only"`：明确统计边界。
 
 summary **不包含**功能正确率、测试通过率、错误检测率、四层评估结果、反例指标、人工标注对比或任何阶段二及以后的指标。
+
+以上题目级指标都从每个 `problem_id` 最后一条有效非 `skipped` 记录重建；resume 追加的 `skipped` 事件不会覆盖历史成功记录或重复增加解析/repair 计数。旧 v1 summary 不含这七个 v2 指标，阶段二 exporter 不会根据旧 `retry_count` 猜测是否发生过 repair。
 
 ## 阶段二 EvalPlus 产物（`artifacts/experiments/phase2/<run_id>/`）
 

@@ -38,6 +38,7 @@ from tracejudge_hy3.prompts.solver import (
     build_solver_user_prompt,
 )
 from tracejudge_hy3.providers.base import (
+    AttemptOutcome,
     GenerationStatus,
     LLMProvider,
     SolutionGeneration,
@@ -248,22 +249,26 @@ class Hy3OpenAIProvider(LLMProvider):
         last_raw_attempt: int | None = None
         last_error: Exception | None = None
         last_status: GenerationStatus = "provider_error"
+        attempt_outcomes: list[AttemptOutcome] = []
 
         for attempt in range(1, attempts + 1):
             try:
                 raw = await self._call_model(messages)
             except ProviderAuthError as exc:
+                attempt_outcomes.append("provider_error")
                 safe_error = ProviderAuthError(self._redact_configured_secret(str(exc)))
                 return SolutionGeneration(
                     status="provider_error",
                     raw_output=last_raw,
                     solution=None,
                     attempt_count=attempt,
+                    attempt_outcomes=tuple(attempt_outcomes),
                     error=safe_error,
                     raw_output_attempt=last_raw_attempt,
                     parse_attempted=last_raw is not None,
                 )
             except (ProviderTimeoutError, ProviderResponseError) as exc:
+                attempt_outcomes.append("provider_error")
                 safe_message = self._redact_configured_secret(str(exc))
                 last_error = type(exc)(safe_message)
                 last_status = "provider_error"
@@ -283,6 +288,7 @@ class Hy3OpenAIProvider(LLMProvider):
                 solution = parse_structured_output(parse_raw, SolutionTrace)
                 validate_solution_for_problem(problem, solution)
             except (ParsingError, ValueError) as exc:
+                attempt_outcomes.append("parse_error")
                 safe_error = self._artifact_safe_model_text(str(exc))
                 last_error = ParsingError(safe_error)
                 last_status = "parse_error"
@@ -307,16 +313,19 @@ class Hy3OpenAIProvider(LLMProvider):
                 ]
                 continue
 
+            attempt_outcomes.append("success")
             return SolutionGeneration(
                 status="success",
                 raw_output=artifact_raw,
                 solution=solution,
                 attempt_count=attempt,
+                attempt_outcomes=tuple(attempt_outcomes),
                 raw_output_attempt=attempt,
                 parse_attempted=True,
             )
 
         assert last_error is not None
+        assert len(attempt_outcomes) == attempts
         if last_status == "parse_error":
             error: Exception = ProviderParseError(
                 f"Hy3 response failed schema/context validation after {attempts} attempt(s): "
@@ -335,6 +344,7 @@ class Hy3OpenAIProvider(LLMProvider):
             raw_output=last_raw,
             solution=None,
             attempt_count=attempts,
+            attempt_outcomes=tuple(attempt_outcomes),
             error=error,
             raw_output_attempt=last_raw_attempt,
             parse_attempted=last_raw is not None,

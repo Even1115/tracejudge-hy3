@@ -60,7 +60,14 @@ _MAX_SOLUTION_BYTES = 2 * 1024 * 1024
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _RESPONSE_STATUSES = {"success", "parse_error", "provider_error", "skipped"}
-_RESPONSE_KEYS = {
+_ATTEMPT_OUTCOMES = {"success", "parse_error", "provider_error"}
+_PHASE1_ARTIFACT_SCHEMA_V1 = 1
+_PHASE1_ARTIFACT_SCHEMA_V2 = 2
+_SUPPORTED_PHASE1_ARTIFACT_SCHEMAS = {
+    _PHASE1_ARTIFACT_SCHEMA_V1,
+    _PHASE1_ARTIFACT_SCHEMA_V2,
+}
+_RESPONSE_KEYS_V1 = {
     "run_id",
     "invocation_id",
     "problem_id",
@@ -80,6 +87,42 @@ _RESPONSE_KEYS = {
     "error_type",
     "error",
 }
+_RESPONSE_KEYS_V2 = _RESPONSE_KEYS_V1 | {"attempt_outcomes"}
+_SUMMARY_KEYS_V1 = {
+    "run_id",
+    "experiment_label",
+    "updated_at",
+    "completed_at",
+    "total_problem_count",
+    "dataset_problem_count",
+    "final_outcome_counts",
+    "success_count",
+    "parse_error_count",
+    "provider_error_count",
+    "failure_count",
+    "pending_count",
+    "parse_attempted_count",
+    "parse_success_count",
+    "parse_failure_count",
+    "parse_success_rate",
+    "average_duration_seconds",
+    "record_count",
+    "record_status_counts",
+    "status_counts",
+    "invocation",
+    "skipped_count",
+    "metrics_scope",
+}
+_SUMMARY_OBSERVABILITY_KEYS_V2 = {
+    "first_attempt_parse_success_count",
+    "parse_failure_encountered_count",
+    "repair_attempted_count",
+    "repair_success_count",
+    "terminal_parse_error_count",
+    "average_attempt_count",
+    "average_retry_count",
+}
+_SUMMARY_KEYS_V2 = _SUMMARY_KEYS_V1 | _SUMMARY_OBSERVABILITY_KEYS_V2
 _SOLUTION_TRACE_KEYS = {
     "problem_id",
     "requirement_understanding",
@@ -113,6 +156,7 @@ class _DatasetValidation:
 class _ManifestValidation:
     source: Phase1SourceIdentity
     payload: dict[str, Any]
+    artifact_schema_version: int
     invocation_ids: frozenset[str]
     invocation_by_id: dict[str, dict[str, Any]]
 
@@ -188,7 +232,7 @@ def _mapping(value: Any, *, label: str) -> Mapping[str, Any]:
 
 def _exact_keys(value: Mapping[str, Any], expected: set[str], *, label: str) -> None:
     if set(value) != expected:
-        raise EvalPlusExportError(f"{label} fields do not match schema version 1")
+        raise EvalPlusExportError(f"{label} fields do not match the declared schema")
 
 
 def _text(value: Any, *, label: str) -> str:
@@ -542,7 +586,13 @@ def _validate_phase1_manifest(
         },
         label="phase-one manifest",
     )
-    if payload.get("schema_version") != 1 or payload.get("phase") != "phase1_baseline_generation":
+    artifact_schema_version = payload.get("schema_version")
+    if (
+        isinstance(artifact_schema_version, bool)
+        or not isinstance(artifact_schema_version, int)
+        or artifact_schema_version not in _SUPPORTED_PHASE1_ARTIFACT_SCHEMAS
+        or payload.get("phase") != "phase1_baseline_generation"
+    ):
         raise EvalPlusExportError("phase-one manifest schema/phase is invalid")
     if payload.get("status") != "completed" or not isinstance(payload.get("completed_at"), str):
         raise EvalPlusExportError("phase-one manifest is not completed")
@@ -667,6 +717,7 @@ def _validate_phase1_manifest(
     return _ManifestValidation(
         source=source,
         payload=payload,
+        artifact_schema_version=artifact_schema_version,
         invocation_ids=frozenset(invocation_by_id),
         invocation_by_id=invocation_by_id,
     )
@@ -694,7 +745,12 @@ def _validate_response_common(
     manifest: _ManifestValidation,
     expected_ids: frozenset[str],
 ) -> tuple[str, str, str]:
-    _exact_keys(record, _RESPONSE_KEYS, label="phase-one response")
+    response_keys = (
+        _RESPONSE_KEYS_V1
+        if manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V1
+        else _RESPONSE_KEYS_V2
+    )
+    _exact_keys(record, response_keys, label="phase-one response")
     if record.get("run_id") != manifest.source.run_id:
         raise EvalPlusExportError("phase-one response run_id differs from manifest")
     invocation_id = _text(record.get("invocation_id"), label="response invocation_id")
@@ -718,6 +774,31 @@ def _validate_response_common(
     retry_count = _integer(record.get("retry_count"), label="response retry_count")
     if retry_count > attempt_count:
         raise EvalPlusExportError("phase-one response retry count exceeds attempt count")
+    if manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V2:
+        raw_outcomes = record.get("attempt_outcomes")
+        if not isinstance(raw_outcomes, list) or any(
+            not isinstance(outcome, str) or outcome not in _ATTEMPT_OUTCOMES
+            for outcome in raw_outcomes
+        ):
+            raise EvalPlusExportError("phase-one response attempt outcomes are invalid")
+        if attempt_count != len(raw_outcomes):
+            raise EvalPlusExportError(
+                "phase-one response attempt count differs from attempt outcomes"
+            )
+        if status == "skipped":
+            if raw_outcomes:
+                raise EvalPlusExportError("phase-one skipped response has attempt outcomes")
+        else:
+            if not raw_outcomes or raw_outcomes[-1] != status:
+                raise EvalPlusExportError(
+                    "phase-one response final attempt outcome differs from status"
+                )
+            if "success" in raw_outcomes[:-1]:
+                raise EvalPlusExportError("phase-one response continues after a successful attempt")
+            if retry_count != attempt_count - 1:
+                raise EvalPlusExportError(
+                    "phase-one response retry count differs from its attempt sequence"
+                )
     raw_output_attempt = record.get("raw_output_attempt")
     if raw_output_attempt is not None:
         raw_output_attempt = _integer(
@@ -725,8 +806,33 @@ def _validate_response_common(
         )
         if raw_output_attempt > attempt_count:
             raise EvalPlusExportError("phase-one response raw output attempt is invalid")
+        if (
+            manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V2
+            and record["attempt_outcomes"][raw_output_attempt - 1] == "provider_error"
+        ):
+            raise EvalPlusExportError("phase-one raw output attempt references a provider error")
+    if manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V2 and (
+        record.get("raw_output") is None
+    ) is not (raw_output_attempt is None):
+        raise EvalPlusExportError("phase-one raw output and attempt metadata are inconsistent")
+    if (
+        manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V2
+        and record.get("raw_output") is not None
+        and not isinstance(record.get("raw_output"), str)
+    ):
+        raise EvalPlusExportError("phase-one raw output must be text or null")
     if not isinstance(record.get("parse_attempted"), bool):
         raise EvalPlusExportError("phase-one response parse_attempted is invalid")
+    if manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V2:
+        expected_parse_attempted = any(
+            outcome in {"parse_error", "success"} for outcome in record["attempt_outcomes"]
+        )
+        if record.get("parse_attempted") is not expected_parse_attempted:
+            raise EvalPlusExportError(
+                "phase-one response parse_attempted differs from attempt outcomes"
+            )
+        if expected_parse_attempted and not isinstance(record.get("raw_output"), str):
+            raise EvalPlusExportError("phase-one parse attempt is missing its raw output")
     return problem_id, invocation_id, str(status)
 
 
@@ -784,6 +890,12 @@ def _validate_responses(
                 or record.get("error") is not None
             ):
                 raise EvalPlusExportError("successful phase-one response fields are inconsistent")
+            if manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V2 and not isinstance(
+                record.get("raw_output"), str
+            ):
+                raise EvalPlusExportError(
+                    "successful phase-one v2 response is missing its raw output"
+                )
             sample, code_hash = _validated_sample(problem_id, record.get("solution_trace"))
             reference = Phase1ResponseReference(
                 phase1_run_id=manifest.source.run_id,
@@ -853,33 +965,14 @@ def _validate_summary(
     expected_count: int,
 ) -> None:
     summary = _json_object(summary_bytes, label="phase-one summary")
+    summary_keys = (
+        _SUMMARY_KEYS_V1
+        if manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V1
+        else _SUMMARY_KEYS_V2
+    )
     _exact_keys(
         summary,
-        {
-            "run_id",
-            "experiment_label",
-            "updated_at",
-            "completed_at",
-            "total_problem_count",
-            "dataset_problem_count",
-            "final_outcome_counts",
-            "success_count",
-            "parse_error_count",
-            "provider_error_count",
-            "failure_count",
-            "pending_count",
-            "parse_attempted_count",
-            "parse_success_count",
-            "parse_failure_count",
-            "parse_success_rate",
-            "average_duration_seconds",
-            "record_count",
-            "record_status_counts",
-            "status_counts",
-            "invocation",
-            "skipped_count",
-            "metrics_scope",
-        },
+        summary_keys,
         label="phase-one summary",
     )
     if summary.get("run_id") != manifest.source.run_id:
@@ -944,6 +1037,55 @@ def _validate_summary(
         or not math.isclose(float(actual_average), expected_average, rel_tol=1e-12, abs_tol=1e-12)
     ):
         raise EvalPlusExportError("phase-one summary average duration differs from responses")
+
+    if manifest.artifact_schema_version == _PHASE1_ARTIFACT_SCHEMA_V2:
+        final_values = list(final_records.values())
+        attempt_histories = [record["attempt_outcomes"] for record in final_values]
+        expected_observability_counts = {
+            "first_attempt_parse_success_count": sum(
+                bool(outcomes) and outcomes[0] == "success" for outcomes in attempt_histories
+            ),
+            "parse_failure_encountered_count": sum(
+                "parse_error" in outcomes for outcomes in attempt_histories
+            ),
+            "repair_attempted_count": sum(
+                "parse_error" in outcomes[:-1] for outcomes in attempt_histories
+            ),
+            "repair_success_count": sum(
+                record["status"] == "success" and "parse_error" in record["attempt_outcomes"][:-1]
+                for record in final_values
+            ),
+            "terminal_parse_error_count": sum(
+                record["status"] == "parse_error" for record in final_values
+            ),
+        }
+        for field, expected_value in expected_observability_counts.items():
+            if _integer(summary.get(field), label=f"phase-one summary {field}") != expected_value:
+                raise EvalPlusExportError(
+                    "phase-one summary parse observability metrics differ from responses"
+                )
+
+        expected_attempt_average = sum(
+            int(record["attempt_count"]) for record in final_values
+        ) / len(final_values)
+        expected_retry_average = sum(int(record["retry_count"]) for record in final_values) / len(
+            final_values
+        )
+        for field, expected_value in (
+            ("average_attempt_count", expected_attempt_average),
+            ("average_retry_count", expected_retry_average),
+        ):
+            actual_value = summary.get(field)
+            if (
+                isinstance(actual_value, bool)
+                or not isinstance(actual_value, int | float)
+                or not math.isclose(
+                    float(actual_value), expected_value, rel_tol=1e-12, abs_tol=1e-12
+                )
+            ):
+                raise EvalPlusExportError(
+                    "phase-one summary attempt averages differ from responses"
+                )
 
     invocation = _mapping(summary.get("invocation"), label="phase-one summary invocation")
     _exact_keys(

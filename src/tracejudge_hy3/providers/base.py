@@ -6,13 +6,15 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from tracejudge_hy3.exceptions import ParsingError, ProviderError
+from tracejudge_hy3.exceptions import ParsingError, ProviderError, ProviderResponseError
 from tracejudge_hy3.schemas.evaluation import ProcessAssessment
 from tracejudge_hy3.schemas.execution import ExecutionSummary, StaticEvidence
 from tracejudge_hy3.schemas.problem import ProblemSpec
 from tracejudge_hy3.schemas.solution import SolutionTrace
 
 GenerationStatus = Literal["success", "parse_error", "provider_error"]
+AttemptOutcome = GenerationStatus
+_ATTEMPT_OUTCOMES = frozenset({"success", "parse_error", "provider_error"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,9 +31,56 @@ class SolutionGeneration:
     raw_output: str | None
     solution: SolutionTrace | None
     attempt_count: int
+    attempt_outcomes: tuple[AttemptOutcome, ...]
     error: Exception | None = None
     raw_output_attempt: int | None = None
     parse_attempted: bool = False
+
+    def __post_init__(self) -> None:
+        """Reject ambiguous or internally inconsistent attempt histories."""
+
+        if isinstance(self.attempt_count, bool) or not isinstance(self.attempt_count, int):
+            raise TypeError("attempt_count must be an integer")
+        if self.attempt_count < 1:
+            raise ValueError("a generation sequence must contain at least one attempt")
+        if not isinstance(self.attempt_outcomes, tuple):
+            raise TypeError("attempt_outcomes must be a tuple")
+        if self.attempt_count != len(self.attempt_outcomes):
+            raise ValueError("attempt_count must equal len(attempt_outcomes)")
+        if not isinstance(self.status, str) or self.status not in _ATTEMPT_OUTCOMES:
+            raise ValueError(f"unsupported generation status: {self.status!r}")
+        if any(
+            not isinstance(outcome, str) or outcome not in _ATTEMPT_OUTCOMES
+            for outcome in self.attempt_outcomes
+        ):
+            raise ValueError("attempt_outcomes contains an unsupported outcome")
+        if self.attempt_outcomes[-1] != self.status:
+            raise ValueError("generation status must equal the final attempt outcome")
+        if "success" in self.attempt_outcomes[:-1]:
+            raise ValueError("a generation sequence cannot continue after success")
+        expected_parse_attempted = any(
+            outcome in {"parse_error", "success"} for outcome in self.attempt_outcomes
+        )
+        if self.parse_attempted is not expected_parse_attempted:
+            raise ValueError("parse_attempted must match the observable attempt outcomes")
+        if self.raw_output is not None and not isinstance(self.raw_output, str):
+            raise TypeError("raw_output must be text or None")
+        if self.raw_output_attempt is not None and (
+            isinstance(self.raw_output_attempt, bool)
+            or not isinstance(self.raw_output_attempt, int)
+        ):
+            raise TypeError("raw_output_attempt must be an integer or None")
+        if expected_parse_attempted and (
+            self.raw_output is None or self.raw_output_attempt is None
+        ):
+            raise ValueError("a parse attempt must preserve raw output and its attempt number")
+        if (self.raw_output is None) is not (self.raw_output_attempt is None):
+            raise ValueError("raw_output and raw_output_attempt must be present together")
+        if self.raw_output_attempt is not None:
+            if not 1 <= self.raw_output_attempt <= self.attempt_count:
+                raise ValueError("raw_output_attempt is outside the attempt sequence")
+            if self.attempt_outcomes[self.raw_output_attempt - 1] == "provider_error":
+                raise ValueError("raw_output_attempt cannot reference a provider_error")
 
     @property
     def retry_count(self) -> int:
@@ -88,15 +137,17 @@ class LLMProvider(ABC):
 
         try:
             solution = await self.generate_solution(problem)
-            validate_solution_for_problem(problem, solution)
         except (ParsingError, ValueError) as exc:
             return SolutionGeneration(
-                status="parse_error",
+                status="provider_error",
                 raw_output=None,
                 solution=None,
                 attempt_count=1,
-                error=exc,
-                parse_attempted=True,
+                attempt_outcomes=("provider_error",),
+                error=ProviderResponseError(
+                    "provider failed before exposing auditable raw model output "
+                    f"({type(exc).__name__})"
+                ),
             )
         except ProviderError as exc:
             return SolutionGeneration(
@@ -104,13 +155,30 @@ class LLMProvider(ABC):
                 raw_output=None,
                 solution=None,
                 attempt_count=1,
+                attempt_outcomes=("provider_error",),
                 error=exc,
+            )
+
+        raw_output = solution.model_dump_json()
+        try:
+            validate_solution_for_problem(problem, solution)
+        except ValueError as exc:
+            return SolutionGeneration(
+                status="parse_error",
+                raw_output=raw_output,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("parse_error",),
+                error=exc,
+                raw_output_attempt=1,
+                parse_attempted=True,
             )
         return SolutionGeneration(
             status="success",
-            raw_output=solution.model_dump_json(),
+            raw_output=raw_output,
             solution=solution,
             attempt_count=1,
+            attempt_outcomes=("success",),
             raw_output_attempt=1,
             parse_attempted=True,
         )

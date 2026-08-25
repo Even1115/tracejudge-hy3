@@ -79,7 +79,9 @@ from tracejudge_hy3.schemas.problem import ProblemSpec
 
 ResponseStatus = Literal["success", "parse_error", "provider_error", "skipped"]
 
+PHASE1_ARTIFACT_SCHEMA_VERSION = 2
 _ALLOWED_PROVIDER_STATUSES = {"success", "parse_error", "provider_error"}
+_ALLOWED_ATTEMPT_OUTCOMES = frozenset(_ALLOWED_PROVIDER_STATUSES)
 _DIRECT_DEPENDENCIES = ("pydantic", "pydantic-settings", "openai", "typer", "rich")
 _RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _EXPERIMENT_LABEL_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
@@ -93,6 +95,7 @@ class GenerationDetails(Protocol):
     raw_output: str | None
     solution: Any
     attempt_count: int
+    attempt_outcomes: Sequence[str]
     retry_count: int
     error: Any
     raw_output_attempt: int | None
@@ -113,6 +116,10 @@ class BaselineProvider(Protocol):
 
 class BaselineExperimentError(ValueError):
     """Raised when a run cannot be created or safely resumed."""
+
+
+class _ProviderContractError(BaselineExperimentError):
+    """Raised when a provider returns internally inconsistent attempt metadata."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -807,6 +814,113 @@ def _parse_status(status: ResponseStatus, *, parse_attempted: bool) -> str:
     }[status]
 
 
+def _strict_attempt_integer(value: Any, *, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise _ProviderContractError(f"{label} must be a non-negative integer")
+    return value
+
+
+def _validated_attempt_outcomes(
+    value: Any,
+    *,
+    status: ResponseStatus,
+    attempt_count: int,
+    retry_count: int,
+    parse_attempted: bool,
+    raw_output_attempt: int | None,
+) -> tuple[str, ...]:
+    """Validate the exact finite call sequence used by a phase-one record."""
+
+    if not isinstance(value, list | tuple):
+        raise _ProviderContractError("attempt_outcomes must be a list or tuple")
+    outcomes = tuple(value)
+    if any(not isinstance(item, str) or item not in _ALLOWED_ATTEMPT_OUTCOMES for item in outcomes):
+        raise _ProviderContractError("attempt_outcomes contains an unsupported outcome")
+
+    if status == "skipped":
+        if outcomes or attempt_count != 0 or retry_count != 0:
+            raise _ProviderContractError(
+                "skipped records must have no attempts, retries, or attempt outcomes"
+            )
+        if parse_attempted or raw_output_attempt is not None:
+            raise _ProviderContractError("skipped records cannot contain parse attempt metadata")
+        return outcomes
+
+    if attempt_count < 1:
+        raise _ProviderContractError("non-skipped records must contain at least one attempt")
+    if attempt_count != len(outcomes):
+        raise _ProviderContractError("attempt_count must equal len(attempt_outcomes)")
+    if retry_count != attempt_count - 1:
+        raise _ProviderContractError("retry_count must equal attempt_count - 1")
+    if not outcomes or outcomes[-1] != status:
+        raise _ProviderContractError("final status must match the last attempt outcome")
+    if "success" in outcomes[:-1] or outcomes.count("success") > 1:
+        raise _ProviderContractError("no attempt may follow a successful attempt")
+
+    expected_parse_attempted = any(outcome in {"parse_error", "success"} for outcome in outcomes)
+    if parse_attempted is not expected_parse_attempted:
+        raise _ProviderContractError(
+            "parse_attempted must reflect parse_error/success attempt outcomes"
+        )
+    if expected_parse_attempted and raw_output_attempt is None:
+        raise _ProviderContractError(
+            "a parse attempt must preserve raw output and its attempt number"
+        )
+    if raw_output_attempt is not None:
+        if not 1 <= raw_output_attempt <= attempt_count:
+            raise _ProviderContractError("raw_output_attempt is outside the attempt sequence")
+        if outcomes[raw_output_attempt - 1] == "provider_error":
+            raise _ProviderContractError(
+                "raw_output_attempt cannot reference a provider_error attempt"
+            )
+    return outcomes
+
+
+def _validate_existing_response_attempts(records: Sequence[Mapping[str, Any]]) -> None:
+    """Reject a v2 resume log that is missing or mixing attempt schemas."""
+
+    for record in records:
+        raw_status = record.get("status")
+        if raw_status not in {*_ALLOWED_PROVIDER_STATUSES, "skipped"}:
+            raise BaselineExperimentError("cannot resume: response status is invalid")
+        status: ResponseStatus = raw_status  # type: ignore[assignment]
+        attempt_count = _strict_attempt_integer(
+            record.get("attempt_count"), label="response attempt_count"
+        )
+        retry_count = _strict_attempt_integer(
+            record.get("retry_count"), label="response retry_count"
+        )
+        parse_attempted = record.get("parse_attempted")
+        if not isinstance(parse_attempted, bool):
+            raise BaselineExperimentError("cannot resume: parse_attempted is invalid")
+        raw_output_attempt_value = record.get("raw_output_attempt")
+        raw_output_attempt = None
+        if raw_output_attempt_value is not None:
+            raw_output_attempt = _strict_attempt_integer(
+                raw_output_attempt_value, label="response raw_output_attempt"
+            )
+        raw_output = record.get("raw_output")
+        if raw_output is not None and not isinstance(raw_output, str):
+            raise BaselineExperimentError("cannot resume: raw_output is invalid")
+        if (raw_output is None) is not (raw_output_attempt is None):
+            raise BaselineExperimentError(
+                "cannot resume: raw output and attempt metadata are inconsistent"
+            )
+        try:
+            _validated_attempt_outcomes(
+                record.get("attempt_outcomes"),
+                status=status,
+                attempt_count=attempt_count,
+                retry_count=retry_count,
+                parse_attempted=parse_attempted,
+                raw_output_attempt=raw_output_attempt,
+            )
+        except _ProviderContractError as exc:
+            raise BaselineExperimentError(
+                "cannot resume: responses use invalid or mixed attempt metadata"
+            ) from exc
+
+
 def _base_response(
     *,
     run_id: str,
@@ -819,6 +933,7 @@ def _base_response(
     duration_seconds: float,
     attempt_count: int,
     retry_count: int,
+    attempt_outcomes: Sequence[str],
     raw_output_attempt: int | None,
     parse_attempted: bool,
     raw_output: str | None,
@@ -837,8 +952,9 @@ def _base_response(
         "started_at": _iso_utc(started_at),
         "ended_at": _iso_utc(ended_at),
         "duration_seconds": round(max(0.0, duration_seconds), 6),
-        "attempt_count": max(0, attempt_count),
-        "retry_count": max(0, retry_count),
+        "attempt_count": attempt_count,
+        "retry_count": retry_count,
+        "attempt_outcomes": list(attempt_outcomes),
         "raw_output_attempt": raw_output_attempt,
         "parse_attempted": parse_attempted,
         "raw_output": raw_output,
@@ -867,6 +983,7 @@ def _skipped_response(
         duration_seconds=0.0,
         attempt_count=0,
         retry_count=0,
+        attempt_outcomes=(),
         raw_output_attempt=None,
         parse_attempted=False,
         raw_output=None,
@@ -888,45 +1005,48 @@ def _generation_response(
 ) -> dict[str, Any]:
     raw_status = str(generation.status)
     if raw_status not in _ALLOWED_PROVIDER_STATUSES:
-        raise ValueError(f"provider returned unsupported generation status: {raw_status!r}")
+        raise _ProviderContractError(
+            f"provider returned unsupported generation status: {raw_status!r}"
+        )
     status: ResponseStatus = raw_status  # type: ignore[assignment]
-    attempt_count = int(generation.attempt_count)
-    retry_count = int(generation.retry_count)
-    if attempt_count < 0 or retry_count < 0:
-        raise ValueError("provider returned a negative attempt/retry count")
+    attempt_count = _strict_attempt_integer(
+        generation.attempt_count, label="provider attempt_count"
+    )
+    retry_count = _strict_attempt_integer(generation.retry_count, label="provider retry_count")
 
     raw_output = None
     if generation.raw_output is not None:
         raw_output = _redact_text(str(generation.raw_output))
-    parse_attempted = bool(
-        getattr(
-            generation,
-            "parse_attempted",
-            status in {"success", "parse_error"} or raw_output is not None,
-        )
-    )
-    if status in {"success", "parse_error"}:
-        parse_attempted = True
+    parse_attempted_value = getattr(generation, "parse_attempted", None)
+    if not isinstance(parse_attempted_value, bool):
+        raise _ProviderContractError("provider parse_attempted must be boolean")
+    parse_attempted = parse_attempted_value
     raw_output_attempt_value = getattr(generation, "raw_output_attempt", None)
-    raw_output_attempt = (
-        int(raw_output_attempt_value) if raw_output_attempt_value is not None else None
+    raw_output_attempt = None
+    if raw_output_attempt_value is not None:
+        raw_output_attempt = _strict_attempt_integer(
+            raw_output_attempt_value, label="provider raw_output_attempt"
+        )
+    if (raw_output is None) is not (raw_output_attempt is None):
+        raise _ProviderContractError(
+            "raw_output and raw_output_attempt must either both be present or both be absent"
+        )
+    attempt_outcomes = _validated_attempt_outcomes(
+        getattr(generation, "attempt_outcomes", None),
+        status=status,
+        attempt_count=attempt_count,
+        retry_count=retry_count,
+        parse_attempted=parse_attempted,
+        raw_output_attempt=raw_output_attempt,
     )
-    if raw_output is not None and raw_output_attempt is None and attempt_count > 0:
-        raw_output_attempt = attempt_count
-    if raw_output_attempt is not None and not 1 <= raw_output_attempt <= attempt_count:
-        raise ValueError("provider returned an invalid raw_output_attempt")
 
     solution_trace = _solution_payload(generation.solution)
     error: dict[str, str] | None = None
     if status == "success":
         if solution_trace is None:
-            status = "parse_error"
-            parse_attempted = True
-            error = _error_payload(
-                None,
-                default_type="MissingSolutionTrace",
-                default_message="provider reported success without a parsed SolutionTrace",
-            )
+            raise _ProviderContractError("provider reported success without a parsed SolutionTrace")
+        if raw_output is None:
+            raise _ProviderContractError("provider reported success without raw output")
     else:
         error = _error_payload(
             generation.error,
@@ -951,6 +1071,7 @@ def _generation_response(
         duration_seconds=duration_seconds,
         attempt_count=attempt_count,
         retry_count=retry_count,
+        attempt_outcomes=attempt_outcomes,
         raw_output_attempt=raw_output_attempt,
         parse_attempted=parse_attempted,
         raw_output=raw_output,
@@ -981,6 +1102,7 @@ def _provider_exception_response(
         duration_seconds=duration_seconds,
         attempt_count=1,
         retry_count=0,
+        attempt_outcomes=("provider_error",),
         raw_output_attempt=None,
         parse_attempted=False,
         raw_output=None,
@@ -1038,6 +1160,61 @@ def _summary_payload(
     parse_failed_count = final_parse_counts["failed"]
     parse_denominator = parsed_count + parse_failed_count
     durations = [float(record.get("duration_seconds", 0.0)) for record in final_events.values()]
+    final_attempts: list[tuple[Mapping[str, Any], tuple[str, ...], int, int]] = []
+    for record in final_events.values():
+        attempt_count = _strict_attempt_integer(
+            record.get("attempt_count"), label="summary attempt_count"
+        )
+        retry_count = _strict_attempt_integer(
+            record.get("retry_count"), label="summary retry_count"
+        )
+        parse_attempted = record.get("parse_attempted")
+        if not isinstance(parse_attempted, bool):
+            raise _ProviderContractError("summary parse_attempted must be boolean")
+        raw_output_attempt_value = record.get("raw_output_attempt")
+        raw_output_attempt = None
+        if raw_output_attempt_value is not None:
+            raw_output_attempt = _strict_attempt_integer(
+                raw_output_attempt_value, label="summary raw_output_attempt"
+            )
+        status: ResponseStatus = str(record.get("status"))  # type: ignore[assignment]
+        outcomes = _validated_attempt_outcomes(
+            record.get("attempt_outcomes"),
+            status=status,
+            attempt_count=attempt_count,
+            retry_count=retry_count,
+            parse_attempted=parse_attempted,
+            raw_output_attempt=raw_output_attempt,
+        )
+        final_attempts.append((record, outcomes, attempt_count, retry_count))
+
+    first_attempt_parse_success_count = sum(
+        outcomes[0] == "success" for _, outcomes, _, _ in final_attempts
+    )
+    parse_failure_encountered_count = sum(
+        "parse_error" in outcomes for _, outcomes, _, _ in final_attempts
+    )
+    repair_attempted_count = sum(
+        any(outcome == "parse_error" for outcome in outcomes[:-1])
+        for _, outcomes, _, _ in final_attempts
+    )
+    repair_success_count = sum(
+        record.get("status") == "success" and "parse_error" in outcomes
+        for record, outcomes, _, _ in final_attempts
+    )
+    terminal_parse_error_count = sum(
+        record.get("status") == "parse_error" for record, _, _, _ in final_attempts
+    )
+    average_attempt_count = (
+        sum(attempt_count for _, _, attempt_count, _ in final_attempts) / len(final_attempts)
+        if final_attempts
+        else None
+    )
+    average_retry_count = (
+        sum(retry_count for _, _, _, retry_count in final_attempts) / len(final_attempts)
+        if final_attempts
+        else None
+    )
     completed_or_updated = invocation_completed_at or _utc_now()
     invocation_status_counts = Counter(
         str(record.get("status", "unknown")) for record in invocation_records
@@ -1066,6 +1243,13 @@ def _summary_payload(
         "parse_success_count": parsed_count,
         "parse_failure_count": parse_failed_count,
         "parse_success_rate": (parsed_count / parse_denominator if parse_denominator else None),
+        "first_attempt_parse_success_count": first_attempt_parse_success_count,
+        "parse_failure_encountered_count": parse_failure_encountered_count,
+        "repair_attempted_count": repair_attempted_count,
+        "repair_success_count": repair_success_count,
+        "terminal_parse_error_count": terminal_parse_error_count,
+        "average_attempt_count": average_attempt_count,
+        "average_retry_count": average_retry_count,
         "average_duration_seconds": sum(durations) / len(durations) if durations else None,
         "record_count": len(records),
         "record_status_counts": dict(sorted(status_counts.items())),
@@ -1100,7 +1284,7 @@ def _initial_manifest(
     started_at: datetime,
 ) -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": PHASE1_ARTIFACT_SCHEMA_VERSION,
         "phase": "phase1_baseline_generation",
         "experiment_label": experiment_label,
         "run_id": run_id,
@@ -1141,6 +1325,11 @@ def _validate_resume(
     git_metadata: Mapping[str, Any],
     environment_metadata: Mapping[str, Any],
 ) -> None:
+    if manifest.get("schema_version") != PHASE1_ARTIFACT_SCHEMA_VERSION:
+        raise BaselineExperimentError(
+            "cannot resume: existing run uses a different phase-one artifact schema; "
+            "start a new run instead"
+        )
     if manifest.get("run_id") != run_id:
         raise BaselineExperimentError("run_id does not match the existing manifest")
     dataset = manifest.get("dataset")
@@ -1324,6 +1513,7 @@ async def _run_baseline_experiment_open_provider(
             environment_metadata=environment_metadata,
         )
         records = _read_jsonl(paths.responses)
+        _validate_existing_response_attempts(records)
         manifest = _record_resume_invocation(
             manifest,
             invocation_id=invocation_id,
@@ -1392,6 +1582,8 @@ async def _run_baseline_experiment_open_provider(
                     ended_at=ended_at,
                     duration_seconds=time.perf_counter() - monotonic_started_at,
                 )
+            except _ProviderContractError:
+                raise
             except Exception as exc:
                 ended_at = _utc_now()
                 record = _provider_exception_response(

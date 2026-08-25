@@ -36,6 +36,21 @@ from tracejudge_hy3.schemas.problem import ProblemSpec, RequirementItem
 REPOSITORY = Path(__file__).resolve().parents[1]
 SOURCE_MANIFEST = REPOSITORY / "data" / "manifests" / "evalplus_humanevalplus_d32357cf.json"
 EXPECTED_IDS = select_humanevalplus_problem_ids(count=10, seed=20260824)
+REAL_PHASE1_RUN = (
+    REPOSITORY
+    / "artifacts"
+    / "experiments"
+    / "phase1-humanevalplus"
+    / "phase1_20260824T040336563033Z_e23c1905d438"
+)
+REAL_PILOT_MANIFEST = (
+    REPOSITORY
+    / "artifacts"
+    / "datasets"
+    / "processed"
+    / "humanevalplus-pilot-10"
+    / "dataset_manifest.json"
+)
 
 
 def _sha256(payload: bytes) -> str:
@@ -425,6 +440,60 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.write_bytes(_jsonl_bytes(rows))
 
 
+def _upgrade_fixture_to_v2(
+    fixture: ExportFixture,
+    *,
+    attempt_outcomes: dict[str, list[str]] | None = None,
+) -> None:
+    """Upgrade a synthetic v1 run without weakening either schema fixture."""
+
+    configured = attempt_outcomes or {}
+    manifest = json.loads(fixture.manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = 2
+    fixture.manifest_path.write_bytes(_json_bytes(manifest))
+
+    rows = _read_jsonl(fixture.responses_path)
+    for row in rows:
+        outcomes = (
+            [] if row["status"] == "skipped" else configured.get(row["problem_id"], [row["status"]])
+        )
+        row["attempt_outcomes"] = list(outcomes)
+        row["attempt_count"] = len(outcomes)
+        row["retry_count"] = max(0, len(outcomes) - 1)
+        if row["status"] == "success":
+            row["raw_output_attempt"] = len(outcomes)
+    _write_jsonl(fixture.responses_path, rows)
+
+    final_non_skipped: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if row["status"] != "skipped":
+            final_non_skipped[row["problem_id"]] = row
+    final_rows = list(final_non_skipped.values())
+    summary = json.loads(fixture.summary_path.read_text(encoding="utf-8"))
+    summary.update(
+        {
+            "first_attempt_parse_success_count": sum(
+                row["attempt_outcomes"][0] == "success" for row in final_rows
+            ),
+            "parse_failure_encountered_count": sum(
+                "parse_error" in row["attempt_outcomes"] for row in final_rows
+            ),
+            "repair_attempted_count": sum(
+                "parse_error" in row["attempt_outcomes"][:-1] for row in final_rows
+            ),
+            "repair_success_count": sum(
+                row["status"] == "success" and "parse_error" in row["attempt_outcomes"][:-1]
+                for row in final_rows
+            ),
+            "terminal_parse_error_count": sum(row["status"] == "parse_error" for row in final_rows),
+            "average_attempt_count": sum(row["attempt_count"] for row in final_rows)
+            / len(final_rows),
+            "average_retry_count": sum(row["retry_count"] for row in final_rows) / len(final_rows),
+        }
+    )
+    fixture.summary_path.write_bytes(_json_bytes(summary))
+
+
 def test_export_uses_only_solution_code_and_returns_stable_public_metadata(tmp_path):
     fixture = _write_fixture(tmp_path)
     before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
@@ -477,6 +546,256 @@ def test_legal_resume_skipped_records_are_ignored(tmp_path):
     assert [reference.response_line_number for reference in exported.response_references] == list(
         range(1, 11)
     )
+
+
+def test_schema_v2_export_validates_observable_attempt_histories_and_hashes(tmp_path):
+    fixture = _write_fixture(tmp_path)
+    _upgrade_fixture_to_v2(
+        fixture,
+        attempt_outcomes={
+            EXPECTED_IDS[0]: ["parse_error", "success"],
+            EXPECTED_IDS[1]: ["provider_error", "success"],
+        },
+    )
+    response_bytes = fixture.responses_path.read_bytes()
+    response_lines = response_bytes.splitlines(keepends=True)
+
+    exported = load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+    assert len(exported.samples) == len(exported.response_references) == 10
+    assert exported.phase1.responses_sha256 == _sha256(response_bytes)
+    assert exported.phase1.manifest_sha256 == _sha256(fixture.manifest_path.read_bytes())
+    assert exported.phase1.summary_sha256 == _sha256(fixture.summary_path.read_bytes())
+    assert [reference.response_record_sha256 for reference in exported.response_references] == [
+        _sha256(line) for line in response_lines
+    ]
+    assert [reference.code_sha256 for reference in exported.response_references] == [
+        _sha256(fixture.codes[problem_id].encode("utf-8")) for problem_id in EXPECTED_IDS
+    ]
+    # Phase two keeps its existing source identity shape; the manifest hash
+    # already binds the phase-one artifact schema version.
+    assert set(asdict(exported.phase1)) == {
+        "run_id",
+        "experiment_label",
+        "manifest_sha256",
+        "summary_sha256",
+        "responses_sha256",
+        "git_commit",
+        "git_branch",
+        "git_dirty",
+        "provider",
+        "model",
+    }
+
+
+def test_schema_v2_resume_skips_do_not_change_final_attempt_metrics(tmp_path):
+    fixture = _write_fixture(tmp_path, with_skipped=True)
+    _upgrade_fixture_to_v2(
+        fixture,
+        attempt_outcomes={EXPECTED_IDS[0]: ["parse_error", "success"]},
+    )
+
+    exported = load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+    summary = json.loads(fixture.summary_path.read_text(encoding="utf-8"))
+
+    assert len(exported.samples) == 10
+    assert summary["first_attempt_parse_success_count"] == 9
+    assert summary["parse_failure_encountered_count"] == 1
+    assert summary["repair_attempted_count"] == 1
+    assert summary["repair_success_count"] == 1
+    assert summary["terminal_parse_error_count"] == 0
+    assert summary["average_attempt_count"] == 1.1
+    assert summary["average_retry_count"] == 0.1
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "v2_manifest_v1_response",
+        "v1_manifest_v2_response",
+        "v2_manifest_v1_summary",
+        "v1_manifest_v2_summary",
+    ],
+)
+def test_phase1_artifact_versions_cannot_be_silently_mixed(tmp_path, mutation):
+    fixture = _write_fixture(tmp_path)
+    observability_fields = {
+        "first_attempt_parse_success_count": 10,
+        "parse_failure_encountered_count": 0,
+        "repair_attempted_count": 0,
+        "repair_success_count": 0,
+        "terminal_parse_error_count": 0,
+        "average_attempt_count": 1.0,
+        "average_retry_count": 0.0,
+    }
+    if mutation.startswith("v2_manifest"):
+        _upgrade_fixture_to_v2(fixture)
+    if mutation == "v2_manifest_v1_response":
+        rows = _read_jsonl(fixture.responses_path)
+        rows[0].pop("attempt_outcomes")
+        _write_jsonl(fixture.responses_path, rows)
+    elif mutation == "v1_manifest_v2_response":
+        rows = _read_jsonl(fixture.responses_path)
+        rows[0]["attempt_outcomes"] = ["success"]
+        _write_jsonl(fixture.responses_path, rows)
+    elif mutation == "v2_manifest_v1_summary":
+        summary = json.loads(fixture.summary_path.read_text(encoding="utf-8"))
+        for field in observability_fields:
+            summary.pop(field)
+        fixture.summary_path.write_bytes(_json_bytes(summary))
+    else:
+        summary = json.loads(fixture.summary_path.read_text(encoding="utf-8"))
+        summary.update(observability_fields)
+        fixture.summary_path.write_bytes(_json_bytes(summary))
+
+    with pytest.raises(EvalPlusExportError, match="declared schema"):
+        load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+
+@pytest.mark.parametrize(
+    ("outcomes", "attempt_count", "retry_count"),
+    [
+        (["success"], 2, 0),
+        (["not_an_outcome"], 1, 0),
+        (["success", "success"], 2, 1),
+        (["parse_error"], 1, 0),
+        (["provider_error", "success"], 2, 0),
+    ],
+)
+def test_schema_v2_attempt_history_invariants_are_strict(
+    tmp_path, outcomes, attempt_count, retry_count
+):
+    fixture = _write_fixture(tmp_path)
+    _upgrade_fixture_to_v2(fixture)
+    rows = _read_jsonl(fixture.responses_path)
+    rows[0]["attempt_outcomes"] = outcomes
+    rows[0]["attempt_count"] = attempt_count
+    rows[0]["retry_count"] = retry_count
+    _write_jsonl(fixture.responses_path, rows)
+
+    with pytest.raises(EvalPlusExportError):
+        load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+
+def test_schema_v2_raw_output_attempt_cannot_reference_provider_error(tmp_path):
+    fixture = _write_fixture(tmp_path)
+    _upgrade_fixture_to_v2(fixture)
+    rows = _read_jsonl(fixture.responses_path)
+    rows[0]["attempt_outcomes"] = ["provider_error", "success"]
+    rows[0]["attempt_count"] = 2
+    rows[0]["retry_count"] = 1
+    rows[0]["raw_output_attempt"] = 1
+    _write_jsonl(fixture.responses_path, rows)
+
+    with pytest.raises(EvalPlusExportError, match="raw output attempt"):
+        load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+
+def test_schema_v2_success_must_preserve_raw_output(tmp_path):
+    fixture = _write_fixture(tmp_path)
+    _upgrade_fixture_to_v2(fixture)
+    rows = _read_jsonl(fixture.responses_path)
+    rows[0]["raw_output"] = None
+    rows[0]["raw_output_attempt"] = None
+    _write_jsonl(fixture.responses_path, rows)
+
+    with pytest.raises(EvalPlusExportError, match="missing its raw output"):
+        load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+
+def test_schema_v2_parse_error_must_preserve_returned_raw_output(tmp_path):
+    fixture = _write_fixture(tmp_path)
+    _upgrade_fixture_to_v2(fixture)
+    rows = _read_jsonl(fixture.responses_path)
+    parse_failure = {
+        **rows[0],
+        "status": "parse_error",
+        "parse_status": "failed",
+        "attempt_outcomes": ["parse_error"],
+        "raw_output": None,
+        "raw_output_attempt": None,
+        "solution_trace": None,
+        "error_type": "ParsingError",
+        "error": {"type": "ParsingError", "message": "safe parse failure"},
+    }
+    _write_jsonl(fixture.responses_path, [parse_failure, *rows])
+
+    with pytest.raises(EvalPlusExportError, match="parse attempt is missing"):
+        load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+
+def test_schema_v2_skipped_attempt_history_must_be_empty(tmp_path):
+    fixture = _write_fixture(tmp_path, with_skipped=True)
+    _upgrade_fixture_to_v2(fixture)
+    rows = _read_jsonl(fixture.responses_path)
+    rows[-1]["attempt_outcomes"] = ["provider_error"]
+    rows[-1]["attempt_count"] = 1
+    _write_jsonl(fixture.responses_path, rows)
+
+    with pytest.raises(EvalPlusExportError, match="skipped response"):
+        load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "first_attempt_parse_success_count",
+        "parse_failure_encountered_count",
+        "repair_attempted_count",
+        "repair_success_count",
+        "terminal_parse_error_count",
+        "average_attempt_count",
+        "average_retry_count",
+    ],
+)
+def test_schema_v2_summary_observability_is_rebuilt_from_final_records(tmp_path, field):
+    fixture = _write_fixture(tmp_path, with_skipped=True)
+    _upgrade_fixture_to_v2(
+        fixture,
+        attempt_outcomes={EXPECTED_IDS[0]: ["parse_error", "success"]},
+    )
+    summary = json.loads(fixture.summary_path.read_text(encoding="utf-8"))
+    summary[field] += 1
+    fixture.summary_path.write_bytes(_json_bytes(summary))
+
+    with pytest.raises(EvalPlusExportError, match="summary"):
+        load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
+
+
+@pytest.mark.skipif(
+    not REAL_PHASE1_RUN.is_dir() or not REAL_PILOT_MANIFEST.is_file(),
+    reason="local immutable phase-one pilot artifacts are unavailable",
+)
+def test_existing_real_schema_v1_pilot_remains_readable_without_rewrite():
+    before = {
+        path: _sha256(path.read_bytes())
+        for path in (
+            REAL_PHASE1_RUN / "manifest.json",
+            REAL_PHASE1_RUN / "responses.jsonl",
+            REAL_PHASE1_RUN / "summary.json",
+        )
+    }
+
+    exported = load_validated_phase1_export(REAL_PHASE1_RUN, REAL_PILOT_MANIFEST)
+
+    assert len(exported.samples) == len(exported.response_references) == 10
+    assert exported.phase1.manifest_sha256 == (
+        "b54a7471d886df10d78892b58d046bdf9c1d8cf4e09557c0f905e9f0e21b26ce"
+    )
+    assert exported.phase1.responses_sha256 == (
+        "8bb444f448c4426d29bf363c32923c5f804579af5c9407783b576423179db281"
+    )
+    assert exported.phase1.summary_sha256 == (
+        "66d62129685f9d74c62aeb472c78be11029f5602d8095ad4d131ad1f1e7a1f41"
+    )
+    assert before == {
+        path: _sha256(path.read_bytes())
+        for path in (
+            REAL_PHASE1_RUN / "manifest.json",
+            REAL_PHASE1_RUN / "responses.jsonl",
+            REAL_PHASE1_RUN / "summary.json",
+        )
+    }
 
 
 @pytest.mark.parametrize("mutation", ["duplicate_success", "missing_success", "extra_id"])

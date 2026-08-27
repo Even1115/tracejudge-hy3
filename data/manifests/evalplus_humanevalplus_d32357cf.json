@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "dataset_id": "evalplus/humanevalplus",
+  "dataset_card_url": "https://huggingface.co/datasets/evalplus/humanevalplus",
+  "revision": "d32357cf319e50e9c8d8dab5ea876c72b0fd321b",
+  "split": "test",
+  "license": "apache-2.0",
+  "record_count": 164,
+  "retrieved_at": "2026-08-24T01:52:07.816Z",
+  "retrieved_with": {
+    "tool": "hf",
+    "version": "1.28.0"
+  },
+  "checksum_verification": {
+    "tool": "hf cache verify",
+    "verified_file_count": 4,
+    "all_remote_checksums_match": true
+  },
+  "published_fields": [
+    "task_id",
+    "prompt",
+    "canonical_solution",
+    "entry_point",
+    "test"
+  ],
+  "phase1_public_fields": [
+    "task_id",
+    "prompt",
+    "entry_point"
+  ],
+  "phase1_withheld_fields": [
+    "canonical_solution",
+    "test"
+  ],
+  "raw_files": [
+    {
+      "path": ".gitattributes",
+      "size": 2420,
+      "sha256": "3465ffdf32874f23a8c9c79c2841e94a6b59f6505e693ba5d66deab38cd88b34"
+    },
+    {
+      "path": "README.md",
+      "size": 551,
+      "sha256": "e3061487a668029927cde11d75c34713aed3ea5395bdafa2cf6278eeb4d28634"
+    },
+    {
+      "path": "test.jsonl",
+      "size": 11452868,
+      "sha256": "908377f1daf28dcb36846db73a5662b2e05a9907407c2696c89ad9d3b0b04492"
+    },
+    {
+      "path": "data/test-00000-of-00001-5973903632b82d40.parquet",
+      "size": 2902210,
+      "sha256": "4436f5c03d77c17e0cbc57543b90665b5c1266f55a43992a5ed7922cd34a7558"
+    }
+  ]
+}

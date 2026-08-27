@@ -27,6 +27,10 @@ class ProviderResponseError(ProviderError):
     """Raised when a provider response cannot be parsed/validated after retries."""
 
 
+class ProviderParseError(ProviderResponseError):
+    """Raised when model text cannot be parsed/validated after finite retries."""
+
+
 class ProviderTimeoutError(ProviderError):
     """Raised when a provider call exceeds the configured timeout after retries."""
 

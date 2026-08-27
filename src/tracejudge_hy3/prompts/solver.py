@@ -31,7 +31,7 @@ SOLVER_SYSTEM_PROMPT = """\
 1. implementation_steps 中的内容应当是你愿意展示给用户审查的解题说明和实现计划，
    不需要输出不可见的内部思维过程，但内容必须真实反映你实际采用的方案，不能是与代码不符的编造描述。
 2. 不要针对下方给出的可见测试用例进行硬编码或特判（例如直接判断输入是否等于某个样例并返回固定答案）。
-3. 题目不会向你提供隐藏测试用例，你也不应假设或引用任何未给出的测试用例。
+3. 不要假设或引用题面未提供的测试、期望值或其他信息。
 4. 代码必须是可以独立运行的完整函数定义，不要包含使用示例、print 调用或额外的解释文字。
 """
 
@@ -43,10 +43,11 @@ def _test_case_preview(problem: ProblemSpec) -> list[dict]:
     ]
 
 
-def build_solver_user_prompt(problem: ProblemSpec) -> str:
-    payload = {
+def solver_public_payload(problem: ProblemSpec) -> dict:
+    """Return the exact public-data allowlist supplied to the Solver."""
+
+    return {
         "problem_id": problem.problem_id,
-        "title": problem.title,
         "requirement": problem.requirement,
         "function_signature": problem.function_signature,
         "requirements": [
@@ -54,6 +55,10 @@ def build_solver_user_prompt(problem: ProblemSpec) -> str:
         ],
         "visible_test_cases": _test_case_preview(problem),
     }
+
+
+def build_solver_user_prompt(problem: ProblemSpec) -> str:
+    payload = solver_public_payload(problem)
     return (
         "请为以下题目生成结构化解答：\n\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)

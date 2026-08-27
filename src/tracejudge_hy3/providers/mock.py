@@ -24,8 +24,13 @@ from tracejudge_hy3.evaluator.claims import (
     claims_explicit_empty_input_branch,
 )
 from tracejudge_hy3.evaluator.code_location import function_code_span
-from tracejudge_hy3.exceptions import ConfigurationError, TraceJudgeError
-from tracejudge_hy3.providers.base import LLMProvider
+from tracejudge_hy3.exceptions import ConfigurationError, ProviderResponseError, TraceJudgeError
+from tracejudge_hy3.prompts.solver import solver_public_payload
+from tracejudge_hy3.providers.base import (
+    LLMProvider,
+    SolutionGeneration,
+    validate_solution_for_problem,
+)
 from tracejudge_hy3.resources import data_path
 from tracejudge_hy3.schemas.evaluation import ErrorType, ProcessAssessment
 from tracejudge_hy3.schemas.execution import ExecutionSummary, StaticEvidence
@@ -46,9 +51,12 @@ def _find_mock_responses_dir() -> Path:
     return data_path("mock_responses")
 
 
+def _fixture_path(name: str) -> Path:
+    return _find_mock_responses_dir() / f"{name}.json"
+
+
 def _load_fixture(name: str) -> SolutionTrace:
-    fixtures_dir = _find_mock_responses_dir()
-    fixture_path = fixtures_dir / f"{name}.json"
+    fixture_path = _fixture_path(name)
     if not fixture_path.exists():
         raise ConfigurationError(f"mock fixture not found: {fixture_path}")
     payload = json.loads(fixture_path.read_text(encoding="utf-8"))
@@ -63,30 +71,136 @@ class MockProvider(LLMProvider):
 
         self.case = case
 
-    async def generate_solution(self, problem: ProblemSpec) -> SolutionTrace:
+    def _fixture_name(self, problem: ProblemSpec) -> str | None:
         if problem.problem_id == "safe_mean":
             variant = self.case or "correct"
             if variant not in ("correct", "faulty"):
                 raise ConfigurationError(f"unknown mock case '{variant}' for safe_mean")
-            return _load_fixture(f"safe_mean_{variant}")
-        if problem.problem_id == "deduplicate_preserve_order":
-            return _load_fixture("deduplicate_preserve_order_correct")
-        if problem.problem_id == "clamp":
-            return _load_fixture("clamp_correct")
+            return f"safe_mean_{variant}"
+        if problem.problem_id in {"deduplicate_preserve_order", "clamp"}:
+            return f"{problem.problem_id}_correct"
+        return None
+
+    async def generate_solution(self, problem: ProblemSpec) -> SolutionTrace:
+        fixture_name = self._fixture_name(problem)
+        if fixture_name is not None:
+            return _load_fixture(fixture_name)
         return self._fallback_solution(problem)
+
+    async def generate_solution_with_details(self, problem: ProblemSpec) -> SolutionGeneration:
+        """Return deterministic fixture text without using reference-code fallback.
+
+        The fallback remains available to the legacy full-pipeline Mock mode,
+        but it is intentionally forbidden for a baseline experiment because it
+        reads ``reference_code`` and therefore is not a valid Solver sample.
+        """
+
+        try:
+            fixture_name = self._fixture_name(problem)
+        except ConfigurationError as exc:
+            return SolutionGeneration(
+                status="provider_error",
+                raw_output=None,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("provider_error",),
+                error=exc,
+            )
+        if fixture_name is None:
+            error = ProviderResponseError(
+                "no public-data-only baseline Mock fixture exists for "
+                f"problem_id {problem.problem_id!r}"
+            )
+            return SolutionGeneration(
+                status="provider_error",
+                raw_output=None,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("provider_error",),
+                error=error,
+            )
+
+        try:
+            built_in_problem = load_problem_by_id(
+                data_path("sample_problems.jsonl"),
+                problem.problem_id,
+            )
+        except TraceJudgeError as exc:
+            return SolutionGeneration(
+                status="provider_error",
+                raw_output=None,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("provider_error",),
+                error=exc,
+            )
+        if solver_public_payload(problem) != solver_public_payload(built_in_problem):
+            error = ProviderResponseError(
+                "baseline Mock fixtures are restricted to the bundled problem's public prompt "
+                f"for problem_id {problem.problem_id!r}"
+            )
+            return SolutionGeneration(
+                status="provider_error",
+                raw_output=None,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("provider_error",),
+                error=error,
+            )
+
+        fixture_path = _fixture_path(fixture_name)
+        try:
+            raw_output = fixture_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            return SolutionGeneration(
+                status="provider_error",
+                raw_output=None,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("provider_error",),
+                error=exc,
+            )
+        try:
+            solution = SolutionTrace.model_validate_json(raw_output)
+            validate_solution_for_problem(problem, solution)
+        except ValueError as exc:
+            return SolutionGeneration(
+                status="parse_error",
+                raw_output=raw_output,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("parse_error",),
+                error=exc,
+                raw_output_attempt=1,
+                parse_attempted=True,
+            )
+        return SolutionGeneration(
+            status="success",
+            raw_output=raw_output,
+            solution=solution,
+            attempt_count=1,
+            attempt_outcomes=("success",),
+            raw_output_attempt=1,
+            parse_attempted=True,
+        )
+
+    def public_generation_config(self) -> dict[str, object]:
+        return {
+            "provider": self.name,
+            "model": "deterministic-mock-fixtures",
+            "reasoning_effort": None,
+            "reasoning_effort_enabled": False,
+            "timeout_seconds": None,
+            "max_retries": 0,
+            "endpoint_sha256": None,
+        }
 
     def is_trusted_local_solution(
         self,
         problem: ProblemSpec,
         solution: SolutionTrace,
     ) -> bool:
-        fixture_name: str | None = None
-        if problem.problem_id == "safe_mean":
-            variant = self.case or "correct"
-            if variant in ("correct", "faulty"):
-                fixture_name = f"safe_mean_{variant}"
-        elif problem.problem_id in {"deduplicate_preserve_order", "clamp"}:
-            fixture_name = f"{problem.problem_id}_correct"
+        fixture_name = self._fixture_name(problem)
 
         if fixture_name is None:
             return False

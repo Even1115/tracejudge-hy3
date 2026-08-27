@@ -70,4 +70,12 @@ def parse_structured_output(raw_text: str, model: type[T]) -> T:
     try:
         return model.model_validate(payload)
     except ValidationError as exc:
-        raise ParsingError(f"schema validation failed: {exc}") from exc
+        # Pydantic's default string includes ``input_value`` and can echo
+        # credentials or full request headers produced by a model. Keep only
+        # the diagnostic fields required for repair.
+        safe_errors = [
+            {key: item[key] for key in ("type", "loc", "msg") if key in item}
+            for item in exc.errors(include_url=False, include_input=False)
+        ]
+        details = json.dumps(safe_errors, ensure_ascii=False, separators=(",", ":"))
+        raise ParsingError(f"schema validation failed: {details}") from exc

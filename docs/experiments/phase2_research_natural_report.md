@@ -1,10 +1,10 @@
 # TraceJudge-Hy3 阶段二自然研究子集实验报告
 
-> 文档状态：正式执行中
+> 文档状态：已完成并验收
 > 协议版本：`phase2_research_natural_v1`
 > 建立日期：2026-08-26
-> 当前证据状态：阶段一、Mock 链和修复后的真实 Docker 验收已核验；首次正式 Docker run 在 preflight 阶段失败，候选实际执行数为 0；当前代码已通过固定镜像 preflight、42 题 cohort preflight 和单题官方 EvalPlus smoke，修复后的新正式 run 待执行
-> 定稿条件：完成真实 Docker smoke、正式 EvalPlus 执行和产物完整性验收
+> 当前证据状态：阶段一、Mock 链、修复后的真实 Docker 验收和 42 题正式 EvalPlus 执行均已核验；首次 preflight 失败 run 作为历史证据保留
+> 定稿日期：2026-08-27
 
 ## 1. 实验目的与证据边界
 
@@ -28,8 +28,8 @@
 | 阶段二导出门槛 | 已通过 | 42 ≥ 预设最低成功数 30 |
 | 当前代码真实 Docker 验收 | 已通过 | 2026-08-27 真实标记测试 `3 passed, 50 deselected in 50.74s`；覆盖固定镜像 preflight、42 题 cohort preflight 和单题官方执行 smoke |
 | 阶段二 Mock 产物链预检 | 已通过 | run `phase2_20260827T061539511466Z_8529bad881a6`；45/42/0/3 一致，不作为功能证据 |
-| 阶段二真实 EvalPlus 执行 | 首次尝试失败，待新建 run | run `phase2_20260827T065923524982Z_ad32756614a7` 在 preflight 阶段因仅支持 10 题的旧协议失败；0 题实际执行 |
-| 阶段二产物完整性验收 | 首次失败 run 已留档；最终验收待执行 | 失败 run 的脱敏 manifest、summary、results 和 execution log 哈希已记录 |
+| 阶段二真实 EvalPlus 执行 | 已完成 | run `phase2_20260827T081939637435Z_3c366f64fc19`；42/42 实际执行，Base 41/42，Base+Extra 40/42 |
+| 阶段二产物完整性验收 | 已通过 | `evaluation_complete=true`；基础设施错误 0；清理失败 0；六类产物哈希已固化 |
 
 ## 3. 数据集与抽样协议
 
@@ -224,32 +224,34 @@
 
 修复将 preflight 边界改为接受 1—164 个唯一 HumanEval+ 公开任务身份，并为 42 题 cohort 增加回归测试。由于修复会改变实现指纹，失败 run 保留用于审计，修复后必须在干净新 commit 上创建新的正式 run，不对该 run 执行跨实现指纹续跑。
 
-### 7.3 最终正式执行概况（待新 run）
+### 7.3 最终正式执行概况
 
 | 指标 | 原始数量 | 分母/说明 |
 | --- | ---: | --- |
 | 阶段一来源题目 | 45 | 固定来源 cohort |
 | 阶段一成功导出 | 42 | 42/45 = 93.33% |
-| 实际官方执行 | `TBD` | 目标 42 |
-| Base pass | `TBD` | 分母为实际官方执行数 |
-| Base fail | `TBD` | 分母为实际官方执行数 |
-| Base+Extra pass | `TBD` | 必须同时满足 Base 与 Plus 为 pass |
-| Plus fail | `TBD` | 分母为实际官方执行数 |
-| timeout | `TBD` | 候选执行结果 |
-| wrong answer or candidate exception | `TBD` | 固定 raw 无法进一步可靠细分 |
-| infrastructure error | `TBD` | 不计作候选失败 |
-| container cleanup failed | `TBD` | 必须为 0 才通过硬验收 |
-| resume reused | `TBD` | 如未续跑则为 0 |
+| 实际官方执行 | 42 | 42/42 = 100.00% |
+| Base pass | 41 | 41/42 = 97.62% |
+| Base fail | 1 | 1/42 = 2.38% |
+| Base+Extra pass | 40 | 40/42 = 95.24%；同时满足 Base 与 Plus 为 pass |
+| Plus fail | 2 | 2/42 = 4.76% |
+| timeout | 0 | 0/42 = 0.00% |
+| wrong answer or candidate exception | 2 | 固定 raw 无法进一步可靠细分 |
+| infrastructure error | 0 | 不计作候选失败 |
+| container cleanup failed | 0 | 通过硬验收 |
+| resume reused | 0 | 本次为干净新 run，未续跑 |
+| 平均逐题容器耗时 | 27.110 秒 | 按 42 个官方执行结果计算 |
+| `evaluation_complete` | true | 结果数、执行数与预期集合一致 |
 
 ### 7.4 通过率
 
 | 指标 | 数值 | 计算式 |
 | --- | --- | --- |
 | Pipeline Coverage | 93.33% | 42/45 |
-| Base pass rate | `TBD` | Base pass / 实际官方执行数 |
-| Base+Extra pass rate | `TBD` | Base+Extra pass / 实际官方执行数 |
-| 来源 cohort 到 Base pass | `TBD` | Base pass / 45 |
-| 来源 cohort 到 Base+Extra pass | `TBD` | Base+Extra pass / 45 |
+| Base pass rate | 97.62% | 41/42 |
+| Base+Extra pass rate | 95.24% | 40/42 |
+| 来源 cohort 到 Base pass | 91.11% | 41/45 |
+| 来源 cohort 到 Base+Extra pass | 88.89% | 40/45 |
 
 Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端比例并列报告。只报告 42 个阶段一成功候选中的通过率会产生成功条件化偏差。
 
@@ -257,9 +259,52 @@ Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端
 
 逐题表只允许从阶段二 `results.jsonl` 的安全字段生成，不得复制 EvalPlus raw 或失败输入。
 
-| problem ID | Base status | Plus status | passed Base | passed Base+Extra | observed Base fail count | observed Plus fail count | duration | error type |
+| problem ID | Base status | Plus status | passed Base | passed Base+Extra | observed Base fail count | observed Plus fail count | duration (s) | error type |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` | `TBD` |
+| `HumanEval/1` | pass | pass | 是 | 是 | 0 | 0 | 30.382 | — |
+| `HumanEval/9` | pass | pass | 是 | 是 | 0 | 0 | 30.382 | — |
+| `HumanEval/11` | pass | pass | 是 | 是 | 0 | 0 | 26.688 | — |
+| `HumanEval/12` | pass | pass | 是 | 是 | 0 | 0 | 26.696 | — |
+| `HumanEval/14` | pass | pass | 是 | 是 | 0 | 0 | 27.065 | — |
+| `HumanEval/16` | pass | pass | 是 | 是 | 0 | 0 | 27.056 | — |
+| `HumanEval/17` | pass | pass | 是 | 是 | 0 | 0 | 27.104 | — |
+| `HumanEval/19` | pass | pass | 是 | 是 | 0 | 0 | 27.074 | — |
+| `HumanEval/29` | pass | pass | 是 | 是 | 0 | 0 | 26.468 | — |
+| `HumanEval/32` | fail | fail | 否 | 否 | 0 | 1 | 26.467 | wrong_answer_or_candidate_exception |
+| `HumanEval/55` | pass | pass | 是 | 是 | 0 | 0 | 25.951 | — |
+| `HumanEval/57` | pass | pass | 是 | 是 | 0 | 0 | 25.962 | — |
+| `HumanEval/59` | pass | pass | 是 | 是 | 0 | 0 | 27.870 | — |
+| `HumanEval/64` | pass | pass | 是 | 是 | 0 | 0 | 25.859 | — |
+| `HumanEval/65` | pass | pass | 是 | 是 | 0 | 0 | 25.802 | — |
+| `HumanEval/66` | pass | pass | 是 | 是 | 0 | 0 | 26.232 | — |
+| `HumanEval/71` | pass | pass | 是 | 是 | 0 | 0 | 26.059 | — |
+| `HumanEval/72` | pass | pass | 是 | 是 | 0 | 0 | 25.553 | — |
+| `HumanEval/74` | pass | pass | 是 | 是 | 0 | 0 | 25.815 | — |
+| `HumanEval/75` | pass | pass | 是 | 是 | 0 | 0 | 25.898 | — |
+| `HumanEval/79` | pass | pass | 是 | 是 | 0 | 0 | 26.465 | — |
+| `HumanEval/83` | pass | pass | 是 | 是 | 0 | 0 | 26.723 | — |
+| `HumanEval/84` | pass | pass | 是 | 是 | 0 | 0 | 26.803 | — |
+| `HumanEval/87` | pass | pass | 是 | 是 | 0 | 0 | 27.580 | — |
+| `HumanEval/92` | pass | pass | 是 | 是 | 0 | 0 | 26.157 | — |
+| `HumanEval/93` | pass | pass | 是 | 是 | 0 | 0 | 25.564 | — |
+| `HumanEval/101` | pass | pass | 是 | 是 | 0 | 0 | 25.506 | — |
+| `HumanEval/102` | pass | pass | 是 | 是 | 0 | 0 | 25.560 | — |
+| `HumanEval/104` | pass | pass | 是 | 是 | 0 | 0 | 25.954 | — |
+| `HumanEval/106` | pass | pass | 是 | 是 | 0 | 0 | 25.907 | — |
+| `HumanEval/111` | pass | pass | 是 | 是 | 0 | 0 | 26.104 | — |
+| `HumanEval/114` | pass | pass | 是 | 是 | 0 | 0 | 25.639 | — |
+| `HumanEval/115` | pass | pass | 是 | 是 | 0 | 0 | 26.053 | — |
+| `HumanEval/119` | pass | pass | 是 | 是 | 0 | 0 | 25.609 | — |
+| `HumanEval/122` | pass | pass | 是 | 是 | 0 | 0 | 26.960 | — |
+| `HumanEval/123` | pass | pass | 是 | 是 | 0 | 0 | 26.245 | — |
+| `HumanEval/146` | pass | pass | 是 | 是 | 0 | 0 | 29.942 | — |
+| `HumanEval/151` | pass | fail | 是 | 否 | 0 | 2 | 29.651 | wrong_answer_or_candidate_exception |
+| `HumanEval/154` | pass | pass | 是 | 是 | 0 | 0 | 33.092 | — |
+| `HumanEval/156` | pass | pass | 是 | 是 | 0 | 0 | 32.511 | — |
+| `HumanEval/157` | pass | pass | 是 | 是 | 0 | 0 | 29.113 | — |
+| `HumanEval/161` | pass | pass | 是 | 是 | 0 | 0 | 29.113 | — |
+
+`HumanEval/32` 的 Base status 为 `fail`，但安全结果中已观测 Base 失败输入计数为 0；这不表示 Base 没有失败，只表示固定 EvalPlus raw 未提供可用的失败输入列表。`HumanEval/151` 通过 Base，但 Plus status 为 `fail`。两题都只能标记为 `wrong_answer_or_candidate_exception`，不能继续细分。
 
 ## 8. 基础设施与异常记录
 
@@ -267,11 +312,12 @@ Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端
 | --- | ---: | --- | --- |
 | preflight failure | 1 | 是 | 已定位为旧协议恰好 10 题的限制；修复后新建正式 run |
 | preflight 错误映射的 `executor_error` 结果 | 42 | 是 | 仅表示统一 preflight 失败，不是 42 次独立候选执行失败 |
-| batch deadline not started | 0 | 是 | 首次尝试未进入任务调度 |
-| batch timeout | 0 | 是 | 首次尝试未进入任务调度 |
-| container cleanup failed | 0 | 是 | 首次尝试未观测到清理失败 |
-| transport/parser infrastructure error | 0 | 是 | 首次尝试未进入 raw 传输或解析 |
-| candidate timeout | 0 | 否 | 没有候选实际执行 |
+| 最终 run 的 batch deadline not started | 0 | 否 | 42 题均已调度和执行 |
+| 最终 run 的 batch timeout | 0 | 否 | 未触发批次超时 |
+| 最终 run 的 container cleanup failed | 0 | 否 | 清理验收通过 |
+| 最终 run 的 transport/parser infrastructure error | 0 | 否 | 42 条均获得有效官方结果 |
+| 最终 run 的 candidate timeout | 0 | 否 | 42 条候选均在超时边界内结束 |
+| 最终 run 的候选功能 fail | 2 | 否 | 按官方状态记录，不细分错误答案与候选异常 |
 
 如发生续跑，应记录每次 invocation 的时间、原因、实际执行数和 reused 数。不得通过创建新 run 隐藏原 run 的基础设施错误。本次因修复改变实现指纹而必须新建 run，但失败 run ID、原因、脱敏计数和哈希仍在本报告中保留。
 
@@ -281,27 +327,34 @@ Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端
 
 | 字段 | 值 |
 | --- | --- |
-| phase2 run ID | `TBD` |
-| experiment label | `TBD（预期：humanevalplus_42_of_45_evalplus_execution_research_natural）` |
-| execution mode | `TBD（必须为 docker）` |
-| created at | `TBD` |
-| completed at | `TBD` |
-| host system | `TBD` |
-| host architecture | `TBD` |
-| image ID | `TBD` |
-| runtime dataset SHA256 | `TBD` |
-| implementation SHA256 | `TBD` |
+| phase2 run ID | `phase2_20260827T081939637435Z_3c366f64fc19` |
+| experiment label | `humanevalplus_42_of_45_evalplus_execution_research_natural` |
+| metrics scope | `research_natural_42_of_45_phase1_success_conditioned_execution` |
+| execution mode | `docker` |
+| created at | `2026-08-27T08:19:39.865Z` |
+| completed at | `2026-08-27T08:29:20.445Z` |
+| phase2 Git commit | `4ef385a20aa8c2654940d1755b08bfca59107868` |
+| phase2 Git dirty | `false` |
+| host system | `Darwin` |
+| host architecture | `arm64` |
+| requested container platform | `linux/amd64` |
+| image ID | `sha256:f9d1e7b55cae8a8c1548f15e7978502ec958bd5e6d41776a0a65ee0f92fe9c1e` |
+| native dataset canonical SHA256 | `691e960259fc54a19f0158b447deab3c26380f57e6714bb1f575fd73dcab8423` |
+| official dataset file SHA256 | `42526ec0e7d5f3ee0b06d6ced98f8c8bae3d76519151bfb3d36f79010645bd7f` |
+| implementation SHA256 | `763e0fbe976d09bb2536107e9a0de2a55d9b55d7a6fea866a5c5d95de21575a6` |
 
 ### 9.2 最终产物哈希
 
 | 文件 | SHA256 |
 | --- | --- |
-| `manifest.json` | `TBD` |
-| `summary.json` | `TBD` |
-| `results.jsonl` | `TBD` |
-| `execution.log` | `TBD` |
-| `samples.jsonl` | `TBD（只记录哈希，不公开内容）` |
-| `evalplus_raw_results.json` | `TBD（只记录哈希，不公开内容）` |
+| `manifest.json` | `e9e6c0d6677e87f07eab00060e75e3a51b0bd61c0df2aa0e428b692b541429a9` |
+| `summary.json` | `c045dd4db307840e56d5f051e77036e4cad9f2284be05b4fe9ec4b1c871019b3` |
+| `results.jsonl` | `73aa67653a59d40b2768d8e00cd40c0bf69c7565f42411824fa4e34e6c65ff78` |
+| `execution.log` | `b00c44c696714d2a61bf10bcae21c3772e30c2941bbac0e400d2066fb4f926ca` |
+| `samples.jsonl` | `06eadfc8ecb7dbcb4e291bb9dd24a11d3d3e4213e9e6aba0f54a938572c0979f`（只记录哈希，不公开内容） |
+| `evalplus_raw_results.json` | `9832146476b17a379682d0ac358862ace4dcdbfedde22fe48d91982d877a1ffc`（只记录哈希，不公开内容） |
+
+上述六个文件权限均为 `0600`。除 manifest 自身外，其余五个输出哈希与 completed manifest 的 `output` 字段精确一致。
 
 ### 9.3 首次失败 run 的脱敏证据哈希
 
@@ -320,7 +373,7 @@ Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端
 artifacts/datasets/processed/humanevalplus-research-natural-45/
 artifacts/experiments/phase1-research-natural/phase1_20260826T130038779522Z_5f55a45bb5e5/
 artifacts/experiments/phase2-research-natural/phase2_20260827T065923524982Z_ad32756614a7/
-artifacts/experiments/phase2-research-natural/<phase2_run_id>/
+artifacts/experiments/phase2-research-natural/phase2_20260827T081939637435Z_3c366f64fc19/
 ```
 
 所有运行产物均应保持 Git ignored。报告可以保存安全哈希和脱敏计数，但不得提交官方 raw、samples、具体失败输入或未审查的模型原始输出。
@@ -365,18 +418,20 @@ artifacts/experiments/phase2-research-natural/<phase2_run_id>/
 - [x] 当前代码版本真实单题 EvalPlus smoke 通过。
 - [x] Mock 导出确认 45/42/0/3 统计一致。
 - [x] 首次正式 run 的 preflight 失败、0 题实际执行和 42 条 `executor_error` 映射已留档。
-- [ ] 在支持 1—164 题 preflight 的干净新 commit 上新建正式 run。
-- [ ] 正式阶段二 Docker run 完成。
-- [ ] 验证阶段二 experiment label 不含 Pilot 身份。
-- [ ] 验证实际结果数为 42。
-- [ ] 验证基础设施错误和清理失败均为 0。
-- [ ] 填写 Base 与 Base+Extra 原始计数和双重分母。
-- [ ] 填写逐题脱敏结果。
-- [ ] 固化阶段二六类产物哈希。
-- [ ] 完成限制、结论和可复现性复核。
+- [x] 在支持 1—164 题 preflight 的干净新 commit 上新建正式 run。
+- [x] 正式阶段二 Docker run 完成。
+- [x] 验证阶段二 experiment label 不含 Pilot 身份。
+- [x] 验证实际结果数为 42。
+- [x] 验证基础设施错误和清理失败均为 0。
+- [x] 填写 Base 与 Base+Extra 原始计数和双重分母。
+- [x] 填写逐题脱敏结果。
+- [x] 固化阶段二六类产物哈希。
+- [x] 完成限制、结论和可复现性复核。
 
 ## 14. 结论
 
-当前只能得出工程性结论：45 题固定来源中有 42 题通过阶段一准入；首次 42 题正式 preflight 因旧协议的固定 10 题限制失败，该 run 的 `actual_execution_count=0`，不产生功能正确率。修复后的当前代码已通过固定镜像 preflight、42 题研究 cohort preflight 和单题官方 EvalPlus Base+Extra smoke，但新的 42 题正式 Docker run 仍待执行。
+固定 45 题自然研究来源中，42 题获得阶段一有效结构化候选，Pipeline Coverage 为 42/45（93.33%）；其余 3 题为 Provider 错误，未进入功能执行。阶段二对 42 个导出候选全部完成了固定官方 EvalPlus Base+Extra 执行，无 timeout、基础设施错误或容器清理失败。
 
-`TBD：最终研究结论仅在修复后的新阶段二 Docker run 和完整性验收结束后填写。结论必须同时报告阶段一 42/45 Pipeline Coverage、阶段二实际执行分母、Base 原始通过数和 Base+Extra 原始通过数。`
+以 42 个实际执行候选为条件分母，Base 通过 41/42（97.62%），Base+Extra 通过 40/42（95.24%）。以预先冻结的 45 题来源 cohort 为端到端分母，对应比例为 Base 41/45（91.11%）和 Base+Extra 40/45（88.89%）。`HumanEval/32` 在 Base 和 Plus 上都为 `fail`；`HumanEval/151` 通过 Base，但在 Plus 上为 `fail`。固定 EvalPlus raw schema 无法将这两个 `fail` 继续可靠地细分为错误答案或候选异常。
+
+这些结果说明阶段一到阶段二的生成—执行链路已在该固定研究子集上完整运行，并为阶段三提供了绑定候选代码哈希的脱敏功能证据。它们不是完整 164 题 HumanEval+ 成绩、标准多样本 pass@k 或官方排行榜结论，也不能单独证明 TraceJudge 过程评估器的研究有效性。

@@ -300,13 +300,17 @@ def _task_metadata_from_public_prompt(problem: Any) -> HumanEvalPlusTaskMetadata
         tree = ast.parse(prompt, filename="<public-humaneval-prompt>", mode="exec")
     except (UnicodeEncodeError, SyntaxError, ValueError):
         raise EvalPlusExportError("public HumanEval+ prompt failed static AST validation") from None
-    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
-    if len(functions) != 1 or functions[0].name != problem.function_name:
+    entry_points = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == problem.function_name
+    ]
+    if len(entry_points) != 1:
         raise EvalPlusExportError("public HumanEval+ prompt entry_point is inconsistent")
     return HumanEvalPlusTaskMetadata(
         problem_id=problem.problem_id,
         prompt_sha256=_sha256(prompt_bytes),
-        entry_point=functions[0].name,
+        entry_point=entry_points[0].name,
     )
 
 

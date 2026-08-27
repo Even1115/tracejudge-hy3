@@ -1070,6 +1070,41 @@ def test_dataset_task_metadata_order_and_ast_entry_point_must_match(tmp_path):
         load_validated_phase1_export(fixture.run_dir, fixture.dataset_manifest)
 
 
+def test_public_prompt_may_define_helpers_alongside_one_entry_point():
+    problem = _problem("HumanEval/32")
+    problem = problem.model_copy(
+        update={
+            "requirement": (
+                "def poly(xs: list[float], x: float) -> float:\n"
+                "    return sum(coefficient * x**index for index, coefficient in enumerate(xs))\n\n"
+                f"{problem.requirement}"
+            )
+        }
+    )
+
+    metadata = exporter_module._task_metadata_from_public_prompt(problem)
+
+    assert metadata.problem_id == "HumanEval/32"
+    assert metadata.entry_point == problem.function_name
+    assert metadata.prompt_sha256 == _sha256(problem.requirement.encode("utf-8"))
+
+
+def test_public_prompt_rejects_duplicate_entry_point_definitions():
+    problem = _problem("HumanEval/32")
+    problem = problem.model_copy(
+        update={
+            "requirement": (
+                f"{problem.requirement}\n"
+                f"def {problem.function_name}(values: list[int]) -> int:\n"
+                "    return 0\n"
+            )
+        }
+    )
+
+    with pytest.raises(EvalPlusExportError, match="entry_point"):
+        exporter_module._task_metadata_from_public_prompt(problem)
+
+
 @pytest.mark.parametrize(
     "artifact",
     ["dataset_manifest", "problems", "manifest", "summary", "responses"],

@@ -8,6 +8,7 @@ candidate code.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -67,7 +68,7 @@ class Phase1SourceIdentity:
 
 @dataclass(frozen=True, slots=True)
 class HumanEvalPlusDatasetIdentity:
-    """Allowlisted identity fields from the validated pilot bundle."""
+    """Allowlisted identity fields from a validated Pilot or research bundle."""
 
     manifest_sha256: str
     dataset_id: str
@@ -85,6 +86,8 @@ class HumanEvalPlusDatasetIdentity:
     selection_algorithm: str
     selection_seed: int
     selected_problem_ids: tuple[str, ...]
+    selection_role: str = "pilot"
+    excluded_manifests: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +113,18 @@ class HumanEvalPlusTaskMetadata:
 
 
 @dataclass(frozen=True, slots=True)
+class Phase1ExportSelectionIdentity:
+    """Auditable source-to-export accounting for one phase-two input set."""
+
+    selection_policy: str
+    min_success_count: int
+    source_problem_count: int
+    exported_success_count: int
+    excluded_parse_error_count: int
+    excluded_provider_error_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class ValidatedSampleExport:
     """Fully validated, in-memory export ready for an isolated executor."""
 
@@ -119,6 +134,7 @@ class ValidatedSampleExport:
     response_references: tuple[Phase1ResponseReference, ...]
     task_metadata: tuple[HumanEvalPlusTaskMetadata, ...]
     samples_sha256: str
+    export_selection: Phase1ExportSelectionIdentity
 
     def reference_for(self, problem_id: str) -> Phase1ResponseReference:
         for reference in self.response_references:

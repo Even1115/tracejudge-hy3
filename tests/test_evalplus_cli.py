@@ -21,6 +21,10 @@ def _fake_run_result(output_dir: str, run_id: str, *, mode: str):
         summary_path=run_dir / "summary.json",
         summary={
             "total_problem_count": 10,
+            "source_problem_count": 10,
+            "exported_success_count": 10,
+            "excluded_parse_error_count": 0,
+            "excluded_provider_error_count": 0,
             "actual_execution_count": 0 if mode == "mock" else 10,
             "base_pass_count": 0 if mode == "mock" else 8,
             "base_pass_rate": None if mode == "mock" else 0.8,
@@ -46,6 +50,8 @@ def test_evalplus_help_exposes_independent_phase_two_options():
         "--parallel",
         "--per-task-timeout",
         "--batch-timeout",
+        "--selection-policy",
+        "--min-success-count",
     ):
         assert option in result.output
 
@@ -134,6 +140,53 @@ def test_docker_cli_wires_explicit_limits_and_reports_safe_counts(tmp_path, monk
     assert "8/10" in result.output
     assert "6/10" in result.output
     assert "固定 EvalPlus raw schema" in result.output
+
+
+def test_research_cli_passes_success_policy_and_reports_source_to_export_counts(
+    tmp_path,
+    monkeypatch,
+):
+    captured: dict[str, object] = {}
+
+    def fake_run_evalplus_experiment(**kwargs):
+        captured.update(kwargs)
+        result = _fake_run_result(kwargs["output_dir"], kwargs["run_id"], mode="mock")
+        result.summary.update(
+            {
+                "total_problem_count": 32,
+                "source_problem_count": 45,
+                "exported_success_count": 32,
+                "excluded_parse_error_count": 8,
+                "excluded_provider_error_count": 5,
+            }
+        )
+        return result
+
+    monkeypatch.setattr(cli_module, "run_evalplus_experiment", fake_run_evalplus_experiment)
+    result = CliRunner().invoke(
+        app,
+        [
+            "evalplus",
+            "--baseline-run",
+            "phase1-research",
+            "--dataset-manifest",
+            "research-dataset-manifest.json",
+            "--output-dir",
+            str(tmp_path),
+            "--executor",
+            "mock",
+            "--selection-policy",
+            "phase1-success-only",
+            "--min-success-count",
+            "30",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["selection_policy"] == "phase1-success-only"
+    assert captured["min_success_count"] == 30
+    for expected in ("阶段一来源题数", "45", "成功导出数", "32", "8", "5"):
+        assert expected in result.output
 
 
 def test_evalplus_cli_rejects_unknown_executor_before_creating_a_run(tmp_path):

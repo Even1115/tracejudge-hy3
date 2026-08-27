@@ -494,6 +494,96 @@ def _upgrade_fixture_to_v2(
     fixture.summary_path.write_bytes(_json_bytes(summary))
 
 
+def _set_terminal_failures(
+    fixture: ExportFixture,
+    *,
+    parse_error_ids: set[str],
+    provider_error_ids: set[str],
+) -> None:
+    """Turn selected v2 success records into internally consistent failures."""
+
+    rows = _read_jsonl(fixture.responses_path)
+    for row in rows:
+        problem_id = row["problem_id"]
+        if problem_id in parse_error_ids:
+            row.update(
+                {
+                    "status": "parse_error",
+                    "parse_status": "failed",
+                    "attempt_outcomes": ["parse_error"],
+                    "solution_trace": None,
+                    "error_type": "ParsingError",
+                    "error": {"type": "ParsingError", "message": "safe parse failure"},
+                }
+            )
+        elif problem_id in provider_error_ids:
+            row.update(
+                {
+                    "status": "provider_error",
+                    "parse_status": "not_attempted",
+                    "attempt_outcomes": ["provider_error"],
+                    "raw_output": None,
+                    "raw_output_attempt": None,
+                    "parse_attempted": False,
+                    "solution_trace": None,
+                    "error_type": "ProviderResponseError",
+                    "error": {
+                        "type": "ProviderResponseError",
+                        "message": "safe provider failure",
+                    },
+                }
+            )
+    _write_jsonl(fixture.responses_path, rows)
+
+    success_count = len(rows) - len(parse_error_ids) - len(provider_error_ids)
+    parse_attempted_count = success_count + len(parse_error_ids)
+    summary = json.loads(fixture.summary_path.read_text(encoding="utf-8"))
+    summary.update(
+        {
+            "final_outcome_counts": {
+                "success": success_count,
+                "parse_error": len(parse_error_ids),
+                "provider_error": len(provider_error_ids),
+                "failure": len(parse_error_ids) + len(provider_error_ids),
+            },
+            "success_count": success_count,
+            "parse_error_count": len(parse_error_ids),
+            "provider_error_count": len(provider_error_ids),
+            "failure_count": len(parse_error_ids) + len(provider_error_ids),
+            "parse_attempted_count": parse_attempted_count,
+            "parse_success_count": success_count,
+            "parse_failure_count": len(parse_error_ids),
+            "parse_success_rate": success_count / parse_attempted_count,
+            "record_status_counts": {
+                "parse_error": len(parse_error_ids),
+                "provider_error": len(provider_error_ids),
+                "success": success_count,
+            },
+            "status_counts": {
+                "parse_error": len(parse_error_ids),
+                "provider_error": len(provider_error_ids),
+                "success": success_count,
+            },
+            "invocation": {
+                **summary["invocation"],
+                "status_counts": {
+                    "parse_error": len(parse_error_ids),
+                    "provider_error": len(provider_error_ids),
+                    "success": success_count,
+                },
+            },
+            "first_attempt_parse_success_count": success_count,
+            "parse_failure_encountered_count": len(parse_error_ids),
+            "repair_attempted_count": 0,
+            "repair_success_count": 0,
+            "terminal_parse_error_count": len(parse_error_ids),
+            "average_attempt_count": 1.0,
+            "average_retry_count": 0.0,
+        }
+    )
+    fixture.summary_path.write_bytes(_json_bytes(summary))
+
+
 def test_export_uses_only_solution_code_and_returns_stable_public_metadata(tmp_path):
     fixture = _write_fixture(tmp_path)
     before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
@@ -606,6 +696,43 @@ def test_schema_v2_resume_skips_do_not_change_final_attempt_metrics(tmp_path):
     assert summary["terminal_parse_error_count"] == 0
     assert summary["average_attempt_count"] == 1.1
     assert summary["average_retry_count"] == 0.1
+
+
+def test_success_only_export_records_source_success_and_excluded_failure_counts(tmp_path):
+    fixture = _write_fixture(tmp_path)
+    _upgrade_fixture_to_v2(fixture)
+    parse_error_ids = set(EXPECTED_IDS[-3:-1])
+    provider_error_ids = {EXPECTED_IDS[-1]}
+    _set_terminal_failures(
+        fixture,
+        parse_error_ids=parse_error_ids,
+        provider_error_ids=provider_error_ids,
+    )
+
+    exported = load_validated_phase1_export(
+        fixture.run_dir,
+        fixture.dataset_manifest,
+        selection_policy="phase1-success-only",
+        min_success_count=7,
+    )
+
+    assert [sample.task_id for sample in exported.samples] == list(EXPECTED_IDS[:7])
+    assert asdict(exported.export_selection) == {
+        "selection_policy": "phase1-success-only",
+        "min_success_count": 7,
+        "source_problem_count": 10,
+        "exported_success_count": 7,
+        "excluded_parse_error_count": 2,
+        "excluded_provider_error_count": 1,
+    }
+
+    with pytest.raises(EvalPlusExportError, match="below min_success_count"):
+        load_validated_phase1_export(
+            fixture.run_dir,
+            fixture.dataset_manifest,
+            selection_policy="phase1-success-only",
+            min_success_count=8,
+        )
 
 
 @pytest.mark.parametrize(
@@ -776,7 +903,12 @@ def test_existing_real_schema_v1_pilot_remains_readable_without_rewrite():
         )
     }
 
-    exported = load_validated_phase1_export(REAL_PHASE1_RUN, REAL_PILOT_MANIFEST)
+    exported = load_validated_phase1_export(
+        REAL_PHASE1_RUN,
+        REAL_PILOT_MANIFEST,
+        selection_policy="all",
+        min_success_count=30,
+    )
 
     assert len(exported.samples) == len(exported.response_references) == 10
     assert exported.phase1.manifest_sha256 == (
@@ -788,6 +920,14 @@ def test_existing_real_schema_v1_pilot_remains_readable_without_rewrite():
     assert exported.phase1.summary_sha256 == (
         "66d62129685f9d74c62aeb472c78be11029f5602d8095ad4d131ad1f1e7a1f41"
     )
+    assert asdict(exported.export_selection) == {
+        "selection_policy": "all",
+        "min_success_count": 30,
+        "source_problem_count": 10,
+        "exported_success_count": 10,
+        "excluded_parse_error_count": 0,
+        "excluded_provider_error_count": 0,
+    }
     assert before == {
         path: _sha256(path.read_bytes())
         for path in (

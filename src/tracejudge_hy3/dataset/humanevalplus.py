@@ -48,6 +48,7 @@ ALLOWED_RAW_FIELDS = PUBLIC_RAW_FIELDS | frozenset(KNOWN_WITHHELD_FIELDS)
 WITHHELD_REFERENCE_CODE = "# EVALPLUS_REFERENCE_CODE_WITHHELD_FROM_PHASE1\n"
 FULL_EXPERIMENT_LABEL = "humanevalplus_164_public_prompt_generation_pilot"
 PILOT_EXPERIMENT_LABEL = "humanevalplus_10_public_prompt_generation_pilot"
+RESEARCH_NATURAL_EXPERIMENT_LABEL = "humanevalplus_45_public_prompt_generation_research_natural"
 FULL_SELECTION_ALGORITHM = "all-pinned-task-ids-numeric-order-v1"
 SELECTION_ALGORITHM = "sha256(seed\\0problem_id)-lowest-v1"
 PILOT_LIMITATIONS = (
@@ -56,6 +57,16 @@ PILOT_LIMITATIONS = (
     "no_humanevalplus_score_or_pass_at_k",
     "public_benchmark_training_contamination_is_possible",
 )
+RESEARCH_NATURAL_LIMITATIONS = (
+    "generation_and_parsing_only",
+    "no_candidate_execution",
+    "no_humanevalplus_score_or_pass_at_k",
+    "public_benchmark_training_contamination_is_possible",
+    "research_natural_cohort_not_full_humanevalplus",
+)
+ALLOWED_SELECTION_ROLES = frozenset({"pilot", "research_natural"})
+DATASET_MANIFEST_SCHEMA_VERSION = 1
+RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -667,22 +678,100 @@ def _selection_rank(*, seed: int, problem_id: str) -> str:
     return hashlib.sha256(f"{seed}\0{problem_id}".encode()).hexdigest()
 
 
-def select_humanevalplus_problem_ids(*, count: int, seed: int) -> tuple[str, ...]:
-    """Return the reproducible public-ID-only selection for the pinned universe."""
+def select_humanevalplus_problem_ids(
+    *, count: int, seed: int, exclude_ids: Sequence[str] | None = None
+) -> tuple[str, ...]:
+    """Return the reproducible public-ID-only selection for the pinned universe.
+
+    When ``exclude_ids`` is supplied, those public IDs are removed from the
+    universe before ranking.  The same seed therefore produces disjoint cohorts
+    for disjoint exclusion sets.
+    """
 
     if count <= 0:
         raise DatasetError("sample count must be greater than zero")
-    if count > EXPECTED_RECORD_COUNT:
-        raise DatasetError("sample count exceeds the available problem count")
+    excluded = frozenset(exclude_ids) if exclude_ids is not None else frozenset()
+    unknown = excluded - {f"HumanEval/{index}" for index in range(EXPECTED_RECORD_COUNT)}
+    if unknown:
+        raise DatasetError(f"exclusion set contains unknown problem IDs: {sorted(unknown)}")
+    available = EXPECTED_RECORD_COUNT - len(excluded)
+    if count > available:
+        raise DatasetError(
+            f"sample count {count} exceeds the available problem count "
+            f"after excluding {len(excluded)} tasks"
+        )
     all_ids = [f"HumanEval/{index}" for index in range(EXPECTED_RECORD_COUNT)]
     ranked = sorted(
-        all_ids,
+        (problem_id for problem_id in all_ids if problem_id not in excluded),
         key=lambda problem_id: (
             _selection_rank(seed=seed, problem_id=problem_id),
             problem_id,
         ),
     )
     return tuple(sorted(ranked[:count], key=_safe_task_id_number))
+
+
+def _load_exclude_manifest(path: Path) -> dict[str, Any]:
+    """Validate a v1 selection manifest used to exclude tasks from a new cohort.
+
+    Only pinned v1 ``tracejudge_dataset_selection`` manifests are accepted as
+    exclusion sources.  The caller is responsible for checking that the
+    revision/dataset identity matches the parent projection.
+    """
+
+    payload = _read_json_object(path, label="exclusion dataset manifest")
+    expected_top_level = {
+        "schema_version",
+        "kind",
+        "experiment_label",
+        "metrics_scope",
+        "dataset_id",
+        "source",
+        "revision",
+        "split",
+        "license",
+        "adapter",
+        "source_manifest_sha256",
+        "parent_manifest_sha256",
+        "raw_snapshot",
+        "public_projection",
+        "selection",
+        "withheld_fields",
+        "limitations",
+    }
+    if set(payload) != expected_top_level:
+        raise DatasetError("exclusion manifest contains fields outside the pinned v1 schema")
+    if payload.get("schema_version") != DATASET_MANIFEST_SCHEMA_VERSION:
+        raise DatasetError("exclusion manifest schema_version must be 1")
+    if payload.get("kind") != "tracejudge_dataset_selection":
+        raise DatasetError("exclusion manifest is not a HumanEval+ dataset selection")
+    if payload.get("dataset_id") != DATASET_ID:
+        raise DatasetError("exclusion manifest dataset_id does not match the parent projection")
+    if payload.get("source") != DATASET_SOURCE:
+        raise DatasetError("exclusion manifest source does not match the parent projection")
+    if payload.get("metrics_scope") != "generation_and_parsing_only":
+        raise DatasetError("exclusion manifest metrics_scope is invalid")
+    if payload.get("split") != "test" or payload.get("license") != "apache-2.0":
+        raise DatasetError("exclusion manifest split/license identity is invalid")
+    revision = payload.get("revision")
+    if not isinstance(revision, str) or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise DatasetError("exclusion manifest revision is invalid")
+    adapter = payload.get("adapter")
+    if adapter != {"name": ADAPTER_NAME, "version": ADAPTER_VERSION}:
+        raise DatasetError("exclusion manifest adapter identity is invalid")
+    selection = payload.get("selection")
+    if not isinstance(selection, Mapping):
+        raise DatasetError("exclusion manifest selection is invalid")
+    if set(selection) != {"algorithm", "seed", "count", "selected_problem_ids"}:
+        raise DatasetError("exclusion manifest selection fields are invalid")
+    if selection.get("algorithm") != SELECTION_ALGORITHM:
+        raise DatasetError("exclusion manifest selection algorithm is invalid")
+    selected_ids = selection.get("selected_problem_ids")
+    if not isinstance(selected_ids, list) or not all(
+        isinstance(problem_id, str) for problem_id in selected_ids
+    ):
+        raise DatasetError("exclusion manifest selected_problem_ids are invalid")
+    return payload
 
 
 def sample_humanevalplus(
@@ -692,14 +781,29 @@ def sample_humanevalplus(
     count: int,
     seed: int,
     output_dir: str | Path,
+    exclude_manifests: Sequence[str | Path] | None = None,
+    selection_role: str = "pilot",
 ) -> SampleResult:
-    """Select task IDs deterministically using only public identifiers."""
+    """Select task IDs deterministically using only public identifiers.
 
-    selected_id_list = list(select_humanevalplus_problem_ids(count=count, seed=seed))
+    Args:
+        dataset_path: Complete public projection ``problems.jsonl``.
+        source_manifest_path: The full public projection manifest.
+        count: Number of tasks to select.
+        seed: Fixed seed combined with public ``problem_id`` for ranking.
+        output_dir: Atomic-publish target directory.
+        exclude_manifests: Optional v1 selection manifests whose
+            ``selected_problem_ids`` are removed from the universe before ranking.
+        selection_role: Either ``"pilot"`` or ``"research_natural"``.
+    """
+
+    if selection_role not in ALLOWED_SELECTION_ROLES:
+        raise DatasetError(f"selection_role must be one of {sorted(ALLOWED_SELECTION_ROLES)}")
     resolved_dataset = Path(dataset_path).expanduser().resolve()
     resolved_manifest = Path(source_manifest_path).expanduser().resolve()
     resolved_output = Path(output_dir).expanduser().resolve()
     parent_manifest = _load_bundle_manifest(resolved_manifest)
+    parent_revision = parent_manifest.get("revision")
     parent_raw_snapshot = parent_manifest.get("raw_snapshot")
     assert isinstance(parent_raw_snapshot, Mapping)
     dataset_hash = _sha256_file(resolved_dataset)
@@ -707,25 +811,101 @@ def sample_humanevalplus(
     if not isinstance(projection, Mapping) or projection.get("sha256") != dataset_hash:
         raise DatasetError("full public projection does not match its dataset manifest")
 
+    excluded_manifest_records: list[dict[str, Any]] = []
+    excluded_problem_ids: list[str] = []
+    seen_excluded_ids: set[str] = set()
+    exclude_paths = [Path(item) for item in (exclude_manifests or [])]
+    for exclude_path in exclude_paths:
+        resolved_exclude = exclude_path.expanduser().resolve()
+        exclude_payload = _load_exclude_manifest(resolved_exclude)
+        if exclude_payload.get("revision") != parent_revision:
+            raise DatasetError("exclusion manifest revision does not match the parent projection")
+        if exclude_payload.get("dataset_id") != DATASET_ID:
+            raise DatasetError("exclusion manifest dataset_id does not match the parent projection")
+        exclude_selection = exclude_payload.get("selection")
+        assert isinstance(exclude_selection, Mapping)
+        ids = list(exclude_selection.get("selected_problem_ids", []))
+        for problem_id in ids:
+            if problem_id in seen_excluded_ids:
+                raise DatasetError(f"duplicate problem ID {problem_id} across exclusion manifests")
+            seen_excluded_ids.add(problem_id)
+            excluded_problem_ids.append(problem_id)
+        excluded_manifest_records.append(
+            {
+                "manifest_sha256": _sha256_file(resolved_exclude),
+                "kind": exclude_payload.get("kind"),
+                "experiment_label": exclude_payload.get("experiment_label"),
+                "selection_role": "pilot",
+                "selected_problem_ids": ids,
+            }
+        )
+
+    selected_id_list = list(
+        select_humanevalplus_problem_ids(count=count, seed=seed, exclude_ids=excluded_problem_ids)
+    )
+    selected_set = set(selected_id_list)
+    overlap = selected_set & seen_excluded_ids
+    if overlap:
+        raise DatasetError(f"selected problem IDs overlap with excluded set: {sorted(overlap)}")
+
     problems = load_problems(resolved_dataset)
     validate_humanevalplus_public_problems(problems, require_complete_snapshot=True)
     problems_by_id = {problem.problem_id: problem for problem in problems}
     selected = [problems_by_id[problem_id] for problem_id in selected_id_list]
     selected_bytes = _jsonl_bytes([problem.model_dump(mode="json") for problem in selected])
     _validate_problem_bytes(selected_bytes, selected_id_list)
-    label = (
-        PILOT_EXPERIMENT_LABEL
-        if count == 10
-        else f"humanevalplus_{count}_public_prompt_generation_pilot"
-    )
-    manifest = {
-        "schema_version": 1,
+
+    if selection_role == "research_natural":
+        if count != 45:
+            raise DatasetError("research_natural cohort is pinned to 45 tasks")
+        if seed != 20260825:
+            raise DatasetError("research_natural cohort is pinned to seed 20260825")
+        label = RESEARCH_NATURAL_EXPERIMENT_LABEL
+        limitations = list(RESEARCH_NATURAL_LIMITATIONS)
+        schema_version = RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION
+    else:
+        label = (
+            PILOT_EXPERIMENT_LABEL
+            if count == 10
+            else f"humanevalplus_{count}_public_prompt_generation_pilot"
+        )
+        limitations = list(PILOT_LIMITATIONS)
+        schema_version = DATASET_MANIFEST_SCHEMA_VERSION
+
+    selection_block: dict[str, Any] = {
+        "algorithm": SELECTION_ALGORITHM,
+        "seed": seed,
+        "count": count,
+        "selected_problem_ids": selected_id_list,
+    }
+    if schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
+        selection_block["selected_problem_ids_sha256"] = ordered_problem_ids_sha256(
+            selected_id_list
+        )
+        selection_block["excluded_problem_ids"] = sorted(
+            excluded_problem_ids, key=_safe_task_id_number
+        )
+        selection_block["excluded_problem_ids_sha256"] = ordered_problem_ids_sha256(
+            sorted(excluded_problem_ids, key=_safe_task_id_number)
+        )
+        selection_block["excluded_manifests_count"] = len(excluded_manifest_records)
+        selection_block["excluded_manifests_sha256"] = _sha256_bytes(
+            _json_bytes(
+                [
+                    {"manifest_sha256": record["manifest_sha256"]}
+                    for record in excluded_manifest_records
+                ]
+            )
+        )
+
+    manifest: dict[str, Any] = {
+        "schema_version": schema_version,
         "kind": "tracejudge_dataset_selection",
         "experiment_label": label,
         "metrics_scope": "generation_and_parsing_only",
         "dataset_id": DATASET_ID,
         "source": DATASET_SOURCE,
-        "revision": parent_manifest.get("revision"),
+        "revision": parent_revision,
         "split": parent_manifest.get("split"),
         "license": parent_manifest.get("license"),
         "adapter": parent_manifest.get("adapter"),
@@ -742,15 +922,13 @@ def sample_humanevalplus(
             "record_count": len(selected),
             "ordered_problem_ids_sha256": ordered_problem_ids_sha256(selected_id_list),
         },
-        "selection": {
-            "algorithm": SELECTION_ALGORITHM,
-            "seed": seed,
-            "count": count,
-            "selected_problem_ids": selected_id_list,
-        },
+        "selection": selection_block,
         "withheld_fields": parent_manifest.get("withheld_fields"),
-        "limitations": list(PILOT_LIMITATIONS),
+        "limitations": limitations,
     }
+    if schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
+        manifest["selection_role"] = selection_role
+        manifest["excluded_manifests"] = excluded_manifest_records
     manifest_bytes = _json_bytes(manifest)
     _publish_bundle(
         resolved_output,

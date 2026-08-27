@@ -33,6 +33,9 @@ from tracejudge_hy3.dataset.humanevalplus import (
     ADAPTER_VERSION as HUMANEVALPLUS_ADAPTER_VERSION,
 )
 from tracejudge_hy3.dataset.humanevalplus import (
+    ALLOWED_SELECTION_ROLES as HUMANEVALPLUS_ALLOWED_SELECTION_ROLES,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
     DATASET_ID as HUMANEVALPLUS_DATASET_ID,
 )
 from tracejudge_hy3.dataset.humanevalplus import (
@@ -57,9 +60,19 @@ from tracejudge_hy3.dataset.humanevalplus import (
     PILOT_LIMITATIONS as HUMANEVALPLUS_PILOT_LIMITATIONS,
 )
 from tracejudge_hy3.dataset.humanevalplus import (
+    RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION as HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    RESEARCH_NATURAL_EXPERIMENT_LABEL as HUMANEVALPLUS_RESEARCH_NATURAL_LABEL,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
+    RESEARCH_NATURAL_LIMITATIONS as HUMANEVALPLUS_RESEARCH_NATURAL_LIMITATIONS,
+)
+from tracejudge_hy3.dataset.humanevalplus import (
     SELECTION_ALGORITHM as HUMANEVALPLUS_SELECTION_ALGORITHM,
 )
 from tracejudge_hy3.dataset.humanevalplus import (
+    _safe_task_id_number,
     ordered_problem_ids_sha256,
     select_humanevalplus_problem_ids,
     validate_humanevalplus_public_problems,
@@ -406,8 +419,12 @@ def _load_dataset_provenance(
         raise BaselineExperimentError("dataset manifest is not valid UTF-8 JSON") from None
     if not isinstance(payload, Mapping):
         raise BaselineExperimentError("dataset manifest must contain a JSON object")
-    if payload.get("schema_version") != 1:
-        raise BaselineExperimentError("dataset manifest schema_version must be 1")
+
+    schema_version = payload.get("schema_version")
+    if schema_version not in {1, HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA}:
+        raise BaselineExperimentError(
+            f"dataset manifest schema_version must be 1 or {HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA}"
+        )
 
     experiment_label = _manifest_text(payload, "experiment_label")
     if not _EXPERIMENT_LABEL_PATTERN.fullmatch(experiment_label):
@@ -422,6 +439,21 @@ def _load_dataset_provenance(
         "tracejudge_dataset_selection",
     }:
         raise BaselineExperimentError("dataset manifest kind is not supported by baseline")
+
+    selection_role = payload.get("selection_role", "pilot")
+    if selection_role not in HUMANEVALPLUS_ALLOWED_SELECTION_ROLES:
+        raise BaselineExperimentError(
+            f"dataset manifest selection_role must be one of "
+            f"{sorted(HUMANEVALPLUS_ALLOWED_SELECTION_ROLES)}"
+        )
+    if (
+        schema_version == HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA
+        and selection_role != "research_natural"
+    ):
+        raise BaselineExperimentError(
+            "schema version 2 dataset manifest must use selection_role 'research_natural'"
+        )
+
     common_fields = {
         "schema_version",
         "kind",
@@ -439,11 +471,12 @@ def _load_dataset_provenance(
         "selection",
         "withheld_fields",
     }
-    expected_fields = (
-        common_fields
-        if kind == "tracejudge_humanevalplus_public_projection"
-        else common_fields | {"parent_manifest_sha256", "limitations"}
-    )
+    if kind == "tracejudge_humanevalplus_public_projection":
+        expected_fields = common_fields
+    else:
+        expected_fields = common_fields | {"parent_manifest_sha256", "limitations"}
+        if schema_version == HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA:
+            expected_fields |= {"selection_role", "excluded_manifests"}
     if set(payload) != expected_fields:
         raise BaselineExperimentError("dataset manifest contains fields outside its schema")
 
@@ -466,11 +499,19 @@ def _load_dataset_provenance(
         "ordered_problem_ids_sha256",
     }:
         raise BaselineExperimentError("dataset manifest projection fields are invalid")
-    expected_selection_fields = (
-        {"algorithm", "count", "selected_problem_ids"}
-        if kind == "tracejudge_humanevalplus_public_projection"
-        else {"algorithm", "seed", "count", "selected_problem_ids"}
-    )
+
+    if kind == "tracejudge_humanevalplus_public_projection":
+        expected_selection_fields: set[str] = {"algorithm", "count", "selected_problem_ids"}
+    else:
+        expected_selection_fields = {"algorithm", "seed", "count", "selected_problem_ids"}
+        if schema_version == HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA:
+            expected_selection_fields |= {
+                "selected_problem_ids_sha256",
+                "excluded_problem_ids",
+                "excluded_problem_ids_sha256",
+                "excluded_manifests_count",
+                "excluded_manifests_sha256",
+            }
     if set(selection) != expected_selection_fields:
         raise BaselineExperimentError("dataset manifest selection fields are invalid")
     if set(raw_snapshot) != {"aggregate_sha256", "test_jsonl_sha256", "record_count"}:
@@ -528,6 +569,78 @@ def _load_dataset_provenance(
     if raw_snapshot.get("record_count") != HUMANEVALPLUS_RECORD_COUNT:
         raise BaselineExperimentError("HumanEval+ raw snapshot must record 164 tasks")
 
+    excluded_manifests: list[dict[str, Any]] = []
+    excluded_problem_ids: list[str] = []
+    if schema_version == HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA:
+        raw_excluded = payload.get("excluded_manifests")
+        if not isinstance(raw_excluded, list):
+            raise BaselineExperimentError("excluded_manifests must be a list")
+        seen_excluded: set[str] = set()
+        for entry in raw_excluded:
+            if not isinstance(entry, Mapping):
+                raise BaselineExperimentError("excluded_manifests entry must be an object")
+            if set(entry) != {
+                "manifest_sha256",
+                "kind",
+                "experiment_label",
+                "selection_role",
+                "selected_problem_ids",
+            }:
+                raise BaselineExperimentError("excluded_manifests entry fields are invalid")
+            entry_hash = _manifest_sha256(entry, "manifest_sha256")
+            if entry.get("kind") != "tracejudge_dataset_selection":
+                raise BaselineExperimentError("excluded_manifests entry kind is invalid")
+            entry_label = _manifest_text(entry, "experiment_label")
+            entry_role = entry.get("selection_role")
+            if entry_role != "pilot":
+                raise BaselineExperimentError(
+                    "excluded_manifests entry selection_role must be 'pilot'"
+                )
+            entry_ids = entry.get("selected_problem_ids")
+            if not isinstance(entry_ids, list) or not all(
+                isinstance(problem_id, str) for problem_id in entry_ids
+            ):
+                raise BaselineExperimentError(
+                    "excluded_manifests entry selected_problem_ids are invalid"
+                )
+            for problem_id in entry_ids:
+                if problem_id in seen_excluded:
+                    raise BaselineExperimentError(
+                        f"duplicate excluded problem ID {problem_id} across exclusion manifests"
+                    )
+                seen_excluded.add(problem_id)
+                excluded_problem_ids.append(problem_id)
+            excluded_manifests.append(
+                {
+                    "manifest_sha256": entry_hash,
+                    "kind": "tracejudge_dataset_selection",
+                    "experiment_label": entry_label,
+                    "selection_role": "pilot",
+                    "selected_problem_ids": list(entry_ids),
+                }
+            )
+
+        recorded_excluded = selection.get("excluded_problem_ids")
+        sorted_excluded = sorted(excluded_problem_ids, key=_safe_task_id_number)
+        if recorded_excluded != sorted_excluded:
+            raise BaselineExperimentError(
+                "excluded_problem_ids do not match the union of excluded manifests"
+            )
+        if selection.get("excluded_manifests_count") != len(excluded_manifests):
+            raise BaselineExperimentError("excluded_manifests_count is inconsistent")
+        expected_excluded_ids_hash = ordered_problem_ids_sha256(sorted_excluded)
+        if _manifest_sha256(selection, "excluded_problem_ids_sha256") != expected_excluded_ids_hash:
+            raise BaselineExperimentError("excluded_problem_ids_sha256 is inconsistent")
+        expected_manifests_hash = hashlib.sha256(
+            _json_bytes(
+                [{"manifest_sha256": record["manifest_sha256"]} for record in excluded_manifests]
+            )
+        ).hexdigest()
+        if _manifest_sha256(selection, "excluded_manifests_sha256") != expected_manifests_hash:
+            raise BaselineExperimentError("excluded_manifests_sha256 is inconsistent")
+        if _manifest_sha256(selection, "selected_problem_ids_sha256") != expected_order_hash:
+            raise BaselineExperimentError("selected_problem_ids_sha256 is inconsistent")
+
     algorithm = _manifest_text(selection, "algorithm")
     seed = selection.get("seed")
     if kind == "tracejudge_humanevalplus_public_projection":
@@ -537,31 +650,48 @@ def _load_dataset_provenance(
         if algorithm != HUMANEVALPLUS_FULL_SELECTION or seed is not None:
             raise BaselineExperimentError("full HumanEval+ selection identity is invalid")
     else:
-        expected_label = (
-            HUMANEVALPLUS_PILOT_LABEL
-            if len(problems) == 10
-            else f"humanevalplus_{len(problems)}_public_prompt_generation_pilot"
-        )
+        if selection_role == "research_natural":
+            expected_label = HUMANEVALPLUS_RESEARCH_NATURAL_LABEL
+            if len(problems) != 45 or seed != 20260825:
+                raise BaselineExperimentError(
+                    "research_natural cohort must contain 45 tasks with seed 20260825"
+                )
+        else:
+            expected_label = (
+                HUMANEVALPLUS_PILOT_LABEL
+                if len(problems) == 10
+                else f"humanevalplus_{len(problems)}_public_prompt_generation_pilot"
+            )
         if algorithm != HUMANEVALPLUS_SELECTION_ALGORITHM or not isinstance(seed, int):
-            raise BaselineExperimentError("HumanEval+ pilot selection identity is invalid")
+            raise BaselineExperimentError("HumanEval+ selection identity is invalid")
         try:
             expected_selected_ids = list(
-                select_humanevalplus_problem_ids(count=len(problems), seed=seed)
+                select_humanevalplus_problem_ids(
+                    count=len(problems),
+                    seed=seed,
+                    exclude_ids=excluded_problem_ids or None,
+                )
             )
         except DatasetError as exc:
             raise BaselineExperimentError(str(exc)) from None
         if problem_ids != expected_selected_ids:
             raise BaselineExperimentError(
-                "HumanEval+ pilot selection does not match its deterministic seed"
+                "HumanEval+ selection does not match its deterministic seed and exclusions"
             )
     if experiment_label != expected_label:
         raise BaselineExperimentError(
             "dataset manifest experiment label does not match its selection"
         )
-    if kind == "tracejudge_dataset_selection" and payload.get("limitations") != list(
-        HUMANEVALPLUS_PILOT_LIMITATIONS
-    ):
-        raise BaselineExperimentError("HumanEval+ pilot limitations identity is invalid")
+
+    if kind == "tracejudge_dataset_selection":
+        expected_limitations = (
+            HUMANEVALPLUS_RESEARCH_NATURAL_LIMITATIONS
+            if selection_role == "research_natural"
+            else HUMANEVALPLUS_PILOT_LIMITATIONS
+        )
+        if payload.get("limitations") != list(expected_limitations):
+            raise BaselineExperimentError("dataset manifest limitations are invalid")
+
     withheld_fields = payload.get("withheld_fields")
     if (
         not isinstance(withheld_fields, list)
@@ -608,6 +738,9 @@ def _load_dataset_provenance(
     }
     if parent_manifest_hash is not None:
         identity["parent_manifest_sha256"] = parent_manifest_hash
+    if schema_version == HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA:
+        identity["selection_role"] = selection_role
+        identity["excluded_manifests"] = excluded_manifests
     return experiment_label, identity
 
 

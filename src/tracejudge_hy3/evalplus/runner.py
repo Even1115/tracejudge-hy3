@@ -25,9 +25,14 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, cast
 
-from .exporter import load_validated_phase1_export, serialize_samples_jsonl
+from .exporter import (
+    RESEARCH_NATURAL_COUNT,
+    SelectionPolicy,
+    load_validated_phase1_export,
+    serialize_samples_jsonl,
+)
 from .parser import (
     INFRASTRUCTURE_ERROR_TYPES,
     RAW_BUNDLE_KIND,
@@ -36,11 +41,14 @@ from .parser import (
     infrastructure_error_result,
     parse_official_result,
 )
-from .schemas import EvalPlusSample, HumanEvalPlusTaskMetadata, ValidatedSampleExport
+from .schemas import (
+    EvalPlusSample,
+    HumanEvalPlusTaskMetadata,
+    ValidatedSampleExport,
+)
 
-PHASE2_EXPERIMENT_LABEL = "humanevalplus_10_evalplus_execution_pilot"
-PHASE2_METRICS_SCOPE = "fixed_10_task_generation_to_execution_engineering_pilot"
 RAW_MOCK_BUNDLE_KIND = "tracejudge_evalplus_mock_no_execution_bundle"
+
 
 _RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -103,14 +111,74 @@ _RESULT_FIELDS = {
     "failure_count_scope",
     "source_response",
 }
-_LIMITATIONS = [
-    "fixed_10_problem_subset_not_full_humanevalplus",
-    "single_sample_generation_to_execution_engineering_pilot",
-    "not_an_official_benchmark_ranking",
-    "public_benchmark_training_contamination_or_memorization_is_possible",
-    "phase1_parse_success_is_not_phase2_functional_success",
-    "pinned_evalplus_fail_combines_wrong_answers_and_candidate_exceptions",
-]
+
+
+def _phase2_identity(
+    exported: ValidatedSampleExport,
+) -> tuple[str, str, list[str], str]:
+    """Return (experiment_label, metrics_scope, limitations, cohort_description)."""
+
+    dataset_identity = exported.dataset
+    selection = exported.export_selection
+    source_count = selection.source_problem_count
+    exported_count = selection.exported_success_count
+    shared_limitations = [
+        "not_an_official_benchmark_ranking",
+        "public_benchmark_training_contamination_or_memorization_is_possible",
+        "phase1_parse_success_is_not_phase2_functional_success",
+        "pinned_evalplus_fail_combines_wrong_answers_and_candidate_exceptions",
+    ]
+    if dataset_identity.selection_role == "pilot":
+        limitations = [
+            f"fixed_{source_count}_problem_subset_not_full_humanevalplus",
+            "single_sample_generation_to_execution_engineering_pilot",
+            *shared_limitations,
+        ]
+        if exported_count != source_count:
+            limitations.append("phase2_conditioned_on_phase1_success")
+        if exported_count == source_count:
+            return (
+                f"humanevalplus_{source_count}_evalplus_execution_pilot",
+                f"fixed_{source_count}_task_generation_to_execution_engineering_pilot",
+                limitations,
+                f"fixed_{source_count}_problem_single_sample_generation_to_execution_pilot",
+            )
+        return (
+            f"humanevalplus_{exported_count}_of_{source_count}_evalplus_execution_pilot",
+            f"fixed_{exported_count}_of_{source_count}_task_generation_to_execution_pilot",
+            limitations,
+            f"fixed_{exported_count}_of_{source_count}_problem_single_sample_execution_pilot",
+        )
+    if (
+        dataset_identity.selection_role == "research_natural"
+        and source_count == RESEARCH_NATURAL_COUNT
+    ):
+        limitations = [
+            "research_natural_45_source_task_subset_not_full_humanevalplus",
+            "single_sample_per_exported_phase1_success",
+            *shared_limitations,
+        ]
+        if selection.selection_policy == "phase1-success-only":
+            limitations.append("phase2_conditioned_on_phase1_success")
+        if exported_count == source_count:
+            return (
+                "humanevalplus_45_evalplus_execution_research_natural",
+                "research_natural_45_task_generation_to_execution",
+                limitations,
+                "research_natural_45_task_single_sample_generation_to_execution",
+            )
+        return (
+            f"humanevalplus_{exported_count}_of_45_evalplus_execution_research_natural",
+            f"research_natural_{exported_count}_of_45_phase1_success_conditioned_execution",
+            limitations,
+            f"research_natural_{exported_count}_of_45_phase1_successful_tasks_execution",
+        )
+    return (
+        f"humanevalplus_{exported_count}_of_{source_count}_evalplus_execution",
+        f"fixed_{exported_count}_of_{source_count}_task_generation_to_execution",
+        list(shared_limitations),
+        f"fixed_{exported_count}_of_{source_count}_problem_single_sample_execution",
+    )
 
 
 class EvalPlusExperimentError(ValueError):
@@ -531,6 +599,7 @@ def _input_identity(exported: ValidatedSampleExport) -> dict[str, Any]:
             reference.problem_id: reference.code_sha256
             for reference in exported.response_references
         },
+        "phase1_export_selection": asdict(exported.export_selection),
     }
 
 
@@ -566,18 +635,20 @@ def _validate_resume_manifest_schema(
     *,
     run_id: str,
     execution_mode: str,
+    exported: ValidatedSampleExport,
 ) -> None:
+    expected_label, expected_scope, expected_limitations, _ = _phase2_identity(exported)
     if set(manifest) != _MANIFEST_FIELDS:
         raise EvalPlusExperimentError("resume manifest schema is invalid")
     if (
         manifest.get("schema_version") != 1
         or manifest.get("phase") != "phase2_evalplus_execution"
-        or manifest.get("experiment_label") != PHASE2_EXPERIMENT_LABEL
-        or manifest.get("metrics_scope") != PHASE2_METRICS_SCOPE
+        or manifest.get("experiment_label") != expected_label
+        or manifest.get("metrics_scope") != expected_scope
         or manifest.get("run_id") != run_id
         or manifest.get("execution_mode") != execution_mode
         or manifest.get("status") not in {"running", "completed"}
-        or manifest.get("limitations") != _LIMITATIONS
+        or manifest.get("limitations") != expected_limitations
         or not isinstance(manifest.get("resume_fingerprint"), str)
         or not _SHA256_PATTERN.fullmatch(str(manifest.get("resume_fingerprint")))
     ):
@@ -687,6 +758,7 @@ def _validate_resume_before_preflight(
         manifest,
         run_id=run_id,
         execution_mode=executor.mode,
+        exported=exported,
     )
 
     recorded_static = {
@@ -803,12 +875,13 @@ def _new_manifest(
     created_at: str,
     initial_resume: bool = False,
 ) -> dict[str, Any]:
+    experiment_label, metrics_scope, limitations, _ = _phase2_identity(exported)
     invocation_id = uuid.uuid4().hex
     return {
         "schema_version": 1,
         "phase": "phase2_evalplus_execution",
-        "experiment_label": PHASE2_EXPERIMENT_LABEL,
-        "metrics_scope": PHASE2_METRICS_SCOPE,
+        "experiment_label": experiment_label,
+        "metrics_scope": metrics_scope,
         "run_id": run_id,
         "status": "running",
         "created_at": created_at,
@@ -838,7 +911,7 @@ def _new_manifest(
                 "status": "running",
             }
         ],
-        "limitations": list(_LIMITATIONS),
+        "limitations": list(limitations),
     }
 
 
@@ -1329,6 +1402,7 @@ def _summary_for_run(
     execution_mode: Literal["docker", "mock"],
     completed_at: str,
     reused_problem_ids: Sequence[str],
+    exported: ValidatedSampleExport,
 ) -> dict[str, Any]:
     core = build_summary(
         results,
@@ -1337,15 +1411,26 @@ def _summary_for_run(
     )
     reused = set(reused_problem_ids)
     current = [result for result in results if result.get("problem_id") not in reused]
-    return {
+    experiment_label, metrics_scope, limitations, cohort_description = _phase2_identity(exported)
+    selection = exported.export_selection
+    summary = {
         **core,
         "run_id": run_id,
-        "experiment_label": PHASE2_EXPERIMENT_LABEL,
-        "metrics_scope": PHASE2_METRICS_SCOPE
-        if execution_mode == "docker"
-        else "mock_dry_run_only",
+        "experiment_label": experiment_label,
+        "metrics_scope": metrics_scope if execution_mode == "docker" else "mock_dry_run_only",
         "completed_at": completed_at,
-        "pilot_description": "fixed_10_problem_single_sample_generation_to_execution_pilot",
+        "source_problem_count": selection.source_problem_count,
+        "exported_success_count": selection.exported_success_count,
+        "excluded_parse_error_count": selection.excluded_parse_error_count,
+        "excluded_provider_error_count": selection.excluded_provider_error_count,
+        "selection_policy": selection.selection_policy,
+        "min_success_count": selection.min_success_count,
+        "pipeline_coverage_rate": (
+            selection.exported_success_count / selection.source_problem_count
+            if selection.source_problem_count
+            else None
+        ),
+        "limitations": limitations,
         "resume_skipped_count": len(reused),
         "current_invocation_official_result_count": sum(
             result.get("infrastructure_status") == "ok" for result in current
@@ -1354,6 +1439,11 @@ def _summary_for_run(
             result.get("infrastructure_status") == "error" for result in current
         ),
     }
+    description_field = (
+        "pilot_description" if exported.dataset.selection_role == "pilot" else "cohort_description"
+    )
+    summary[description_field] = cohort_description
+    return summary
 
 
 def _finalize_manifest(
@@ -1735,6 +1825,8 @@ def run_evalplus_experiment(
     max_workers: int = 2,
     per_task_timeout_seconds: float = 180.0,
     batch_timeout_seconds: float = 900.0,
+    selection_policy: str = "all",
+    min_success_count: int = 30,
 ) -> EvalPlusRunResult:
     """Validate phase one, then run only the isolated injected executor.
 
@@ -1743,6 +1835,18 @@ def run_evalplus_experiment(
     candidate bytes, implementation, executor/image identity, and limits.
     """
 
+    if selection_policy not in {"all", "phase1-success-only"}:
+        raise EvalPlusExperimentError("selection_policy must be 'all' or 'phase1-success-only'")
+    if (
+        isinstance(min_success_count, bool)
+        or not isinstance(min_success_count, int)
+        or min_success_count < 0
+    ):
+        raise EvalPlusExperimentError("min_success_count must be a non-negative integer")
+    if selection_policy == "phase1-success-only" and min_success_count < 1:
+        raise EvalPlusExperimentError(
+            "phase1-success-only requires min_success_count to be at least one"
+        )
     if max_workers < 1 or max_workers > 16:
         raise EvalPlusExperimentError("max_workers must be between 1 and 16")
     for value, label in (
@@ -1761,7 +1865,29 @@ def run_evalplus_experiment(
 
     # This is the complete static consistency boundary.  It performs no writes
     # and receives no executor object, so it cannot start Docker or run code.
-    exported = load_validated_phase1_export(baseline_run_dir, dataset_manifest_path)
+    exported = load_validated_phase1_export(
+        baseline_run_dir,
+        dataset_manifest_path,
+        selection_policy=cast(SelectionPolicy, selection_policy),
+        min_success_count=min_success_count,
+    )
+    export_selection = exported.export_selection
+    if (
+        export_selection.selection_policy != selection_policy
+        or export_selection.min_success_count != min_success_count
+        or export_selection.source_problem_count != len(exported.dataset.selected_problem_ids)
+        or export_selection.exported_success_count != len(exported.samples)
+        or export_selection.exported_success_count
+        + export_selection.excluded_parse_error_count
+        + export_selection.excluded_provider_error_count
+        != export_selection.source_problem_count
+    ):
+        raise EvalPlusExperimentError("phase-one export selection accounting is inconsistent")
+    if (
+        selection_policy == "phase1-success-only"
+        and export_selection.exported_success_count < min_success_count
+    ):
+        raise EvalPlusExperimentError("phase-one export is below min_success_count")
 
     effective_run_id = run_id or new_evalplus_run_id()
     _validate_run_id(effective_run_id)
@@ -2029,6 +2155,7 @@ def run_evalplus_experiment(
         execution_mode=executor.mode,
         completed_at=completed_at,
         reused_problem_ids=sorted(reused_problem_ids),
+        exported=exported,
     )
     _atomic_write_json(paths.summary, summary)
     manifest = _finalize_manifest(

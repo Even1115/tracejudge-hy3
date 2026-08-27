@@ -24,12 +24,15 @@ from tracejudge_hy3.dataset.humanevalplus import (
     DATASET_SOURCE,
     EXPECTED_RECORD_COUNT,
     PILOT_EXPERIMENT_LABEL,
+    RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION,
+    RESEARCH_NATURAL_EXPERIMENT_LABEL,
     SELECTION_ALGORITHM,
     WITHHELD_REFERENCE_CODE,
     ConversionResult,
     convert_humanevalplus,
     ordered_problem_ids_sha256,
     sample_humanevalplus,
+    select_humanevalplus_problem_ids,
 )
 from tracejudge_hy3.dataset.loader import load_problems
 from tracejudge_hy3.exceptions import DatasetError
@@ -836,3 +839,135 @@ def test_dataset_cli_output_path_oserror_is_reported_without_traceback(full_bund
     assert "HumanEval+ 转换失败" in result.output
     assert "Traceback" not in result.output
     assert not (blocked_parent / "bundle").exists()
+
+
+RESEARCH_NATURAL_SEED = 20260825
+
+
+def test_research_natural_45_sample_excludes_pilot_and_uses_v2_manifest(full_bundle, tmp_path):
+    pilot = sample_humanevalplus(
+        dataset_path=full_bundle.conversion.dataset_path,
+        source_manifest_path=full_bundle.conversion.manifest_path,
+        count=10,
+        seed=SEED,
+        output_dir=tmp_path / "pilot",
+    )
+    research = sample_humanevalplus(
+        dataset_path=full_bundle.conversion.dataset_path,
+        source_manifest_path=full_bundle.conversion.manifest_path,
+        count=45,
+        seed=RESEARCH_NATURAL_SEED,
+        output_dir=tmp_path / "research",
+        exclude_manifests=[pilot.manifest_path],
+        selection_role="research_natural",
+    )
+
+    expected_ids = select_humanevalplus_problem_ids(
+        count=45,
+        seed=RESEARCH_NATURAL_SEED,
+        exclude_ids=list(pilot.selected_problem_ids),
+    )
+    assert research.selected_problem_ids == expected_ids
+    assert not (set(research.selected_problem_ids) & set(pilot.selected_problem_ids))
+
+    manifest = json.loads(research.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION
+    assert manifest["experiment_label"] == RESEARCH_NATURAL_EXPERIMENT_LABEL
+    assert manifest.get("selection_role") == "research_natural"
+    assert manifest["selection"]["count"] == 45
+    assert manifest["selection"]["seed"] == RESEARCH_NATURAL_SEED
+    assert manifest["selection"]["selected_problem_ids"] == list(expected_ids)
+    assert manifest["selection"]["excluded_problem_ids"] == sorted(
+        pilot.selected_problem_ids,
+        key=lambda problem_id: int(problem_id.split("/")[1]),
+    )
+    assert manifest["excluded_manifests"][0]["manifest_sha256"] == _sha256(
+        pilot.manifest_path.read_bytes()
+    )
+    assert manifest["excluded_manifests"][0]["selection_role"] == "pilot"
+    assert [problem.problem_id for problem in load_problems(research.dataset_path)] == list(
+        expected_ids
+    )
+
+
+def test_research_natural_selection_is_pinned_to_45_and_seed(full_bundle, tmp_path):
+    with pytest.raises(DatasetError, match="pinned to 45"):
+        sample_humanevalplus(
+            dataset_path=full_bundle.conversion.dataset_path,
+            source_manifest_path=full_bundle.conversion.manifest_path,
+            count=44,
+            seed=RESEARCH_NATURAL_SEED,
+            output_dir=tmp_path / "wrong_count",
+            selection_role="research_natural",
+        )
+    with pytest.raises(DatasetError, match="pinned to seed"):
+        sample_humanevalplus(
+            dataset_path=full_bundle.conversion.dataset_path,
+            source_manifest_path=full_bundle.conversion.manifest_path,
+            count=45,
+            seed=SEED,
+            output_dir=tmp_path / "wrong_seed",
+            selection_role="research_natural",
+        )
+
+
+def test_research_natural_exclusion_rejects_mismatched_revision(full_bundle, tmp_path):
+    pilot = sample_humanevalplus(
+        dataset_path=full_bundle.conversion.dataset_path,
+        source_manifest_path=full_bundle.conversion.manifest_path,
+        count=10,
+        seed=SEED,
+        output_dir=tmp_path / "pilot",
+    )
+    mutated = json.loads(pilot.manifest_path.read_text(encoding="utf-8"))
+    mutated["revision"] = "f" * 40
+    forged = tmp_path / "forged_pilot_manifest.json"
+    forged.write_text(
+        json.dumps(mutated, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(DatasetError, match="revision does not match"):
+        sample_humanevalplus(
+            dataset_path=full_bundle.conversion.dataset_path,
+            source_manifest_path=full_bundle.conversion.manifest_path,
+            count=45,
+            seed=RESEARCH_NATURAL_SEED,
+            output_dir=tmp_path / "research",
+            exclude_manifests=[forged],
+            selection_role="research_natural",
+        )
+
+
+async def test_baseline_accepts_research_natural_v2_manifest(full_bundle, tmp_path):
+    pilot = sample_humanevalplus(
+        dataset_path=full_bundle.conversion.dataset_path,
+        source_manifest_path=full_bundle.conversion.manifest_path,
+        count=10,
+        seed=SEED,
+        output_dir=tmp_path / "pilot",
+    )
+    research = sample_humanevalplus(
+        dataset_path=full_bundle.conversion.dataset_path,
+        source_manifest_path=full_bundle.conversion.manifest_path,
+        count=45,
+        seed=RESEARCH_NATURAL_SEED,
+        output_dir=tmp_path / "research",
+        exclude_manifests=[pilot.manifest_path],
+        selection_role="research_natural",
+    )
+
+    provider = _OfflineProvider()
+    result = await run_baseline_experiment(
+        research.dataset_path,
+        provider,
+        tmp_path / "runs",
+        dataset_manifest_path=research.manifest_path,
+    )
+
+    assert result.manifest["experiment_label"] == RESEARCH_NATURAL_EXPERIMENT_LABEL
+    provenance = result.manifest["dataset"]["provenance"]
+    assert provenance["selection_role"] == "research_natural"
+    assert provenance["excluded_manifests"][0]["manifest_sha256"] == _sha256(
+        pilot.manifest_path.read_bytes()
+    )
+    assert provider.closed is True

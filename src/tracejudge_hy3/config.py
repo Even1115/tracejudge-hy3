@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     hy3_reasoning_effort: str = Field(default="high")
     hy3_timeout_seconds: float = Field(default=120.0, gt=0)
     hy3_max_retries: int = Field(default=2, ge=0)
+    hy3_max_parse_repairs: int = Field(default=1, ge=0, le=1)
     hy3_enable_reasoning_effort: bool = Field(default=True)
 
     # Sandbox

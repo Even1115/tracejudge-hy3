@@ -73,7 +73,9 @@ HumanEval/8, HumanEval/26, HumanEval/41, HumanEval/51, HumanEval/70,
 HumanEval/81, HumanEval/95, HumanEval/96, HumanEval/105, HumanEval/120
 ```
 
-Pilot bundle 同样只有 `problems.jsonl` 和 `dataset_manifest.json`；后者额外绑定父 manifest SHA256、固定 seed、选择算法和题号列表，`experiment_label` 固定为 `humanevalplus_10_public_prompt_generation_pilot`。`tracejudge dataset validate` 只离线验证 `ProblemSpec` JSONL 的 schema/重复 ID 等通用约束，不调用 Provider，也不执行任何代码或测试。完整的可复现命令见 README 的“HumanEval+ 固定 10 题阶段一 Pilot”。
+`--selection-role research_natural --count 45 --seed 20260825 --exclude-manifest <pilot_manifest>` 会生成 schema v2 的研究子集 manifest：在 164 题中排除指定 Pilot manifest 的题号后，按同一算法取前 45 题；v2 manifest 额外记录 `selection_role`、`excluded_manifests`（含每个被排除 manifest 的 SHA256、角色与题号）、`excluded_problem_ids` 及其 SHA256、被排除 manifest 列表哈希。
+
+Pilot bundle 同样只有 `problems.jsonl` 和 `dataset_manifest.json`；后者（v1）额外绑定父 manifest SHA256、固定 seed、选择算法和题号列表，`experiment_label` 固定为 `humanevalplus_10_public_prompt_generation_pilot`。研究子集 bundle（v2）的 `experiment_label` 固定为 `humanevalplus_45_public_prompt_generation_research_natural`。`tracejudge dataset validate` 只离线验证 `ProblemSpec` JSONL 的 schema/重复 ID 等通用约束，不调用 Provider，也不执行任何代码或测试。完整的可复现命令见 README 的“HumanEval+ 固定 10 题阶段一 Pilot”和“HumanEval+ 45 题自然研究子集”。
 
 ## `data/mock_responses/*.json`
 
@@ -139,6 +141,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
     "reasoning_effort_enabled": true,
     "timeout_seconds": 120.0,
     "max_retries": 2,
+    "max_parse_repairs": 1,
     "endpoint_sha256": "<sha256; endpoint itself is not stored>"
   },
   "invocations": [
@@ -212,7 +215,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 | `provider_error` | 认证、连接、服务端、超时或 Provider 内部异常；同一批次会继续处理后续题目 |
 | `skipped` | 续跑时该 `problem_id` 历史上已有 `success`，本次不再调用 Provider |
 
-`attempt_outcomes` 是按实际调用顺序保存的脱敏枚举序列，元素只允许 `success` / `parse_error` / `provider_error`。它不保存错误详情、原始输出、请求或凭据；`attempt_count` 必须等于其长度，成功必须是最后一次 outcome。`retry_count = attempt_count - 1` 只是“首次之后的全部额外调用数”：`provider_error → success` 是普通 Provider 重试，不是 JSON repair；只有某次 `parse_error` 后确实又发起下一次调用，才发生 repair。最后一次为 `parse_error` 且没有后续调用时，不会虚构 repair。`skipped` 的 `attempt_count` / `retry_count` 为 0，`attempt_outcomes` 为空。
+`attempt_outcomes` 是按实际调用顺序保存的脱敏枚举序列，元素只允许 `success` / `parse_error` / `provider_error`。它不保存错误详情、原始输出、请求或凭据；`attempt_count` 必须等于其长度，成功必须是最后一次 outcome。`retry_count = attempt_count - 1` 只是“首次之后的全部额外调用数”：`provider_error → success` 是普通 Provider 重试，不是 JSON repair；只有某次 `parse_error` 后确实又发起下一次调用，才发生 repair。`HY3_MAX_PARSE_REPAIRS` 是解析失败触发的修复调用硬上限（与普通 Provider 重试分开），修复预算耗尽后即使仍有 `HY3_MAX_RETRIES` 剩余也不会再追加修复 Prompt，最终状态直接为 `parse_error`。最后一次为 `parse_error` 且没有后续调用时，不会虚构 repair。`skipped` 的 `attempt_count` / `retry_count` 为 0，`attempt_outcomes` 为空。
 
 `parse_status` 独立标记解析结果：`success` 对应 `parsed`，`parse_error` 对应 `failed`，从未得到可解析文本的 `provider_error` 与 `skipped` 对应 `not_attempted`。若早期尝试已对一份原始输出解析失败，但后续尝试又发生超时/服务错误，最终 `status` 是 `provider_error`、`parse_status` 仍是 `failed`，`raw_output_attempt` 指明保存的 `raw_output` 来自第几次调用。`error_type` 是便于汇总的顶层错误类型；`error` 为 `null` 或 `{"type": "<exception class>", "message": "<redacted message>"}`。失败记录不会保留过期的 `solution_trace`；如 Provider 已返回文本，安全脱敏后仍可在 `raw_output` 中保留它。所有持久化字符串中无法表示为 UTF-8 标量值的孤立 surrogate 会统一替换为 `U+FFFD`，以确保单题异常不中止整批持久化且续跑 ID 语义一致。
 
@@ -243,7 +246,7 @@ summary **不包含**功能正确率、测试通过率、错误检测率、四�
 
 ## 阶段二 EvalPlus 产物（`artifacts/experiments/phase2/<run_id>/`）
 
-`tracejudge evalplus` 只接受已完成、与固定 10 题 manifest 严格绑定的阶段一 run。在创建运行目录前，exporter 会验证阶段一的 manifest/summary/responses 字节哈希、题号、状态、Provider/模型、Git commit、数据 revision 和公开投影 provenance。合法续跑可以在 responses 中含有后续 `skipped` 事件；每题必须有且仅有一条历史 `success`，且仅导出该条的 `solution_trace.code`。
+`tracejudge evalplus` 只接受已完成的阶段一 run，并默认要求数据集中每道题都有唯一历史 `success`（`--selection-policy all`）。若使用 `--selection-policy phase1-success-only --min-success-count N`，则只导出阶段一成功题目，且要求成功数不少于 `N`；导出的题号顺序仍遵循数据集 manifest。在创建运行目录前，exporter 会验证阶段一的 manifest/summary/responses 字节哈希、题号、状态、Provider/模型、Git commit、数据 revision 和公开投影 provenance。合法续跑可以在 responses 中含有后续 `skipped` 事件。
 
 ```text
 <output-dir>/<run_id>/
@@ -259,16 +262,16 @@ summary **不包含**功能正确率、测试通过率、错误检测率、四�
 
 ### `manifest.json`
 
-manifest 的 `phase` 固定为 `phase2_evalplus_execution`，`experiment_label` 固定为 `humanevalplus_10_evalplus_execution_pilot`。其允许字段包括：
+manifest 的 `phase` 固定为 `phase2_evalplus_execution`。10 题 Pilot 全部导出时的 `experiment_label` 保持为 `humanevalplus_10_evalplus_execution_pilot`；45 题自然研究子集全部导出时为 `humanevalplus_45_evalplus_execution_research_natural`，只导出 N 题时为 `humanevalplus_{N}_of_45_evalplus_execution_research_natural`。标签中的数量始终与真正进入阶段二的 samples 相符。其允许字段包括：
 
 - `phase1_source`：阶段一 run ID、manifest/summary/responses SHA256、Git commit/分支/工作树状态、Provider 和模型；
-- `dataset`：Hugging Face 数据 revision、许可证、受控 manifest/原始快照/公开投影/题号顺序 SHA256、选择算法/种子/题号；
-- `input`：samples SHA256、记录数、有序题号、每题代码 SHA256，以及按同一顺序记录的 `problem_id` / 公开 prompt SHA256 / entry point；
+- `dataset`：Hugging Face 数据 revision、许可证、受控 manifest/原始快照/公开投影/题号顺序 SHA256、选择算法/种子/题号、`selection_role`（v2 研究子集为 `research_natural`）以及被排除 manifest 列表（v2）；
+- `input`：samples SHA256、记录数、有序题号、每题代码 SHA256，按同一顺序记录的 `problem_id` / 公开 prompt SHA256 / entry point，以及 `phase1_export_selection`；后者精确记录 `selection_policy`、`min_success_count`、`source_problem_count`、`exported_success_count`、`excluded_parse_error_count` 和 `excluded_provider_error_count`；
 - `executor`：镜像内 EvalPlus package `0.4.0.dev2`、源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、官方镜像 RepoDigest、linux/amd64、Python 3.11.10、HumanEval+ release v0.1.10、官方参数、资源/隔离/超时策略；
-- `executor_runtime`：运行前镜像 ID/平台检查、镜像内 `git -C /evalplus rev-parse HEAD` 的实际 commit、Python 最终导入的 `evalplus/evaluate.py` 精确字节 SHA256、EvalPlus 数据集官方 MD5、已加载 164 题 native corpus 的确定性 canonical SHA256 及算法、题数与 10 题公开身份核对数；
+- `executor_runtime`：运行前镜像 ID/平台检查、镜像内 `git -C /evalplus rev-parse HEAD` 的实际 commit、Python 最终导入的 `evalplus/evaluate.py` 精确字节 SHA256、EvalPlus 数据集官方 MD5、已加载 164 题 native corpus 的确定性 canonical SHA256 及算法、题数与实际导出题目的公开身份核对数；
 - `execution_config`：宿主单题容器并发数、容器内官方 parallel=1、单题/整批调度超时、固定 5 秒 batch cleanup grace 和官方时限参数；
 - `resume_fingerprint`：以上来源、候选字节、执行器/数据身份、参数和实现 SHA256 的组合指纹；
-- `git` / `environment` / `invocations` / `preflight` / `output` 及明确的 Pilot 限制。
+- `git` / `environment` / `invocations` / `preflight` / `output` 及与 Pilot/研究 cohort 相符的限制。
 
 Hugging Face revision 和 EvalPlus 代码/release 是两套独立 provenance，manifest 不将它们混成一项。
 
@@ -326,7 +329,7 @@ Hugging Face revision 和 EvalPlus 代码/release 是两套独立 provenance，m
 
 ### `summary.json` 与 `execution.log`
 
-summary 从脱敏逐题记录重建，主要包含总题数、实际执行数、Base 通过数/率、Base+Extra 通过数/率、timeout、`wrong_answer_or_candidate_exception`、基础设施错误、已观测失败数和平均逐题容器耗时。通过率分母是 `actual_execution_count`；基础设施失败不进分母。批次截止另以 `batch_timeout_count`、`batch_deadline_not_started_count` 和 `container_cleanup_failed_count` 区分已启动超时、尚未启动及清理失败/未确认的题；续跑以 `resume_skipped_count` 和本次 invocation 的结果/基础设施计数说明复用边界。`execution_error_count` 为 `null`，并用 `not_available_in_pinned_evalplus_raw_schema` 说明无法从官方状态精确细分。
+summary 从脱敏逐题记录重建，主要包含阶段一来源题数、成功导出数、解析/Provider 排除数、`pipeline_coverage_rate`、阶段二结果数、实际执行数、Base 通过数/率、Base+Extra 通过数/率、timeout、`wrong_answer_or_candidate_exception`、基础设施错误、已观测失败数和平均逐题容器耗时。通过率分母是 `actual_execution_count`；Pipeline Coverage 分母是 `source_problem_count`，两者不混用。基础设施失败不进功能通过率分母。批次截止另以 `batch_timeout_count`、`batch_deadline_not_started_count` 和 `container_cleanup_failed_count` 区分已启动超时、尚未启动及清理失败/未确认的题；续跑以 `resume_skipped_count` 和本次 invocation 的结果/基础设施计数说明复用边界。`execution_error_count` 为 `null`，并用 `not_available_in_pinned_evalplus_raw_schema` 说明无法从官方状态精确细分。
 
 `execution.log` 只是最多 64 KiB 的基础设施事件 JSONL；不保存 Docker/EvalPlus stdout/stderr 原文或失败输入，仅允许时间、题号、耗时、安全错误类别、输出字节数/SHA256、退出码和清理状态等白名单字段。
 

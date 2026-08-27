@@ -232,9 +232,19 @@ def dataset_sample(
     ),
     count: int = typer.Option(10, "--count", min=1, help="确定性抽样题数"),
     seed: int = typer.Option(20260824, "--seed", help="只与公开 problem_id 组合使用的固定种子"),
-    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的 Pilot bundle 目录"),
+    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的 dataset bundle 目录"),
+    exclude_manifest: list[str] | None = typer.Option(  # noqa: B008
+        None,
+        "--exclude-manifest",
+        help="要排除的 v1 子集 manifest（可重复）；至少支持固定 Pilot manifest",
+    ),
+    selection_role: str = typer.Option(
+        "pilot",
+        "--selection-role",
+        help="选择角色：pilot 或 research_natural",
+    ),
 ) -> None:
-    """仅依据公开 problem_id 生成确定性的 Pilot 子集。"""
+    """仅依据公开 problem_id 生成确定性的 Pilot 或研究子集。"""
 
     try:
         result = sample_humanevalplus(
@@ -243,12 +253,19 @@ def dataset_sample(
             count=count,
             seed=seed,
             output_dir=output_dir,
+            exclude_manifests=exclude_manifest,
+            selection_role=selection_role,
         )
     except (TraceJudgeError, OSError) as exc:
         console.print(f"[red]数据集抽样失败：{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    table = Table(title="HumanEval+ 确定性 Pilot 子集")
+    title = (
+        "HumanEval+ 正式自然研究子集"
+        if selection_role == "research_natural"
+        else "HumanEval+ 确定性 Pilot 子集"
+    )
+    table = Table(title=title)
     table.add_column("项目")
     table.add_column("结果")
     table.add_row("题目数", str(len(result.selected_problem_ids)))
@@ -258,7 +275,13 @@ def dataset_sample(
     console.print(table)
     console.print(f"[dim]dataset: {result.dataset_path}[/dim]")
     console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
-    console.print("[yellow]该子集仅用于生成与解析 Pilot，不代表 HumanEval+ 功能分数。[/yellow]")
+    if selection_role == "research_natural":
+        console.print(
+            "[yellow]该子集是阶段三正式自然研究 source cohort，"
+            "不代表完整 HumanEval+ 功能分数或正式 benchmark 排名。[/yellow]"
+        )
+    else:
+        console.print("[yellow]该子集仅用于生成与解析 Pilot，不代表 HumanEval+ 功能分数。[/yellow]")
 
 
 @dataset_app.command("validate")
@@ -360,12 +383,12 @@ def evalplus_command(
     baseline_run: str = typer.Option(
         ...,
         "--baseline-run",
-        help="已完成的阶段一 HumanEval+ 10 题 run 目录",
+        help="已完成的阶段一 HumanEval+ run 目录",
     ),
     dataset_manifest: str = typer.Option(
         ...,
         "--dataset-manifest",
-        help="与阶段一绑定的 10 题 dataset_manifest.json",
+        help="与阶段一绑定的 dataset_manifest.json",
     ),
     output_dir: str = typer.Option(
         "artifacts/experiments/phase2",
@@ -381,6 +404,18 @@ def evalplus_command(
         None,
         "--resume-run-id",
         help="续跑既有 run_id；输入、provenance、镜像或限制变化时会拒绝",
+    ),
+    selection_policy: str = typer.Option(
+        "all",
+        "--selection-policy",
+        help="'all' 要求每个数据集题目都有阶段一成功记录；"
+        "'phase1-success-only' 仅导出成功解析的题目",
+    ),
+    min_success_count: int = typer.Option(
+        30,
+        "--min-success-count",
+        min=1,
+        help="--selection-policy 为 phase1-success-only 时要求的最少成功题数",
     ),
     parallel: int = typer.Option(
         2,
@@ -406,6 +441,8 @@ def evalplus_command(
 
     if executor not in {"docker", "mock"}:
         raise typer.BadParameter("--executor 必须是 'docker' 或 'mock'")
+    if selection_policy not in {"all", "phase1-success-only"}:
+        raise typer.BadParameter("--selection-policy 必须是 'all' 或 'phase1-success-only'")
     if batch_timeout < per_task_timeout:
         raise typer.BadParameter("--batch-timeout 不能小于 --per-task-timeout")
 
@@ -431,6 +468,8 @@ def evalplus_command(
             max_workers=parallel,
             per_task_timeout_seconds=per_task_timeout,
             batch_timeout_seconds=batch_timeout,
+            selection_policy=selection_policy,
+            min_success_count=min_success_count,
         )
     except (EvalPlusExportError, EvalPlusExperimentError, OSError, ValueError) as exc:
         # EvalPlus failures may originate while handling candidate source or
@@ -446,6 +485,12 @@ def evalplus_command(
     base_rate = summary.get("base_pass_rate")
     plus_rate = summary.get("base_plus_pass_rate")
     average_duration = summary.get("average_duration_seconds")
+    source_problem_count = int(summary.get("source_problem_count", summary["total_problem_count"]))
+    exported_success_count = int(
+        summary.get("exported_success_count", summary["total_problem_count"])
+    )
+    excluded_parse_error_count = int(summary.get("excluded_parse_error_count", 0))
+    excluded_provider_error_count = int(summary.get("excluded_provider_error_count", 0))
 
     def rate(value: object) -> str:
         return "N/A" if value is None else f"{float(value):.2%}"
@@ -455,7 +500,11 @@ def evalplus_command(
     table = Table(title=f"阶段二 EvalPlus：{result.run_id}")
     table.add_column("统计")
     table.add_column("结果")
-    table.add_row("固定题目总数", str(summary["total_problem_count"]))
+    table.add_row("阶段一来源题数", str(source_problem_count))
+    table.add_row("成功导出数", str(exported_success_count))
+    table.add_row("解析错误排除数", str(excluded_parse_error_count))
+    table.add_row("Provider 错误排除数", str(excluded_provider_error_count))
+    table.add_row("阶段二结果题数", str(summary["total_problem_count"]))
     table.add_row("实际执行数", str(actual))
     table.add_row(
         "Base 通过",
@@ -479,8 +528,8 @@ def evalplus_command(
     console.print(f"[dim]safe results: {result.results_path}[/dim]")
     console.print(f"[dim]summary: {result.summary_path}[/dim]")
     console.print(
-        "[yellow]这是固定 10 题、单样本的 generation→execution 工程 pilot，"
-        "不是完整 HumanEval+ 成绩或正式 benchmark 排名。[/yellow]"
+        f"[yellow]本次来源 {source_problem_count} 题，成功导出 {exported_success_count} 题并进入"
+        "单样本阶段二结果；不是完整 HumanEval+ 成绩或正式 benchmark 排名。[/yellow]"
     )
     if executor == "mock":
         console.print("[yellow]Mock dry run 未执行任何候选代码或官方测试。[/yellow]")

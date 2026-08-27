@@ -39,7 +39,7 @@
 
 ## 阶段二 EvalPlus 容器边界
 
-`tracejudge evalplus --executor docker` 不复用通用 `DockerSandbox`，而是使用专用的官方 EvalPlus 执行协议。它固定官方镜像 digest 和 `linux/amd64` 平台，并校验镜像内 EvalPlus package `0.4.0.dev2`、源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、Python 3.11.10 与 HumanEval+ release v0.1.10 身份。运行时使用：
+`tracejudge evalplus --executor docker` 不复用通用 `DockerSandbox`，而是使用专用的官方 EvalPlus 执行协议。它固定官方镜像 digest 和 `linux/amd64` 平台，并校验镜像内 EvalPlus package `0.4.0.dev2`、源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、Python 3.11.10 与 HumanEval+ release v0.1.10 身份。输入题号来自阶段一数据集 manifest（10 题 Pilot 或 45 题研究子集等），每题独立容器执行。运行时使用：
 
 - `--pull never` 防止执行时静默替换镜像；运行前通过 `docker image inspect` 验证 RepoDigest、OS 和 architecture；
 - `--network none`、`--read-only`、`--cap-drop ALL`、`--security-opt no-new-privileges`；

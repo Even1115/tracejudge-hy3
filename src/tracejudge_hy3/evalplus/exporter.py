@@ -17,20 +17,26 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ValidationError
 
 from tracejudge_hy3.dataset.humanevalplus import (
     ADAPTER_NAME,
     ADAPTER_VERSION,
+    ALLOWED_SELECTION_ROLES,
     DATASET_ID,
+    DATASET_MANIFEST_SCHEMA_VERSION,
     DATASET_SOURCE,
     EXPECTED_RECORD_COUNT,
     KNOWN_WITHHELD_FIELDS,
     PILOT_EXPERIMENT_LABEL,
     PILOT_LIMITATIONS,
+    RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION,
+    RESEARCH_NATURAL_EXPERIMENT_LABEL,
+    RESEARCH_NATURAL_LIMITATIONS,
     SELECTION_ALGORITHM,
+    _safe_task_id_number,
     ordered_problem_ids_sha256,
     select_humanevalplus_problem_ids,
     validate_humanevalplus_public_problems,
@@ -44,6 +50,7 @@ from .schemas import (
     EvalPlusSample,
     HumanEvalPlusDatasetIdentity,
     HumanEvalPlusTaskMetadata,
+    Phase1ExportSelectionIdentity,
     Phase1ResponseReference,
     Phase1SourceIdentity,
     ValidatedSampleExport,
@@ -53,6 +60,10 @@ PINNED_HUMANEVALPLUS_REVISION = "d32357cf319e50e9c8d8dab5ea876c72b0fd321b"
 PINNED_HUMANEVALPLUS_SOURCE_MANIFEST = "evalplus_humanevalplus_d32357cf.json"
 PILOT_COUNT = 10
 PILOT_SEED = 20260824
+RESEARCH_NATURAL_COUNT = 45
+RESEARCH_NATURAL_SEED = 20260825
+
+SelectionPolicy = Literal["all", "phase1-success-only"]
 
 _MAX_STATIC_INPUT_BYTES = 128 * 1024 * 1024
 _MAX_SOLUTION_BYTES = 2 * 1024 * 1024
@@ -359,7 +370,7 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         raise EvalPlusExportError("dataset manifest must be named dataset_manifest.json")
     manifest_bytes = _read_regular_file(path, label="dataset manifest")
     payload = _json_object(manifest_bytes, label="dataset manifest")
-    expected_top_level = {
+    expected_top_level_v1 = {
         "schema_version",
         "kind",
         "experiment_label",
@@ -378,13 +389,55 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         "withheld_fields",
         "limitations",
     }
-    _exact_keys(payload, expected_top_level, label="dataset manifest")
-    if payload.get("schema_version") != 1:
-        raise EvalPlusExportError("dataset manifest schema_version must be 1")
+    schema_version = payload.get("schema_version")
+    if schema_version == DATASET_MANIFEST_SCHEMA_VERSION:
+        _exact_keys(payload, expected_top_level_v1, label="dataset manifest")
+        selection_role = "pilot"
+        excluded_manifests: list[dict[str, Any]] = []
+    elif schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
+        _exact_keys(
+            payload,
+            expected_top_level_v1 | {"selection_role", "excluded_manifests"},
+            label="dataset manifest",
+        )
+        selection_role = _text(payload.get("selection_role"), label="dataset selection_role")
+        if selection_role not in ALLOWED_SELECTION_ROLES:
+            raise EvalPlusExportError("dataset manifest selection_role is invalid")
+        if selection_role != "research_natural":
+            raise EvalPlusExportError("dataset manifest v2 selection_role must be research_natural")
+        raw_excluded = payload.get("excluded_manifests")
+        if not isinstance(raw_excluded, list):
+            raise EvalPlusExportError("dataset manifest excluded_manifests must be a list")
+        for item in raw_excluded:
+            if not isinstance(item, Mapping):
+                raise EvalPlusExportError(
+                    "dataset manifest excluded_manifests entries must be objects"
+                )
+            _exact_keys(
+                item,
+                {
+                    "manifest_sha256",
+                    "kind",
+                    "experiment_label",
+                    "selection_role",
+                    "selected_problem_ids",
+                },
+                label="dataset excluded manifest record",
+            )
+            _sha256_text(item.get("manifest_sha256"), label="excluded manifest manifest_sha256")
+            _text(item.get("kind"), label="excluded manifest kind")
+            _text(item.get("experiment_label"), label="excluded manifest experiment_label")
+            if item.get("selection_role") not in ALLOWED_SELECTION_ROLES:
+                raise EvalPlusExportError("excluded manifest selection_role is invalid")
+            raw_ids = item.get("selected_problem_ids")
+            if not isinstance(raw_ids, list) or not all(isinstance(pid, str) for pid in raw_ids):
+                raise EvalPlusExportError("excluded manifest selected_problem_ids are invalid")
+        excluded_manifests = [dict(item) for item in raw_excluded]
+    else:
+        raise EvalPlusExportError("dataset manifest schema_version must be 1 or 2")
+
     if payload.get("kind") != "tracejudge_dataset_selection":
         raise EvalPlusExportError("dataset manifest is not a pinned selection bundle")
-    if payload.get("experiment_label") != PILOT_EXPERIMENT_LABEL:
-        raise EvalPlusExportError("dataset manifest experiment label is invalid")
     if payload.get("metrics_scope") != "generation_and_parsing_only":
         raise EvalPlusExportError("dataset manifest source metrics scope is invalid")
     if payload.get("dataset_id") != DATASET_ID or payload.get("source") != DATASET_SOURCE:
@@ -393,8 +446,6 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         raise EvalPlusExportError("dataset manifest HumanEval+ revision is invalid")
     if payload.get("split") != "test" or payload.get("license") != "apache-2.0":
         raise EvalPlusExportError("dataset manifest split/license identity is invalid")
-    if payload.get("limitations") != list(PILOT_LIMITATIONS):
-        raise EvalPlusExportError("dataset manifest pilot limitations are invalid")
 
     adapter = _mapping(payload.get("adapter"), label="dataset manifest adapter")
     _exact_keys(adapter, {"name", "version"}, label="dataset manifest adapter")
@@ -461,24 +512,104 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
     )
 
     selection = _mapping(payload.get("selection"), label="dataset selection")
-    _exact_keys(
-        selection,
-        {"algorithm", "seed", "count", "selected_problem_ids"},
-        label="dataset selection",
-    )
+    if schema_version == DATASET_MANIFEST_SCHEMA_VERSION:
+        _exact_keys(
+            selection,
+            {"algorithm", "seed", "count", "selected_problem_ids"},
+            label="dataset selection",
+        )
+    else:
+        _exact_keys(
+            selection,
+            {
+                "algorithm",
+                "seed",
+                "count",
+                "selected_problem_ids",
+                "selected_problem_ids_sha256",
+                "excluded_problem_ids",
+                "excluded_problem_ids_sha256",
+                "excluded_manifests_count",
+                "excluded_manifests_sha256",
+            },
+            label="dataset selection",
+        )
     if selection.get("algorithm") != SELECTION_ALGORITHM:
         raise EvalPlusExportError("dataset selection algorithm is invalid")
-    if selection.get("seed") != PILOT_SEED or selection.get("count") != PILOT_COUNT:
-        raise EvalPlusExportError("dataset selection seed/count is invalid")
+    count = _integer(selection.get("count"), label="dataset selection count", minimum=1)
+    seed = _integer(selection.get("seed"), label="dataset selection seed")
     selected_ids = selection.get("selected_problem_ids")
-    expected_ids = list(select_humanevalplus_problem_ids(count=PILOT_COUNT, seed=PILOT_SEED))
+    if not isinstance(selected_ids, list) or not all(
+        isinstance(problem_id, str) for problem_id in selected_ids
+    ):
+        raise EvalPlusExportError("dataset selected problem IDs are invalid")
+
+    exclude_ids: list[str] = []
+    if schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
+        raw_excluded_ids = selection.get("excluded_problem_ids")
+        if not isinstance(raw_excluded_ids, list):
+            raise EvalPlusExportError("dataset manifest excluded_problem_ids are invalid")
+        for problem_id in raw_excluded_ids:
+            if not isinstance(problem_id, str):
+                raise EvalPlusExportError(
+                    "dataset manifest excluded_problem_ids contain a non-string"
+                )
+        exclude_ids = list(raw_excluded_ids)
+        sorted_excluded = sorted(exclude_ids, key=_safe_task_id_number)
+        if selection.get("excluded_problem_ids") != sorted_excluded:
+            raise EvalPlusExportError("dataset excluded problem IDs are not in canonical order")
+        if selection.get("excluded_problem_ids_sha256") != ordered_problem_ids_sha256(
+            sorted_excluded
+        ):
+            raise EvalPlusExportError("dataset excluded problem IDs hash is invalid")
+        union_excluded = set()
+        for record in excluded_manifests:
+            union_excluded.update(record["selected_problem_ids"])
+        if sorted(union_excluded, key=_safe_task_id_number) != sorted_excluded:
+            raise EvalPlusExportError(
+                "dataset excluded problem IDs do not match excluded manifests"
+            )
+        if selection.get("excluded_manifests_count") != len(excluded_manifests):
+            raise EvalPlusExportError("dataset excluded manifests count is invalid")
+        expected_manifests_hash = _sha256(
+            _metadata_json_bytes(
+                [{"manifest_sha256": record["manifest_sha256"]} for record in excluded_manifests]
+            )
+        )
+        if selection.get("excluded_manifests_sha256") != expected_manifests_hash:
+            raise EvalPlusExportError("dataset excluded manifests hash is invalid")
+
+    expected_ids = list(
+        select_humanevalplus_problem_ids(count=count, seed=seed, exclude_ids=exclude_ids)
+    )
     if selected_ids != expected_ids:
         raise EvalPlusExportError("dataset selected problem IDs are invalid")
     assert isinstance(selected_ids, list)
-    if projection.get("record_count") != PILOT_COUNT:
+    if projection.get("record_count") != count:
         raise EvalPlusExportError("dataset public projection record count is invalid")
     if ordered_ids_hash != ordered_problem_ids_sha256(selected_ids):
         raise EvalPlusExportError("dataset ordered problem IDs hash is inconsistent")
+
+    if schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
+        if selection.get("selected_problem_ids_sha256") != ordered_problem_ids_sha256(selected_ids):
+            raise EvalPlusExportError("dataset selected problem IDs hash is invalid")
+
+    if selection_role == "pilot":
+        allowed_labels = {
+            PILOT_EXPERIMENT_LABEL,
+            f"humanevalplus_{count}_public_prompt_generation_pilot",
+        }
+        if payload.get("experiment_label") not in allowed_labels:
+            raise EvalPlusExportError("dataset manifest experiment label is invalid")
+        if payload.get("limitations") != list(PILOT_LIMITATIONS):
+            raise EvalPlusExportError("dataset manifest pilot limitations are invalid")
+    else:
+        if payload.get("experiment_label") != RESEARCH_NATURAL_EXPERIMENT_LABEL:
+            raise EvalPlusExportError("dataset manifest experiment label is invalid")
+        if count != RESEARCH_NATURAL_COUNT or seed != RESEARCH_NATURAL_SEED:
+            raise EvalPlusExportError("dataset manifest research_natural seed/count is invalid")
+        if payload.get("limitations") != list(RESEARCH_NATURAL_LIMITATIONS):
+            raise EvalPlusExportError("dataset manifest research_natural limitations are invalid")
 
     withheld_fields = payload.get("withheld_fields")
     if (
@@ -506,7 +637,7 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
     task_metadata = tuple(_task_metadata_from_public_prompt(problem) for problem in problems)
 
     manifest_hash = _sha256(manifest_bytes)
-    expected_provenance = {
+    expected_provenance: dict[str, Any] = {
         "manifest_sha256": manifest_hash,
         "kind": payload["kind"],
         "dataset_id": payload["dataset_id"],
@@ -521,7 +652,7 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         },
         "public_projection": {
             "sha256": problems_hash,
-            "record_count": PILOT_COUNT,
+            "record_count": count,
             "ordered_problem_ids_sha256": ordered_ids_hash,
         },
         "selection": {
@@ -535,6 +666,9 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         "source_manifest_sha256": source_manifest_hash,
         "parent_manifest_sha256": parent_manifest_hash,
     }
+    if schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
+        expected_provenance["selection_role"] = selection_role
+        expected_provenance["excluded_manifests"] = excluded_manifests
     identity = HumanEvalPlusDatasetIdentity(
         manifest_sha256=manifest_hash,
         dataset_id=DATASET_ID,
@@ -550,8 +684,10 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         problems_sha256=problems_hash,
         ordered_problem_ids_sha256=ordered_ids_hash,
         selection_algorithm=SELECTION_ALGORITHM,
-        selection_seed=PILOT_SEED,
+        selection_seed=seed,
         selected_problem_ids=problem_ids,
+        selection_role=selection_role,
+        excluded_manifests=tuple(excluded_manifests),
     )
     return _DatasetValidation(
         identity=identity,
@@ -599,7 +735,17 @@ def _validate_phase1_manifest(
     run_id = _text(payload.get("run_id"), label="phase-one run_id")
     if run_dir.name != run_id:
         raise EvalPlusExportError("phase-one run directory does not match manifest run_id")
-    if payload.get("experiment_label") != PILOT_EXPERIMENT_LABEL:
+    selection_role = dataset.expected_provenance.get("selection_role", "pilot")
+    problem_count = len(dataset.problem_ids)
+    if selection_role == "research_natural":
+        expected_label = RESEARCH_NATURAL_EXPERIMENT_LABEL
+    else:
+        expected_label = (
+            PILOT_EXPERIMENT_LABEL
+            if problem_count == PILOT_COUNT
+            else f"humanevalplus_{problem_count}_public_prompt_generation_pilot"
+        )
+    if payload.get("experiment_label") != expected_label:
         raise EvalPlusExportError("phase-one experiment label differs from dataset manifest")
 
     manifest_dataset = _mapping(payload.get("dataset"), label="phase-one manifest dataset")
@@ -619,11 +765,11 @@ def _validate_phase1_manifest(
     _text(manifest_dataset.get("path"), label="phase-one dataset path")
     if manifest_dataset.get("sha256") != dataset.identity.problems_sha256:
         raise EvalPlusExportError("phase-one dataset SHA256 differs from dataset manifest")
-    if manifest_dataset.get("problem_count") != PILOT_COUNT:
+    if manifest_dataset.get("problem_count") != len(dataset.problem_ids):
         raise EvalPlusExportError("phase-one dataset problem count is invalid")
-    if manifest_dataset.get("sources") != {DATASET_SOURCE: PILOT_COUNT}:
+    if manifest_dataset.get("sources") != {DATASET_SOURCE: len(dataset.problem_ids)}:
         raise EvalPlusExportError("phase-one dataset source counts are invalid")
-    if manifest_dataset.get("difficulties") != {"unknown": PILOT_COUNT}:
+    if manifest_dataset.get("difficulties") != {"unknown": len(dataset.problem_ids)}:
         raise EvalPlusExportError("phase-one dataset difficulty counts are invalid")
     visible_tests = _mapping(
         manifest_dataset.get("visible_tests"), label="phase-one visible test summary"
@@ -704,7 +850,7 @@ def _validate_phase1_manifest(
 
     source = Phase1SourceIdentity(
         run_id=run_id,
-        experiment_label=PILOT_EXPERIMENT_LABEL,
+        experiment_label=payload.get("experiment_label"),
         manifest_sha256=_sha256(manifest_bytes),
         summary_sha256="",  # Filled only after the summary is validated.
         responses_sha256="",  # Filled only after the response log is validated.
@@ -867,6 +1013,8 @@ def _validate_responses(
     *,
     manifest: _ManifestValidation,
     dataset: _DatasetValidation,
+    selection_policy: SelectionPolicy = "all",
+    min_success_count: int = 0,
 ) -> _ResponseValidation:
     parsed = _response_records(responses_bytes)
     expected_ids = frozenset(dataset.problem_ids)
@@ -941,10 +1089,22 @@ def _validate_responses(
             final_non_skipped[problem_id] = record
         records.append(record)
 
-    if frozenset(success_by_id) != expected_ids:
-        raise EvalPlusExportError("phase-one success problem IDs do not exactly match the dataset")
-    samples = tuple(success_by_id[problem_id][0] for problem_id in dataset.problem_ids)
-    references = tuple(success_by_id[problem_id][1] for problem_id in dataset.problem_ids)
+    if selection_policy == "all":
+        if frozenset(success_by_id) != expected_ids:
+            raise EvalPlusExportError(
+                "phase-one success problem IDs do not exactly match the dataset"
+            )
+        ordered_success_ids = list(dataset.problem_ids)
+    else:
+        if len(success_by_id) < min_success_count:
+            raise EvalPlusExportError(
+                f"phase-one success count {len(success_by_id)} is below min_success_count {min_success_count}"
+            )
+        ordered_success_ids = [
+            problem_id for problem_id in dataset.problem_ids if problem_id in success_by_id
+        ]
+    samples = tuple(success_by_id[problem_id][0] for problem_id in ordered_success_ids)
+    references = tuple(success_by_id[problem_id][1] for problem_id in ordered_success_ids)
     return _ResponseValidation(
         samples=samples,
         references=references,
@@ -963,6 +1123,8 @@ def _validate_summary(
     manifest: _ManifestValidation,
     responses: _ResponseValidation,
     expected_count: int,
+    selection_policy: SelectionPolicy = "all",
+    min_success_count: int = 0,
 ) -> None:
     summary = _json_object(summary_bytes, label="phase-one summary")
     summary_keys = (
@@ -1009,23 +1171,39 @@ def _validate_summary(
     }
     if summary.get("final_outcome_counts") != expected_final_counts:
         raise EvalPlusExportError("phase-one summary final outcomes differ from responses")
-    if (
-        summary.get("success_count") != expected_count
-        or summary.get("parse_error_count") != 0
-        or summary.get("provider_error_count") != 0
-        or summary.get("failure_count") != 0
-        or summary.get("pending_count") != 0
-    ):
-        raise EvalPlusExportError("phase-one summary does not describe ten final successes")
+    if selection_policy == "all":
+        if (
+            summary.get("success_count") != expected_count
+            or summary.get("parse_error_count") != 0
+            or summary.get("provider_error_count") != 0
+            or summary.get("failure_count") != 0
+            or summary.get("pending_count") != 0
+        ):
+            raise EvalPlusExportError("phase-one summary does not describe ten final successes")
+    else:
+        if (
+            summary.get("success_count") != final_counts["success"]
+            or summary.get("parse_error_count") != final_counts["parse_error"]
+            or summary.get("provider_error_count") != final_counts["provider_error"]
+            or summary.get("failure_count")
+            != final_counts["parse_error"] + final_counts["provider_error"]
+            or summary.get("pending_count") != 0
+            or summary.get("success_count") < min_success_count
+        ):
+            raise EvalPlusExportError("phase-one summary success counts are inconsistent")
 
     parse_counts = Counter(str(record["parse_status"]) for record in final_records.values())
     parsed = parse_counts["parsed"]
     failed = parse_counts["failed"]
+    if selection_policy == "all":
+        expected_parse_success_rate = 1.0
+    else:
+        expected_parse_success_rate = parsed / (parsed + failed) if parsed + failed else 0.0
     if (
         summary.get("parse_attempted_count") != parsed + failed
         or summary.get("parse_success_count") != parsed
         or summary.get("parse_failure_count") != failed
-        or summary.get("parse_success_rate") != 1.0
+        or summary.get("parse_success_rate") != expected_parse_success_rate
     ):
         raise EvalPlusExportError("phase-one summary parse metrics differ from responses")
     durations = [float(record["duration_seconds"]) for record in final_records.values()]
@@ -1115,8 +1293,34 @@ def _validate_summary(
 def load_validated_phase1_export(
     baseline_run_dir: str | Path,
     dataset_manifest_path: str | Path,
+    *,
+    selection_policy: SelectionPolicy = "all",
+    min_success_count: int = 0,
 ) -> ValidatedSampleExport:
-    """Return ten validated samples without creating files or executing code."""
+    """Return validated samples without creating files or executing code.
+
+    Args:
+        baseline_run_dir: Completed phase-one run directory.
+        dataset_manifest_path: dataset_manifest.json for the selected cohort.
+        selection_policy: ``all`` requires every dataset problem to have a
+            successful phase-one response; ``phase1-success-only`` exports only
+            successful responses.
+        min_success_count: Minimum number of distinct successful problem IDs
+            required when ``selection_policy`` is ``phase1-success-only``.
+    """
+
+    if selection_policy not in {"all", "phase1-success-only"}:
+        raise EvalPlusExportError("selection_policy must be 'all' or 'phase1-success-only'")
+    if (
+        isinstance(min_success_count, bool)
+        or not isinstance(min_success_count, int)
+        or min_success_count < 0
+    ):
+        raise EvalPlusExportError("min_success_count must be a non-negative integer")
+    if selection_policy == "phase1-success-only" and min_success_count < 1:
+        raise EvalPlusExportError(
+            "phase1-success-only requires min_success_count to be at least one"
+        )
 
     raw_run_dir = Path(baseline_run_dir).expanduser()
     if raw_run_dir.is_symlink() or not raw_run_dir.is_dir():
@@ -1138,12 +1342,16 @@ def load_validated_phase1_export(
         responses_bytes,
         manifest=manifest,
         dataset=dataset,
+        selection_policy=selection_policy,
+        min_success_count=min_success_count,
     )
     _validate_summary(
         summary_bytes,
         manifest=manifest,
         responses=responses,
         expected_count=len(dataset.problem_ids),
+        selection_policy=selection_policy,
+        min_success_count=min_success_count,
     )
 
     samples_bytes = serialize_samples_jsonl(responses.samples)
@@ -1159,28 +1367,61 @@ def load_validated_phase1_export(
         provider=manifest.source.provider,
         model=manifest.source.model,
     )
+    if selection_policy == "all":
+        task_metadata = dataset.task_metadata
+    else:
+        success_ids = [sample.task_id for sample in responses.samples]
+        metadata_by_id = {meta.problem_id: meta for meta in dataset.task_metadata}
+        task_metadata = tuple(metadata_by_id[problem_id] for problem_id in success_ids)
+    final_counts = Counter(str(record["status"]) for record in responses.final_non_skipped.values())
+    source_problem_count = len(dataset.problem_ids)
+    exported_success_count = len(responses.samples)
+    excluded_parse_error_count = final_counts["parse_error"]
+    excluded_provider_error_count = final_counts["provider_error"]
+    if (
+        exported_success_count + excluded_parse_error_count + excluded_provider_error_count
+        != source_problem_count
+    ):
+        raise EvalPlusExportError("phase-one final outcomes do not cover the source cohort")
     return ValidatedSampleExport(
         phase1=source,
         dataset=dataset.identity,
         samples=responses.samples,
         response_references=responses.references,
-        task_metadata=dataset.task_metadata,
+        task_metadata=task_metadata,
         samples_sha256=_sha256(samples_bytes),
+        export_selection=Phase1ExportSelectionIdentity(
+            selection_policy=selection_policy,
+            min_success_count=min_success_count,
+            source_problem_count=source_problem_count,
+            exported_success_count=exported_success_count,
+            excluded_parse_error_count=excluded_parse_error_count,
+            excluded_provider_error_count=excluded_provider_error_count,
+        ),
     )
 
 
 def export_phase1_samples(
     baseline_run_dir: str | Path,
     dataset_manifest_path: str | Path,
+    *,
+    selection_policy: SelectionPolicy = "all",
+    min_success_count: int = 0,
 ) -> ValidatedSampleExport:
     """Compatibility alias emphasizing that the export remains in memory."""
 
-    return load_validated_phase1_export(baseline_run_dir, dataset_manifest_path)
+    return load_validated_phase1_export(
+        baseline_run_dir,
+        dataset_manifest_path,
+        selection_policy=selection_policy,
+        min_success_count=min_success_count,
+    )
 
 
 __all__ = [
     "EvalPlusExportError",
     "PINNED_HUMANEVALPLUS_REVISION",
+    "SelectionPolicy",
     "export_phase1_samples",
     "load_validated_phase1_export",
     "serialize_samples_jsonl",

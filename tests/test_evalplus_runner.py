@@ -23,6 +23,7 @@ from tracejudge_hy3.evalplus.schemas import (
     EvalPlusSample,
     HumanEvalPlusDatasetIdentity,
     HumanEvalPlusTaskMetadata,
+    Phase1ExportSelectionIdentity,
     Phase1ResponseReference,
     Phase1SourceIdentity,
     ValidatedSampleExport,
@@ -33,7 +34,18 @@ FAILURE_CANARY = "PRIVATE_EVALPLUS_FAILURE_INPUT_CANARY"
 SOLUTION_CANARY = "CANDIDATE_SOURCE_BODY_CANARY"
 
 
-def _export(*, code_suffix: str = "") -> ValidatedSampleExport:
+def _export(
+    *,
+    code_suffix: str = "",
+    problem_ids: tuple[str, ...] = IDS,
+    source_problem_ids: tuple[str, ...] | None = None,
+    selection_role: str = "pilot",
+    selection_policy: str = "all",
+    min_success_count: int = 30,
+    excluded_parse_error_count: int = 0,
+    excluded_provider_error_count: int = 0,
+) -> ValidatedSampleExport:
+    source_ids = source_problem_ids or problem_ids
     samples = tuple(
         EvalPlusSample(
             task_id=problem_id,
@@ -43,7 +55,7 @@ def _export(*, code_suffix: str = "") -> ValidatedSampleExport:
                 f"    return value{code_suffix}\n"
             ),
         )
-        for index, problem_id in enumerate(IDS)
+        for index, problem_id in enumerate(problem_ids)
     )
     references = tuple(
         Phase1ResponseReference(
@@ -62,13 +74,17 @@ def _export(*, code_suffix: str = "") -> ValidatedSampleExport:
             prompt_sha256=hashlib.sha256(f"prompt-{problem_id}".encode()).hexdigest(),
             entry_point=f"candidate_{index}",
         )
-        for index, problem_id in enumerate(IDS)
+        for index, problem_id in enumerate(problem_ids)
     )
     sample_bytes = serialize_samples_jsonl(samples)
     return ValidatedSampleExport(
         phase1=Phase1SourceIdentity(
             run_id="phase1_fixture",
-            experiment_label="humanevalplus_10_public_prompt_generation_pilot",
+            experiment_label=(
+                "humanevalplus_45_public_prompt_generation_research_natural"
+                if selection_role == "research_natural"
+                else "humanevalplus_10_public_prompt_generation_pilot"
+            ),
             manifest_sha256="1" * 64,
             summary_sha256="2" * 64,
             responses_sha256="3" * 64,
@@ -93,13 +109,43 @@ def _export(*, code_suffix: str = "") -> ValidatedSampleExport:
             problems_sha256="b" * 64,
             ordered_problem_ids_sha256="c" * 64,
             selection_algorithm="fixture-selection",
-            selection_seed=20260824,
-            selected_problem_ids=IDS,
+            selection_seed=20260825 if selection_role == "research_natural" else 20260824,
+            selected_problem_ids=source_ids,
+            selection_role=selection_role,
         ),
         samples=samples,
         response_references=references,
         task_metadata=task_metadata,
         samples_sha256=hashlib.sha256(sample_bytes).hexdigest(),
+        export_selection=Phase1ExportSelectionIdentity(
+            selection_policy=selection_policy,
+            min_success_count=min_success_count,
+            source_problem_count=len(source_ids),
+            exported_success_count=len(problem_ids),
+            excluded_parse_error_count=excluded_parse_error_count,
+            excluded_provider_error_count=excluded_provider_error_count,
+        ),
+    )
+
+
+def _research_export(
+    *,
+    success_count: int,
+    parse_error_count: int,
+    provider_error_count: int,
+    selection_policy: str = "phase1-success-only",
+    min_success_count: int = 30,
+) -> ValidatedSampleExport:
+    source_ids = tuple(f"HumanEval/{index}" for index in range(45))
+    assert success_count + parse_error_count + provider_error_count == len(source_ids)
+    return _export(
+        problem_ids=source_ids[:success_count],
+        source_problem_ids=source_ids,
+        selection_role="research_natural",
+        selection_policy=selection_policy,
+        min_success_count=min_success_count,
+        excluded_parse_error_count=parse_error_count,
+        excluded_provider_error_count=provider_error_count,
     )
 
 
@@ -256,6 +302,205 @@ def test_mock_dry_run_creates_private_complete_artifacts_without_execution(tmp_p
     assert result.summary["base_pass_rate"] is None
     assert result.manifest["execution_mode"] == "mock"
     assert result.manifest["output"]["samples_sha256"] == exported.samples_sha256
+    assert result.manifest["experiment_label"] == "humanevalplus_2_evalplus_execution_pilot"
+    assert "pilot_description" in result.summary
+    assert "cohort_description" not in result.summary
+    assert result.manifest["input"]["phase1_export_selection"] == {
+        "selection_policy": "all",
+        "min_success_count": 30,
+        "source_problem_count": 2,
+        "exported_success_count": 2,
+        "excluded_parse_error_count": 0,
+        "excluded_provider_error_count": 0,
+    }
+
+
+def test_ten_task_pilot_keeps_existing_phase_two_identity(tmp_path, monkeypatch):
+    pilot_ids = tuple(f"HumanEval/{index}" for index in range(10))
+    exported = _export(problem_ids=pilot_ids)
+    _patch_export(monkeypatch, exported)
+
+    result = run_evalplus_experiment(
+        "unused-phase1",
+        "unused-manifest",
+        tmp_path / "phase2",
+        executor=MockEvalPlusExecutor(),
+        run_id="phase2_ten_task_compatibility",
+        selection_policy="all",
+        min_success_count=30,
+    )
+
+    assert result.manifest["experiment_label"] == "humanevalplus_10_evalplus_execution_pilot"
+    assert result.manifest["metrics_scope"] == (
+        "fixed_10_task_generation_to_execution_engineering_pilot"
+    )
+    assert "fixed_10_problem_subset_not_full_humanevalplus" in result.manifest["limitations"]
+    assert result.summary["source_problem_count"] == 10
+    assert result.summary["exported_success_count"] == 10
+    assert "pilot_description" in result.summary
+
+
+def test_research_success_only_records_45_32_8_5_without_pilot_identity(
+    tmp_path,
+    monkeypatch,
+):
+    exported = _research_export(
+        success_count=32,
+        parse_error_count=8,
+        provider_error_count=5,
+    )
+    _patch_export(monkeypatch, exported)
+
+    result = run_evalplus_experiment(
+        "unused-phase1",
+        "unused-manifest",
+        tmp_path / "phase2",
+        executor=MockEvalPlusExecutor(),
+        run_id="phase2_research_32_of_45",
+        selection_policy="phase1-success-only",
+        min_success_count=30,
+    )
+
+    expected_accounting = {
+        "selection_policy": "phase1-success-only",
+        "min_success_count": 30,
+        "source_problem_count": 45,
+        "exported_success_count": 32,
+        "excluded_parse_error_count": 8,
+        "excluded_provider_error_count": 5,
+    }
+    assert result.manifest["input"]["phase1_export_selection"] == expected_accounting
+    assert result.manifest["experiment_label"] == (
+        "humanevalplus_32_of_45_evalplus_execution_research_natural"
+    )
+    assert result.summary["source_problem_count"] == 45
+    assert result.summary["exported_success_count"] == 32
+    assert result.summary["excluded_parse_error_count"] == 8
+    assert result.summary["excluded_provider_error_count"] == 5
+    assert result.summary["total_problem_count"] == 32
+    assert result.summary["pipeline_coverage_rate"] == 32 / 45
+    assert result.summary["cohort_description"].startswith("research_natural_32_of_45")
+    assert "pilot_description" not in result.summary
+    public_text = json.dumps(
+        {"manifest": result.manifest, "summary": result.summary},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    assert "fixed_10" not in public_text
+    assert "engineering_pilot" not in public_text
+
+
+def test_research_success_only_rejects_29_successes_before_creating_run(
+    tmp_path,
+    monkeypatch,
+):
+    exported = _research_export(
+        success_count=29,
+        parse_error_count=10,
+        provider_error_count=6,
+    )
+    _patch_export(monkeypatch, exported)
+    output = tmp_path / "phase2"
+
+    with pytest.raises(EvalPlusExperimentError, match="below min_success_count"):
+        run_evalplus_experiment(
+            "unused-phase1",
+            "unused-manifest",
+            output,
+            executor=MockEvalPlusExecutor(),
+            run_id="phase2_research_29_of_45",
+            selection_policy="phase1-success-only",
+            min_success_count=30,
+        )
+
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    ("first_selection", "resumed_selection", "first_policy", "resumed_policy"),
+    [
+        (
+            Phase1ExportSelectionIdentity(
+                selection_policy="phase1-success-only",
+                min_success_count=30,
+                source_problem_count=45,
+                exported_success_count=45,
+                excluded_parse_error_count=0,
+                excluded_provider_error_count=0,
+            ),
+            Phase1ExportSelectionIdentity(
+                selection_policy="phase1-success-only",
+                min_success_count=31,
+                source_problem_count=45,
+                exported_success_count=45,
+                excluded_parse_error_count=0,
+                excluded_provider_error_count=0,
+            ),
+            "phase1-success-only",
+            "phase1-success-only",
+        ),
+        (
+            Phase1ExportSelectionIdentity(
+                selection_policy="phase1-success-only",
+                min_success_count=30,
+                source_problem_count=45,
+                exported_success_count=45,
+                excluded_parse_error_count=0,
+                excluded_provider_error_count=0,
+            ),
+            Phase1ExportSelectionIdentity(
+                selection_policy="all",
+                min_success_count=30,
+                source_problem_count=45,
+                exported_success_count=45,
+                excluded_parse_error_count=0,
+                excluded_provider_error_count=0,
+            ),
+            "phase1-success-only",
+            "all",
+        ),
+    ],
+)
+def test_resume_rejects_changed_success_selection_policy_or_threshold(
+    tmp_path,
+    monkeypatch,
+    first_selection,
+    resumed_selection,
+    first_policy,
+    resumed_policy,
+):
+    exported = _research_export(
+        success_count=45,
+        parse_error_count=0,
+        provider_error_count=0,
+        selection_policy=first_selection.selection_policy,
+        min_success_count=first_selection.min_success_count,
+    )
+    _patch_export(monkeypatch, exported)
+    output = tmp_path / "phase2"
+    run_evalplus_experiment(
+        "unused-phase1",
+        "unused-manifest",
+        output,
+        executor=MockEvalPlusExecutor(),
+        run_id="phase2_selection_resume",
+        selection_policy=first_policy,
+        min_success_count=first_selection.min_success_count,
+    )
+
+    changed = replace(exported, export_selection=resumed_selection)
+    _patch_export(monkeypatch, changed)
+    with pytest.raises(EvalPlusExperimentError, match="resume"):
+        run_evalplus_experiment(
+            "unused-phase1",
+            "unused-manifest",
+            output,
+            executor=MockEvalPlusExecutor(),
+            run_id="phase2_selection_resume",
+            resume=True,
+            selection_policy=resumed_policy,
+            min_success_count=resumed_selection.min_success_count,
+        )
 
 
 def test_mock_dry_run_can_resume_without_changing_artifacts_identity(tmp_path, monkeypatch):

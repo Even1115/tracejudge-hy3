@@ -10,7 +10,7 @@
 - 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`）；
 - 从本地固定 revision 快照离线生成 164 题 HumanEval+ 阶段一公开投影，并以固定 seed/公开题号生成可复现的 10 题 Pilot；投影不含 `canonical_solution`、官方测试或任何可执行测试；
 - `baseline --dataset-manifest` 对 HumanEval+ provenance、投影哈希、题号顺序和选择参数做绑定，只生成/解析 Solver 输出；
-- 固定官方镜像 digest、镜像内 EvalPlus package `0.4.0.dev2` 与源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、Python/HumanEval+ release 的独立阶段二执行边界；仅支持上述固定 10 题、每题单候选的 Base 与 Extra 工程 Pilot；
+- 固定官方镜像 digest、镜像内 EvalPlus package `0.4.0.dev2` 与源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、Python/HumanEval+ release 的独立阶段二执行边界；支持固定 10 题工程 Pilot，以及从 45 题 research-natural 来源中按 `phase1-success-only` 导出的单候选 Base 与 Extra 正式运行；
 - 基础 AST 静态分析（分支/循环/数据结构/空输入启发式/硬编码启发式）；
 - 可见测试、隐藏测试、挑战测试；
 - 基础需求—步骤—代码对齐（规则命中 + LLM 判断交叉验证）；
@@ -35,4 +35,4 @@
 
 模型输出中的"过程"是面向用户、可审查的解题说明和实现计划，不要求也不试图暴露模型不可见的内部思维链。
 
-HumanEval+ 固定 10 题有两个彼此分离的证据范围：阶段一仅产生 `generation_and_parsing_only` 事实；阶段二仅产生固定子集的 single-sample generation→execution 工程 Pilot 事实。解析成功不代表功能通过，阶段二的 10 题通过率也不是完整 164 题 pass@1、正式 benchmark 排名或模型总体能力结论。`run` / `batch` 仍拒绝公开投影；只能通过已完成阶段一产物进入 `tracejudge evalplus`。
+HumanEval+ 固定 10 题有两个彼此分离的证据范围：阶段一仅产生 `generation_and_parsing_only` 事实；阶段二仅产生固定子集的 single-sample generation→execution 工程 Pilot 事实。research-natural 正式运行同样属于固定来源、单候选配置下的功能证据，不是完整 164 题 pass@1、标准多样本 pass@k、正式 benchmark 排名或模型总体能力结论。解析成功不代表功能通过；`run` / `batch` 仍拒绝公开投影，只能通过已完成且 provenance 一致的阶段一产物进入 `tracejudge evalplus`。

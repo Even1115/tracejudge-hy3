@@ -1,9 +1,9 @@
 # TraceJudge-Hy3 阶段二自然研究子集实验报告
 
-> 文档状态：预运行报告骨架  
-> 协议版本：`phase2_research_natural_v1`  
-> 建立日期：2026-08-26  
-> 当前证据状态：阶段一结果已核验；阶段二真实 Docker 结果尚未产生  
+> 文档状态：正式执行中
+> 协议版本：`phase2_research_natural_v1`
+> 建立日期：2026-08-26
+> 当前证据状态：阶段一、Mock 链和修复后的真实 Docker 验收已核验；首次正式 Docker run 在 preflight 阶段失败，候选实际执行数为 0；当前代码已通过固定镜像 preflight、42 题 cohort preflight 和单题官方 EvalPlus smoke，修复后的新正式 run 待执行
 > 定稿条件：完成真实 Docker smoke、正式 EvalPlus 执行和产物完整性验收
 
 ## 1. 实验目的与证据边界
@@ -26,10 +26,10 @@
 | 45 题自然研究数据集 | 已完成并核验 | schema v2、固定 seed、排除 10 题 Pilot |
 | 阶段一真实 Hy3 生成 | 已完成并核验 | 42 success、0 parse error、3 provider error |
 | 阶段二导出门槛 | 已通过 | 42 ≥ 预设最低成功数 30 |
-| 固定镜像 Docker smoke | `TBD` | 必须为真实测试 `2 passed` |
-| 阶段二 Mock 产物链预检 | `TBD` | 只验证导出和产物协议，不作为功能证据 |
-| 阶段二真实 EvalPlus 执行 | `TBD` | 预期输入 42 个阶段一成功候选 |
-| 阶段二产物完整性验收 | `TBD` | manifest、summary、results、raw 和 execution log 哈希 |
+| 当前代码真实 Docker 验收 | 已通过 | 2026-08-27 真实标记测试 `3 passed, 50 deselected in 50.74s`；覆盖固定镜像 preflight、42 题 cohort preflight 和单题官方执行 smoke |
+| 阶段二 Mock 产物链预检 | 已通过 | run `phase2_20260827T061539511466Z_8529bad881a6`；45/42/0/3 一致，不作为功能证据 |
+| 阶段二真实 EvalPlus 执行 | 首次尝试失败，待新建 run | run `phase2_20260827T065923524982Z_ad32756614a7` 在 preflight 阶段因仅支持 10 题的旧协议失败；0 题实际执行 |
+| 阶段二产物完整性验收 | 首次失败 run 已留档；最终验收待执行 | 失败 run 的脱敏 manifest、summary、results 和 execution log 哈希已记录 |
 
 ## 3. 数据集与抽样协议
 
@@ -171,7 +171,7 @@
 
 以下条件在查看阶段二功能结果前固定：
 
-1. 真实 Docker 集成测试为 `2 passed`，不能是 skipped。
+1. 当前代码的真实 Docker 集成测试必须同时覆盖固定镜像 preflight、42 题研究 cohort preflight 和单题官方 EvalPlus smoke，结果为 `3 passed`，不能是 skipped。
 2. 阶段二 executor 必须为 `docker`，不能以 Mock 结果代替。
 3. `source_problem_count` 必须为 45。
 4. `exported_success_count` 必须为 42，且不少于 30。
@@ -186,19 +186,45 @@
 
 任何硬门槛失败都必须如实记录。基础设施错误不能计作候选代码失败，也不能从分母中静默删除后声称实验完整。
 
+首次正式 preflight 失败后新增一项矫正性门槛：修复后的当前 commit 必须通过原有镜像 preflight、单题官方 smoke 和新增的 42 题研究 cohort preflight，即显式 Docker 标记测试应为 `3 passed`。新增项只校验公开任务身份，不执行候选代码。该门槛是针对已观测基础设施缺陷的修复验收，不是查看功能结果后修改评价指标。
+
 ## 7. 阶段二结果
 
-### 7.1 Docker smoke
+### 7.1 Docker smoke 与修复后验收
 
 | 指标 | 结果 |
 | --- | --- |
-| 执行日期 | `TBD` |
-| 固定镜像 preflight | `TBD` |
-| 单题真实官方 EvalPlus smoke | `TBD` |
-| 测试结果 | `TBD（目标：2 passed）` |
-| 异常 | `TBD` |
+| 执行日期 | 2026-08-27 |
+| 固定镜像 preflight | 通过（10题 Pilot 公开身份） |
+| 单题真实官方 EvalPlus smoke | 通过 |
+| 修复前测试结果 | `2 passed, 42 deselected in 49.41s` |
+| 修复前覆盖缺口 | 该 smoke 仅覆盖 10 题 preflight，未覆盖 42 题研究 cohort；此缺口导致首次正式 run 才暴露固定 10 题限制 |
+| 修复后当前代码结果 | `3 passed, 50 deselected in 50.74s` |
+| 修复后覆盖范围 | 固定镜像与运行时身份 preflight；正式 42 题 `research-natural` cohort preflight；单题官方 EvalPlus Base+Extra 执行 smoke |
 
-### 7.2 执行概况
+修复后的三项真实 Docker 测试已全部通过。其中 42 题 cohort preflight 只校验公开任务身份和数据一致性，不执行 42 个候选；单题 smoke 用于确认固定 EvalPlus 执行路径可用。因此，该 `3 passed` 是正式运行前的工程验收证据，不是 42 题功能评测结果。
+
+### 7.2 首次正式执行尝试（基础设施失败，排除功能结果）
+
+| 字段 | 结果 |
+| --- | --- |
+| run ID | `phase2_20260827T065923524982Z_ad32756614a7` |
+| 创建时间 | `2026-08-27T06:59:23.738Z` |
+| 完成时间 | `2026-08-27T06:59:23.955Z` |
+| experiment label | `humanevalplus_42_of_45_evalplus_execution_research_natural` |
+| execution mode | `docker` |
+| preflight | `failed` / `executor_error` |
+| 阶段二结果记录 | 42 |
+| 实际官方执行 | 0 |
+| 基础设施错误 | 42（同一 preflight 错误向所有待执行题目的安全映射） |
+| 容器清理失败 | 0 |
+| `evaluation_complete` | `false` |
+
+第一次正式阶段二尝试在候选执行前失败：42 个待执行候选均被统一标记为 `executor_error`，`actual_execution_count=0`，原因是 Docker preflight 的宿主与容器协议仍固定要求恰好 10 题。本次不产生 Base、Base+Extra 或任何功能正确率，不得记为 0% 通过率。
+
+修复将 preflight 边界改为接受 1—164 个唯一 HumanEval+ 公开任务身份，并为 42 题 cohort 增加回归测试。由于修复会改变实现指纹，失败 run 保留用于审计，修复后必须在干净新 commit 上创建新的正式 run，不对该 run 执行跨实现指纹续跑。
+
+### 7.3 最终正式执行概况（待新 run）
 
 | 指标 | 原始数量 | 分母/说明 |
 | --- | ---: | --- |
@@ -215,7 +241,7 @@
 | container cleanup failed | `TBD` | 必须为 0 才通过硬验收 |
 | resume reused | `TBD` | 如未续跑则为 0 |
 
-### 7.3 通过率
+### 7.4 通过率
 
 | 指标 | 数值 | 计算式 |
 | --- | --- | --- |
@@ -227,7 +253,7 @@
 
 Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端比例并列报告。只报告 42 个阶段一成功候选中的通过率会产生成功条件化偏差。
 
-### 7.4 逐题脱敏结果
+### 7.5 逐题脱敏结果
 
 逐题表只允许从阶段二 `results.jsonl` 的安全字段生成，不得复制 EvalPlus raw 或失败输入。
 
@@ -239,14 +265,15 @@ Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端
 
 | 事件 | 数量 | 是否影响完整性 | 处理 |
 | --- | ---: | --- | --- |
-| preflight failure | `TBD` | 是 | 不进入正式执行，修复后重新预检 |
-| batch deadline not started | `TBD` | 是 | 使用同一参数和 run ID 恢复 |
-| batch timeout | `TBD` | 是 | 不计作代码失败 |
-| container cleanup failed | `TBD` | 是 | 不得将 run 标记为成功实验 |
-| transport/parser infrastructure error | `TBD` | 是 | 不计作代码失败 |
-| candidate timeout | `TBD` | 否 | 作为候选执行结果报告 |
+| preflight failure | 1 | 是 | 已定位为旧协议恰好 10 题的限制；修复后新建正式 run |
+| preflight 错误映射的 `executor_error` 结果 | 42 | 是 | 仅表示统一 preflight 失败，不是 42 次独立候选执行失败 |
+| batch deadline not started | 0 | 是 | 首次尝试未进入任务调度 |
+| batch timeout | 0 | 是 | 首次尝试未进入任务调度 |
+| container cleanup failed | 0 | 是 | 首次尝试未观测到清理失败 |
+| transport/parser infrastructure error | 0 | 是 | 首次尝试未进入 raw 传输或解析 |
+| candidate timeout | 0 | 否 | 没有候选实际执行 |
 
-如发生续跑，应记录每次 invocation 的时间、原因、实际执行数和 reused 数。不得通过创建新 run 隐藏原 run 的基础设施错误。
+如发生续跑，应记录每次 invocation 的时间、原因、实际执行数和 reused 数。不得通过创建新 run 隐藏原 run 的基础设施错误。本次因修复改变实现指纹而必须新建 run，但失败 run ID、原因、脱敏计数和哈希仍在本报告中保留。
 
 ## 9. 产物与可复现性
 
@@ -276,11 +303,23 @@ Base 和 Base+Extra 的条件通过率必须与 45 题来源 cohort 的端到端
 | `samples.jsonl` | `TBD（只记录哈希，不公开内容）` |
 | `evalplus_raw_results.json` | `TBD（只记录哈希，不公开内容）` |
 
-### 9.3 本地证据路径
+### 9.3 首次失败 run 的脱敏证据哈希
+
+| 文件 | SHA256 |
+| --- | --- |
+| `manifest.json` | `be3e57797418e86b8e82af5aa37e7d814eb5ea94d0ca65d287beae1a95825d44` |
+| `summary.json` | `df07cc11f4f7d52695344308090403b94d7c6d4fbf1fb184bd346f5034306ea0` |
+| `results.jsonl` | `a149a5bc75275f562867e90622f16a3da34b2733f09a4ef3ead2c79ade2606fd` |
+| `execution.log` | `fdf90bf02a57870757cac8f6f83791a5574c01833211c734ba210dd32a262411` |
+
+本表只固化失败 run 的脱敏审计产物。`samples.jsonl` 和 `evalplus_raw_results.json` 仍保持 evaluation-only，不读取、不展示，也不在此处用作功能证据。
+
+### 9.4 本地证据路径
 
 ```text
 artifacts/datasets/processed/humanevalplus-research-natural-45/
 artifacts/experiments/phase1-research-natural/phase1_20260826T130038779522Z_5f55a45bb5e5/
+artifacts/experiments/phase2-research-natural/phase2_20260827T065923524982Z_ad32756614a7/
 artifacts/experiments/phase2-research-natural/<phase2_run_id>/
 ```
 
@@ -322,9 +361,11 @@ artifacts/experiments/phase2-research-natural/<phase2_run_id>/
 
 ## 13. 待完成清单
 
-- [ ] 当前代码版本真实 Docker preflight 通过。
-- [ ] 当前代码版本真实单题 EvalPlus smoke 通过。
-- [ ] Mock 导出确认 45/42/0/3 统计一致。
+- [x] 当前代码版本真实 Docker preflight 通过（含 42 题研究 cohort preflight）。
+- [x] 当前代码版本真实单题 EvalPlus smoke 通过。
+- [x] Mock 导出确认 45/42/0/3 统计一致。
+- [x] 首次正式 run 的 preflight 失败、0 题实际执行和 42 条 `executor_error` 映射已留档。
+- [ ] 在支持 1—164 题 preflight 的干净新 commit 上新建正式 run。
 - [ ] 正式阶段二 Docker run 完成。
 - [ ] 验证阶段二 experiment label 不含 Pilot 身份。
 - [ ] 验证实际结果数为 42。
@@ -336,4 +377,6 @@ artifacts/experiments/phase2-research-natural/<phase2_run_id>/
 
 ## 14. 结论
 
-`TBD：仅在阶段二真实 Docker 运行和完整性验收结束后填写。结论必须同时报告阶段一 42/45 Pipeline Coverage、阶段二实际执行分母、Base 原始通过数和 Base+Extra 原始通过数。`
+当前只能得出工程性结论：45 题固定来源中有 42 题通过阶段一准入；首次 42 题正式 preflight 因旧协议的固定 10 题限制失败，该 run 的 `actual_execution_count=0`，不产生功能正确率。修复后的当前代码已通过固定镜像 preflight、42 题研究 cohort preflight 和单题官方 EvalPlus Base+Extra smoke，但新的 42 题正式 Docker run 仍待执行。
+
+`TBD：最终研究结论仅在修复后的新阶段二 Docker run 和完整性验收结束后填写。结论必须同时报告阶段一 42/45 Pipeline Coverage、阶段二实际执行分母、Base 原始通过数和 Base+Extra 原始通过数。`

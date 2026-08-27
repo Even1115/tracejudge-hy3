@@ -43,6 +43,9 @@ packages = ["src/tracejudge_hy3"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "docker: opt-in integration tests requiring the pinned local Docker image",
+]
 
 [tool.ruff]
 line-length = 100

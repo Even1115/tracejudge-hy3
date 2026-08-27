@@ -193,6 +193,7 @@ class LLMProvider(ABC):
             "reasoning_effort_enabled": False,
             "timeout_seconds": None,
             "max_retries": 0,
+            "max_parse_repairs": 0,
             "endpoint_sha256": None,
         }
 

@@ -374,6 +374,128 @@ async def test_hy3_mixed_parse_then_timeout_preserves_raw_attempt_metadata(monke
     assert "未通过 JSON Schema" in repair_messages[-1]["content"]
 
 
+async def test_hy3_provider_parse_repair_budget_zero_is_terminal_on_first_parse_error(
+    monkeypatch,
+):
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    provider = Hy3OpenAIProvider(_settings(hy3_max_retries=2, hy3_max_parse_repairs=0))
+    provider._call_model = AsyncMock(return_value="not JSON")
+    problem = load_problem_by_id(DATASET, "safe_mean")
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "parse_error"
+    assert generation.attempt_outcomes == ("parse_error",)
+    assert generation.attempt_count == 1
+    assert provider._call_model.await_count == 1
+
+
+async def test_hy3_provider_only_consumes_one_parse_repair_despite_extra_retries(
+    monkeypatch,
+):
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    provider = Hy3OpenAIProvider(_settings(hy3_max_retries=2, hy3_max_parse_repairs=1))
+    provider._call_model = AsyncMock(
+        side_effect=["not JSON", "still not JSON", "should not be called"]
+    )
+    problem = load_problem_by_id(DATASET, "safe_mean")
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "parse_error"
+    assert generation.attempt_outcomes == ("parse_error", "parse_error")
+    assert generation.attempt_count == 2
+    assert provider._call_model.await_count == 2
+
+
+async def test_hy3_provider_can_repair_after_provider_error_then_parse_error(
+    monkeypatch,
+):
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    provider = Hy3OpenAIProvider(_settings(hy3_max_retries=2, hy3_max_parse_repairs=1))
+    problem = load_problem_by_id(DATASET, "safe_mean")
+    valid_solution = await MockProvider(case="correct").generate_solution(problem)
+    provider._call_model = AsyncMock(
+        side_effect=[
+            ProviderResponseError("temporary API failure"),
+            "not JSON",
+            valid_solution.model_dump_json(),
+        ]
+    )
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "success"
+    assert generation.attempt_outcomes == ("provider_error", "parse_error", "success")
+    assert generation.attempt_count == 3
+    assert provider._call_model.await_count == 3
+    repair_messages = provider._call_model.await_args_list[2].args[0]
+    assert "未通过 JSON Schema" in repair_messages[-1]["content"]
+
+
+async def test_hy3_provider_keeps_repair_budget_across_provider_errors(monkeypatch):
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    provider = Hy3OpenAIProvider(_settings(hy3_max_retries=3, hy3_max_parse_repairs=1))
+    problem = load_problem_by_id(DATASET, "safe_mean")
+    valid_solution = await MockProvider(case="correct").generate_solution(problem)
+    provider._call_model = AsyncMock(
+        side_effect=[
+            "not JSON",
+            ProviderResponseError("first retry failed"),
+            ProviderResponseError("second retry failed"),
+            valid_solution.model_dump_json(),
+        ]
+    )
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "success"
+    assert generation.attempt_outcomes == (
+        "parse_error",
+        "provider_error",
+        "provider_error",
+        "success",
+    )
+    assert generation.attempt_count == 4
+    assert provider._call_model.await_count == 4
+    # Only the first parse error triggered one repair prompt; later provider
+    # errors did not reset the budget or add further repair turns.
+    message_lengths = [len(call.args[0]) for call in provider._call_model.await_args_list]
+    assert message_lengths[0] == 2  # system + user
+    assert all(length == 4 for length in message_lengths[1:])  # one repair turn appended
+
+
+async def test_hy3_public_config_includes_parse_repair_limit(monkeypatch):
+    fake_client = _FakeClient()
+    monkeypatch.setattr(
+        "tracejudge_hy3.providers.hy3_openai.openai.AsyncOpenAI",
+        lambda **kwargs: fake_client,
+    )
+    provider = Hy3OpenAIProvider(_settings(hy3_max_parse_repairs=1))
+
+    config = provider.public_generation_config()
+
+    assert config["max_parse_repairs"] == 1
+    assert config["max_retries"] == 1
+    await provider.aclose()
+
+
 async def test_hy3_auth_failure_records_one_provider_error_and_never_retries(monkeypatch):
     fake_client = _FakeClient()
     monkeypatch.setattr(

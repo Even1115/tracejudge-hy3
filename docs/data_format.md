@@ -73,7 +73,9 @@ HumanEval/8, HumanEval/26, HumanEval/41, HumanEval/51, HumanEval/70,
 HumanEval/81, HumanEval/95, HumanEval/96, HumanEval/105, HumanEval/120
 ```
 
-Pilot bundle 同样只有 `problems.jsonl` 和 `dataset_manifest.json`；后者额外绑定父 manifest SHA256、固定 seed、选择算法和题号列表，`experiment_label` 固定为 `humanevalplus_10_public_prompt_generation_pilot`。`tracejudge dataset validate` 只离线验证 `ProblemSpec` JSONL 的 schema/重复 ID 等通用约束，不调用 Provider，也不执行任何代码或测试。完整的可复现命令见 README 的“HumanEval+ 固定 10 题阶段一 Pilot”。
+`--selection-role research_natural --count 45 --seed 20260825 --exclude-manifest <pilot_manifest>` 会生成 schema v2 的研究子集 manifest：在 164 题中排除指定 Pilot manifest 的题号后，按同一算法取前 45 题；v2 manifest 额外记录 `selection_role`、`excluded_manifests`（含每个被排除 manifest 的 SHA256、角色与题号）、`excluded_problem_ids` 及其 SHA256、被排除 manifest 列表哈希。
+
+Pilot bundle 同样只有 `problems.jsonl` 和 `dataset_manifest.json`；后者（v1）额外绑定父 manifest SHA256、固定 seed、选择算法和题号列表，`experiment_label` 固定为 `humanevalplus_10_public_prompt_generation_pilot`。研究子集 bundle（v2）的 `experiment_label` 固定为 `humanevalplus_45_public_prompt_generation_research_natural`。`tracejudge dataset validate` 只离线验证 `ProblemSpec` JSONL 的 schema/重复 ID 等通用约束，不调用 Provider，也不执行任何代码或测试。完整的可复现命令见 README 的“HumanEval+ 固定 10 题阶段一 Pilot”和“HumanEval+ 45 题自然研究子集”。
 
 ## `data/mock_responses/*.json`
 
@@ -102,7 +104,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 
 ```jsonc
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "phase": "phase1_baseline_generation",
   "experiment_label": "self_constructed_mvp_fixture_pilot",
   "run_id": "phase1_<timestamp>_<random>",
@@ -139,6 +141,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
     "reasoning_effort_enabled": true,
     "timeout_seconds": 120.0,
     "max_retries": 2,
+    "max_parse_repairs": 1,
     "endpoint_sha256": "<sha256; endpoint itself is not stored>"
   },
   "invocations": [
@@ -155,7 +158,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 }
 ```
 
-`status` 在处理中为 `running`，批次正常处理完后原子更新为 `completed` 并写入 `completed_at`。`provider_config` 是 Provider 显式返回的白名单，不会通过枚举 Provider 内部属性来采集配置。Hy3 先剔除 endpoint 的 userinfo/query/fragment，再记录规范化 endpoint SHA256，不记录 endpoint 原文。敏感键会被过滤，常见凭据形式会被脱敏；API Key、Authorization Header、完整请求头、Cookie 和密码不得写入产物。传入 HumanEval+ `--dataset-manifest` 时，`dataset.provenance` 只保存经白名单校验的身份信息：manifest SHA256、revision、许可证、适配器、原始快照/公开投影哈希、题号顺序与确定性选择参数、withheld 字段名和 `generation_and_parsing_only` 边界；不会原样复制任意 manifest 字段或私有测试内容。续跑会在 `invocations` 中追加带当时 Git/环境快照的 `resume: true` 记录，将遗留的 `running` invocation 标记为 `interrupted` 并写入 `interrupted_at`，但不改变初始 `run_id`。工作树不干净时，`working_tree_sha256` 只保存变更内容的指纹，不保存 diff 或未跟踪文件内容；本 run 自身产物目录从该指纹中排除。
+顶层 `schema_version` 是 manifest、responses 和 summary 整个阶段一 artifact bundle 的统一版本。新 writer 固定创建 v2；已有 v1 产物保持原字节只读，阶段二 exporter 仍按 v1 严格验证，但新 writer 会拒绝 resume v1，避免同一 run 静默混写。`status` 在处理中为 `running`，批次正常处理完后原子更新为 `completed` 并写入 `completed_at`。`provider_config` 是 Provider 显式返回的白名单，不会通过枚举 Provider 内部属性来采集配置。Hy3 先剔除 endpoint 的 userinfo/query/fragment，再记录规范化 endpoint SHA256，不记录 endpoint 原文。敏感键会被过滤，常见凭据形式会被脱敏；API Key、Authorization Header、完整请求头、Cookie 和密码不得写入产物。传入 HumanEval+ `--dataset-manifest` 时，`dataset.provenance` 只保存经白名单校验的身份信息：manifest SHA256、revision、许可证、适配器、原始快照/公开投影哈希、题号顺序与确定性选择参数、withheld 字段名和 `generation_and_parsing_only` 边界；不会原样复制任意 manifest 字段或私有测试内容。续跑会在 `invocations` 中追加带当时 Git/环境快照的 `resume: true` 记录，将遗留的 `running` invocation 标记为 `interrupted` 并写入 `interrupted_at`，但不改变初始 `run_id`。工作树不干净时，`working_tree_sha256` 只保存变更内容的指纹，不保存 diff 或未跟踪文件内容；本 run 自身产物目录从该指纹中排除。
 
 ### `responses.jsonl`
 
@@ -175,6 +178,7 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
   "duration_seconds": 1.234567,
   "attempt_count": 1,
   "retry_count": 0,
+  "attempt_outcomes": ["success"],
   "raw_output_attempt": 1,
   "parse_attempted": true,
   "raw_output": "<provider text after artifact-safety redaction>",
@@ -211,6 +215,8 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 | `provider_error` | 认证、连接、服务端、超时或 Provider 内部异常；同一批次会继续处理后续题目 |
 | `skipped` | 续跑时该 `problem_id` 历史上已有 `success`，本次不再调用 Provider |
 
+`attempt_outcomes` 是按实际调用顺序保存的脱敏枚举序列，元素只允许 `success` / `parse_error` / `provider_error`。它不保存错误详情、原始输出、请求或凭据；`attempt_count` 必须等于其长度，成功必须是最后一次 outcome。`retry_count = attempt_count - 1` 只是“首次之后的全部额外调用数”：`provider_error → success` 是普通 Provider 重试，不是 JSON repair；只有某次 `parse_error` 后确实又发起下一次调用，才发生 repair。`HY3_MAX_PARSE_REPAIRS` 是解析失败触发的修复调用硬上限（与普通 Provider 重试分开），修复预算耗尽后即使仍有 `HY3_MAX_RETRIES` 剩余也不会再追加修复 Prompt，最终状态直接为 `parse_error`。最后一次为 `parse_error` 且没有后续调用时，不会虚构 repair。`skipped` 的 `attempt_count` / `retry_count` 为 0，`attempt_outcomes` 为空。
+
 `parse_status` 独立标记解析结果：`success` 对应 `parsed`，`parse_error` 对应 `failed`，从未得到可解析文本的 `provider_error` 与 `skipped` 对应 `not_attempted`。若早期尝试已对一份原始输出解析失败，但后续尝试又发生超时/服务错误，最终 `status` 是 `provider_error`、`parse_status` 仍是 `failed`，`raw_output_attempt` 指明保存的 `raw_output` 来自第几次调用。`error_type` 是便于汇总的顶层错误类型；`error` 为 `null` 或 `{"type": "<exception class>", "message": "<redacted message>"}`。失败记录不会保留过期的 `solution_trace`；如 Provider 已返回文本，安全脱敏后仍可在 `raw_output` 中保留它。所有持久化字符串中无法表示为 UTF-8 标量值的孤立 surrogate 会统一替换为 `U+FFFD`，以确保单题异常不中止整批持久化且续跑 ID 语义一致。
 
 使用 `--resume-run-id <run_id>` 续跑时，数据集 SHA256、Provider 公开配置、TraceJudge Git commit/工作树指纹以及 Python/直接依赖环境必须与 manifest 一致。若初始运行传入数据集 manifest，续跑还必须传入同一份 manifest，并精确匹配已记录的 provenance（含 manifest SHA256）和 `experiment_label`；更换 revision、选择 seed/题号、适配器或重写 manifest 都会拒绝续跑。历史上任意一次成功的 `problem_id` 追加 `skipped`，未成功题目重新调用 Provider。
@@ -223,6 +229,12 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 - `experiment_label`：与 manifest 一致的数据/实验性质标记；
 - `final_outcome_counts` 及 `success_count` / `parse_error_count` / `provider_error_count` / `failure_count` / `pending_count`：每题最后一条非 `skipped` 事件构成的最终结果，其中 `failure = parse_error + provider_error`；
 - `parse_attempted_count` / `parse_success_count` / `parse_failure_count` 以及 `parse_success_rate`：`parsed / (parsed + failed)`；若没有解析尝试则为 `null`，从未取得文本的 Provider 失败不进入分母；
+- `first_attempt_parse_success_count`：第一次实际调用的 outcome 即为 `success` 的题目数；
+- `parse_failure_encountered_count`：最终有效调用序列中至少出现过一次 `parse_error` 的题目数；
+- `repair_attempted_count`：至少一次 `parse_error` 后确实还有下一次实际调用的题目数；
+- `repair_success_count`：此前出现过 `parse_error` 且最终状态为 `success` 的题目数；普通 `provider_error → success` 不计入；
+- `terminal_parse_error_count`：最终阶段一状态为 `parse_error` 的题目数；
+- `average_attempt_count` / `average_retry_count`：每题最终有效非 `skipped` 记录的调用数/额外调用数算术平均；没有最终记录时为 `null`；
 - `average_duration_seconds`：每题最终非 `skipped` 事件耗时的算术平均；
 - `record_count` / `record_status_counts`：包含续跑事件在内的全部日志记录数/状态分布；
 - `invocation` / `skipped_count`：最近一次调用的时间、状态分布和跳过数；
@@ -230,8 +242,99 @@ manifest 是运行级别的非敏感复现信息，结构如下（值仅为示�
 
 summary **不包含**功能正确率、测试通过率、错误检测率、四层评估结果、反例指标、人工标注对比或任何阶段二及以后的指标。
 
+以上题目级指标都从每个 `problem_id` 最后一条有效非 `skipped` 记录重建；resume 追加的 `skipped` 事件不会覆盖历史成功记录或重复增加解析/repair 计数。旧 v1 summary 不含这七个 v2 指标，阶段二 exporter 不会根据旧 `retry_count` 猜测是否发生过 repair。
+
+## 阶段二 EvalPlus 产物（`artifacts/experiments/phase2/<run_id>/`）
+
+`tracejudge evalplus` 只接受已完成的阶段一 run，并默认要求数据集中每道题都有唯一历史 `success`（`--selection-policy all`）。若使用 `--selection-policy phase1-success-only --min-success-count N`，则只导出阶段一成功题目，且要求成功数不少于 `N`；导出的题号顺序仍遵循数据集 manifest。在创建运行目录前，exporter 会验证阶段一的 manifest/summary/responses 字节哈希、题号、状态、Provider/模型、Git commit、数据 revision 和公开投影 provenance。合法续跑可以在 responses 中含有后续 `skipped` 事件。
+
+```text
+<output-dir>/<run_id>/
+├── manifest.json
+├── samples.jsonl
+├── evalplus_raw_results.json
+├── results.jsonl
+├── summary.json
+└── execution.log
+```
+
+运行目录权限固定为 `0700`，六个文件均为 `0600`、UTF-8，并使用同目录临时文件 + `fsync` + 原子替换。阶段二拒绝仓库外位置和仓库内未被 `git check-ignore` 覆盖的位置；正常目录位于被 Git 忽略的 `artifacts/` 下。
+
+### `manifest.json`
+
+manifest 的 `phase` 固定为 `phase2_evalplus_execution`。10 题 Pilot 全部导出时的 `experiment_label` 保持为 `humanevalplus_10_evalplus_execution_pilot`；45 题自然研究子集全部导出时为 `humanevalplus_45_evalplus_execution_research_natural`，只导出 N 题时为 `humanevalplus_{N}_of_45_evalplus_execution_research_natural`。标签中的数量始终与真正进入阶段二的 samples 相符。其允许字段包括：
+
+- `phase1_source`：阶段一 run ID、manifest/summary/responses SHA256、Git commit/分支/工作树状态、Provider 和模型；
+- `dataset`：Hugging Face 数据 revision、许可证、受控 manifest/原始快照/公开投影/题号顺序 SHA256、选择算法/种子/题号、`selection_role`（v2 研究子集为 `research_natural`）以及被排除 manifest 列表（v2）；
+- `input`：samples SHA256、记录数、有序题号、每题代码 SHA256，按同一顺序记录的 `problem_id` / 公开 prompt SHA256 / entry point，以及 `phase1_export_selection`；后者精确记录 `selection_policy`、`min_success_count`、`source_problem_count`、`exported_success_count`、`excluded_parse_error_count` 和 `excluded_provider_error_count`；
+- `executor`：镜像内 EvalPlus package `0.4.0.dev2`、源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`、官方镜像 RepoDigest、linux/amd64、Python 3.11.10、HumanEval+ release v0.1.10、官方参数、资源/隔离/超时策略；
+- `executor_runtime`：运行前镜像 ID/平台检查、镜像内 `git -C /evalplus rev-parse HEAD` 的实际 commit、Python 最终导入的 `evalplus/evaluate.py` 精确字节 SHA256、EvalPlus 数据集官方 MD5、已加载 164 题 native corpus 的确定性 canonical SHA256 及算法、题数与实际导出题目的公开身份核对数；
+- `execution_config`：宿主单题容器并发数、容器内官方 parallel=1、单题/整批调度超时、固定 5 秒 batch cleanup grace 和官方时限参数；
+- `resume_fingerprint`：以上来源、候选字节、执行器/数据身份、参数和实现 SHA256 的组合指纹；
+- `git` / `environment` / `invocations` / `preflight` / `output` 及与 Pilot/研究 cohort 相符的限制。
+
+Hugging Face revision 和 EvalPlus 代码/release 是两套独立 provenance，manifest 不将它们混成一项。
+
+### `samples.jsonl` 与 `evalplus_raw_results.json`
+
+`samples.jsonl` 每题恰好两个字段，顺序与数据集 manifest 一致：
+
+```json
+{"task_id":"HumanEval/8","solution":"<exact solution_trace.code>"}
+```
+
+该序列化器只做严格 UTF-8/JSON 编码，不对阶段一已脱敏的代码再次替换文本，避免静默改写候选语义。
+
+`evalplus_raw_results.json` 是 TraceJudge 逐题调用固定官方镜像内 EvalPlus package `0.4.0.dev2`（源码 commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`）后的版本化 raw bundle。其内部官方文档仍保留 `date` / `hash` / `eval`，以及候选 `solution`、`base_status`、`plus_status`、`base_fail_tests`、`plus_fail_tests`。这是 evaluation-only 私有文件；不得打印、提交、加入普通日志或传递给后续模型。
+
+容器传输期间只把两个预创建的宿主临时文件精确挂载为 raw/control 目标，不挂载输出目录；容器 PID 1 以状态 0 完全退出并清理后，宿主才把经身份/大小/哈希校验的 raw 复制为运行目录中的新 `0600` inode。临时文件模式不是最终 artifact 权限。
+
+### `results.jsonl`
+
+每题脱敏记录的核心字段为：
+
+```jsonc
+{
+  "schema_version": 1,
+  "run_id": "<phase2 run id>",
+  "problem_id": "HumanEval/8",
+  "base_status": "pass",
+  "plus_status": "fail",
+  "base_fail_test_count": 0,
+  "plus_fail_test_count": 1,
+  "failure_count_scope": "recorded_by_evalplus_test_details",
+  "passed_base": true,
+  "passed_plus": false,
+  "error_type": "wrong_answer_or_candidate_exception",
+  "infrastructure_status": "ok",
+  "solution_sha256": "<sha256>",
+  "official_override_hash": "<single-task private override md5>",
+  "duration_seconds": 1.234,
+  "started_at": "<UTC timestamp>",
+  "ended_at": "<UTC timestamp>",
+  "source_response": {
+    "phase1_run_id": "<id>",
+    "problem_id": "HumanEval/8",
+    "invocation_id": "<id>",
+    "response_line_number": 1,
+    "response_record_sha256": "<sha256>",
+    "code_sha256": "<sha256>"
+  }
+}
+```
+
+`passed_plus` 表示 Base 和 Extra 都通过，不是只看 `plus_status`。`*_fail_test_count` 只是官方 `--test-details` 在当次执行中已记录的失败数；尤其 timeout 时不保证它等于全部理论失败测试数。具体失败输入不进入该文件。
+
+该固定 EvalPlus commit 的官方 raw 状态只有 `pass` / `fail` / `timeout`；其中 `fail` 不能可靠区分 wrong answer、语法/入口错误或候选运行异常，所以统一使用 `wrong_answer_or_candidate_exception`。基础设施错误的 base/plus status 为 `null`、`infrastructure_status: "error"`，不会被计为代码失败。Mock dry run 使用 `infrastructure_status: "mocked"` / `error_type: "mock_not_executed"`，同样不表示功能结果。
+
+### `summary.json` 与 `execution.log`
+
+summary 从脱敏逐题记录重建，主要包含阶段一来源题数、成功导出数、解析/Provider 排除数、`pipeline_coverage_rate`、阶段二结果数、实际执行数、Base 通过数/率、Base+Extra 通过数/率、timeout、`wrong_answer_or_candidate_exception`、基础设施错误、已观测失败数和平均逐题容器耗时。通过率分母是 `actual_execution_count`；Pipeline Coverage 分母是 `source_problem_count`，两者不混用。基础设施失败不进功能通过率分母。批次截止另以 `batch_timeout_count`、`batch_deadline_not_started_count` 和 `container_cleanup_failed_count` 区分已启动超时、尚未启动及清理失败/未确认的题；续跑以 `resume_skipped_count` 和本次 invocation 的结果/基础设施计数说明复用边界。`execution_error_count` 为 `null`，并用 `not_available_in_pinned_evalplus_raw_schema` 说明无法从官方状态精确细分。
+
+`execution.log` 只是最多 64 KiB 的基础设施事件 JSONL；不保存 Docker/EvalPlus stdout/stderr 原文或失败输入，仅允许时间、题号、耗时、安全错误类别、输出字节数/SHA256、退出码和清理状态等白名单字段。
+
 ## 流水线输出 JSON（`artifacts/*.json`）
 
 这是 `run` / `batch` / `demo` 现有完整评估链路的格式，**与上述阶段一基线产物不同**。它由 `reporting/serializer.py:pipeline_result_to_dict()` 生成，顶层字段：`problem` / `solution` / `static_evidence` / `execution_result` / `llm_assessment` / `process_assessment` / `counterexample` / `error_certificate`，均为对应 Pydantic 模型的 `model_dump(mode="json")`。`batch` 命令将多条这样的记录以 JSONL 形式写入同一个文件。
 
-HumanEval+ 阶段一公开投影没有测试或参考实现，`run` / `batch` 会在 Provider/沙盒执行前明确拒绝它；只能使用带匹配 `--dataset-manifest` 的 `baseline`。在独立 EvalPlus 执行适配器落地前，任何生成/解析统计都不是功能分数或正式 HumanEval+ 结果。
+HumanEval+ 阶段一公开投影没有测试或参考实现，`run` / `batch` 会在 Provider/沙盒执行前明确拒绝它；阶段一只能使用带匹配 `--dataset-manifest` 的 `baseline`，阶段二只能从已完成 run 使用独立 `evalplus`。生成/解析统计不是功能分数；固定 10 题执行统计也不是完整 HumanEval+ 结果或正式 benchmark 排名。

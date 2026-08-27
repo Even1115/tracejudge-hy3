@@ -223,9 +223,19 @@ def dataset_sample(
     ),
     count: int = typer.Option(10, "--count", min=1, help="确定性抽样题数"),
     seed: int = typer.Option(20260824, "--seed", help="只与公开 problem_id 组合使用的固定种子"),
-    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的 Pilot bundle 目录"),
+    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的 dataset bundle 目录"),
+    exclude_manifest: list[str] | None = typer.Option(  # noqa: B008
+        None,
+        "--exclude-manifest",
+        help="要排除的 v1 子集 manifest（可重复）；至少支持固定 Pilot manifest",
+    ),
+    selection_role: str = typer.Option(
+        "pilot",
+        "--selection-role",
+        help="选择角色：pilot 或 research_natural",
+    ),
 ) -> None:
-    """仅依据公开 problem_id 生成确定性的 Pilot 子集。"""
+    """仅依据公开 problem_id 生成确定性的 Pilot 或研究子集。"""
 
     try:
         result = sample_humanevalplus(
@@ -234,12 +244,19 @@ def dataset_sample(
             count=count,
             seed=seed,
             output_dir=output_dir,
+            exclude_manifests=exclude_manifest,
+            selection_role=selection_role,
         )
     except (TraceJudgeError, OSError) as exc:
         console.print(f"[red]数据集抽样失败：{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    table = Table(title="HumanEval+ 确定性 Pilot 子集")
+    title = (
+        "HumanEval+ 正式自然研究子集"
+        if selection_role == "research_natural"
+        else "HumanEval+ 确定性 Pilot 子集"
+    )
+    table = Table(title=title)
     table.add_column("项目")
     table.add_column("结果")
     table.add_row("题目数", str(len(result.selected_problem_ids)))
@@ -249,7 +266,13 @@ def dataset_sample(
     console.print(table)
     console.print(f"[dim]dataset: {result.dataset_path}[/dim]")
     console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
-    console.print("[yellow]该子集仅用于生成与解析 Pilot，不代表 HumanEval+ 功能分数。[/yellow]")
+    if selection_role == "research_natural":
+        console.print(
+            "[yellow]该子集是阶段三正式自然研究 source cohort，"
+            "不代表完整 HumanEval+ 功能分数或正式 benchmark 排名。[/yellow]"
+        )
+    else:
+        console.print("[yellow]该子集仅用于生成与解析 Pilot，不代表 HumanEval+ 功能分数。[/yellow]")
 
 
 @dataset_app.command("validate")

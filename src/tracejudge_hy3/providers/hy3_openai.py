@@ -88,6 +88,7 @@ class Hy3OpenAIProvider(LLMProvider):
             "reasoning_effort_enabled": self.settings.hy3_enable_reasoning_effort,
             "timeout_seconds": self.settings.hy3_timeout_seconds,
             "max_retries": self.settings.hy3_max_retries,
+            "max_parse_repairs": self.settings.hy3_max_parse_repairs,
             # Keep endpoint identity reproducible without persisting a URL that
             # may contain private hostnames, userinfo, or query credentials.
             "endpoint_sha256": self._endpoint_fingerprint(),
@@ -241,17 +242,26 @@ class Hy3OpenAIProvider(LLMProvider):
         ]
 
     async def generate_solution_with_details(self, problem: ProblemSpec) -> SolutionGeneration:
-        """Generate once with finite repair retries and preserve the final raw text."""
+        """Generate once with finite retries and a separate JSON repair budget.
+
+        ``HY3_MAX_RETRIES`` limits the total number of additional model calls.
+        ``HY3_MAX_PARSE_REPAIRS`` limits how many times a JSON repair prompt may
+        be appended after a ``parse_error``.  A provider-level failure never
+        resets the parse-repair budget, and the repair budget can never be used
+        to construct a second repair prompt.
+        """
 
         messages = self._solver_messages(problem)
-        attempts = self.settings.hy3_max_retries + 1
+        max_calls = self.settings.hy3_max_retries + 1
+        max_repairs = self.settings.hy3_max_parse_repairs
         last_raw: str | None = None
         last_raw_attempt: int | None = None
         last_error: Exception | None = None
         last_status: GenerationStatus = "provider_error"
         attempt_outcomes: list[AttemptOutcome] = []
+        repairs_used = 0
 
-        for attempt in range(1, attempts + 1):
+        for attempt in range(1, max_calls + 1):
             try:
                 raw = await self._call_model(messages)
             except ProviderAuthError as exc:
@@ -275,7 +285,7 @@ class Hy3OpenAIProvider(LLMProvider):
                 logger.warning(
                     "Hy3 Solver attempt %d/%d failed (%s)",
                     attempt,
-                    attempts,
+                    max_calls,
                     type(exc).__name__,
                 )
                 continue
@@ -295,23 +305,28 @@ class Hy3OpenAIProvider(LLMProvider):
                 logger.warning(
                     "Hy3 Solver attempt %d/%d failed schema/context validation (%s)",
                     attempt,
-                    attempts,
+                    max_calls,
                     type(exc).__name__,
                 )
-                messages = [
-                    *messages,
-                    {"role": "assistant", "content": artifact_raw},
-                    {
-                        "role": "user",
-                        "content": (
-                            "你上一次的输出未通过 JSON Schema 校验或公开上下文校验，错误信息如下：\n"
-                            f"{safe_error}\n"
-                            "请修正后重新输出一个完整、严格符合要求的 JSON 对象，"
-                            "不要输出 Markdown 代码围栏或 JSON 之外的任何文字。"
-                        ),
-                    },
-                ]
-                continue
+                if repairs_used < max_repairs and attempt < max_calls:
+                    repairs_used += 1
+                    messages = [
+                        *messages,
+                        {"role": "assistant", "content": artifact_raw},
+                        {
+                            "role": "user",
+                            "content": (
+                                "你上一次的输出未通过 JSON Schema 校验或公开上下文校验，错误信息如下：\n"
+                                f"{safe_error}\n"
+                                "请修正后重新输出一个完整、严格符合要求的 JSON 对象，"
+                                "不要输出 Markdown 代码围栏或 JSON 之外的任何文字。"
+                            ),
+                        },
+                    ]
+                    continue
+                # Parse-repair budget is exhausted or no calls remain: this is a
+                # terminal parse_error.
+                break
 
             attempt_outcomes.append("success")
             return SolutionGeneration(
@@ -325,25 +340,25 @@ class Hy3OpenAIProvider(LLMProvider):
             )
 
         assert last_error is not None
-        assert len(attempt_outcomes) == attempts
+        assert attempt_outcomes
         if last_status == "parse_error":
             error: Exception = ProviderParseError(
-                f"Hy3 response failed schema/context validation after {attempts} attempt(s): "
-                f"{last_error}"
+                f"Hy3 response failed schema/context validation after {len(attempt_outcomes)} "
+                f"attempt(s) and {repairs_used} repair attempt(s): {last_error}"
             )
         elif isinstance(last_error, ProviderTimeoutError):
             error = ProviderTimeoutError(
-                f"Hy3 call did not complete within {attempts} attempt(s): {last_error}"
+                f"Hy3 call did not complete within {len(attempt_outcomes)} attempt(s): {last_error}"
             )
         else:
             error = ProviderResponseError(
-                f"Hy3 API request failed after {attempts} attempt(s): {last_error}"
+                f"Hy3 API request failed after {len(attempt_outcomes)} attempt(s): {last_error}"
             )
         return SolutionGeneration(
             status=last_status,
             raw_output=last_raw,
             solution=None,
-            attempt_count=attempts,
+            attempt_count=len(attempt_outcomes),
             attempt_outcomes=tuple(attempt_outcomes),
             error=error,
             raw_output_attempt=last_raw_attempt,

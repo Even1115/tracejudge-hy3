@@ -44,6 +44,14 @@ HIDDEN_CANARY = "PRIVATE_EVALPLUS_FAILURE_INPUT_MUST_NOT_REACH_LOGS"
 CANDIDATE_CANARY = "CANDIDATE_SOURCE_MUST_NOT_REACH_INFRASTRUCTURE_LOGS"
 REPOSITORY = Path(__file__).resolve().parents[1]
 PILOT_PROBLEMS = REPOSITORY / "artifacts/datasets/processed/humanevalplus-pilot-10/problems.jsonl"
+RESEARCH_NATURAL_PROBLEMS = (
+    REPOSITORY
+    / "artifacts"
+    / "datasets"
+    / "processed"
+    / "humanevalplus-research-natural-45"
+    / "problems.jsonl"
+)
 
 
 def _completed(command: list[str], stdout: str = "", *, returncode: int = 0, stderr: str = ""):
@@ -226,7 +234,9 @@ class _FakeDocker:
         self.requests.append(request)
         if mode == "inspect":
             assert output_mounts == []
-            return _completed(command, json.dumps(_runtime_payload()) + "\n")
+            runtime = _runtime_payload()
+            runtime["verified_task_count"] = len(request["tasks"])
+            return _completed(command, json.dumps(runtime) + "\n")
         if mode != "run":
             raise AssertionError("unexpected entrypoint mode")
         if self.block_start:
@@ -283,14 +293,14 @@ class _FakeDocker:
         return _completed(command, "fake-container-id\n")
 
 
-def _metadata() -> tuple[HumanEvalPlusTaskMetadata, ...]:
+def _metadata(count: int = 10) -> tuple[HumanEvalPlusTaskMetadata, ...]:
     return tuple(
         HumanEvalPlusTaskMetadata(
             problem_id=f"HumanEval/{index}",
             prompt_sha256=hashlib.sha256(f"prompt-{index}".encode()).hexdigest(),
             entry_point=f"candidate_{index}",
         )
-        for index in range(10)
+        for index in range(count)
     )
 
 
@@ -418,6 +428,35 @@ def test_preflight_uses_only_hardened_amd64_container_and_records_runtime(tmp_pa
     assert postflight_identity["official_dataset_hash"] == DATASET_MD5
     assert postflight_identity["native_dataset_canonical_sha256"] == DATASET_SHA256
     assert postflight_identity["official_dataset_file_sha256"] == DATASET_FILE_SHA256
+
+
+def test_preflight_accepts_research_natural_task_count(tmp_path: Path):
+    fake = _FakeDocker()
+    runner = _runner(fake)
+
+    result = runner.preflight(task_metadata=_metadata(42), workspace=tmp_path)
+
+    assert result.ready is True
+    assert result.runtime["runtime"]["verified_task_count"] == 42
+    assert len(fake.requests) == 1
+    assert len(fake.requests[0]["tasks"]) == 42
+
+
+@pytest.mark.parametrize("count", [0, 165])
+def test_preflight_rejects_task_counts_outside_native_dataset_bounds(count: int):
+    runner = EvalPlusDockerRunner(which=lambda _executable: None)
+
+    with pytest.raises(ValueError, match="between one and 164"):
+        runner._validate_preflight_tasks(
+            tuple(
+                PublicTaskIdentity.from_prompt(
+                    task_id=f"HumanEval/{index}",
+                    prompt=f"prompt-{index}",
+                    entry_point=f"candidate_{index}",
+                )
+                for index in range(count)
+            )
+        )
 
 
 def test_preflight_rejects_non_amd64_image_with_safe_failure(tmp_path: Path):
@@ -1022,10 +1061,12 @@ def test_container_entrypoint_rejects_embedded_git_head_drift(
         container_entrypoint._evalplus_git_head()
 
 
-def test_container_inspect_verifies_ten_public_identities_without_disclosure(
+@pytest.mark.parametrize("selected_count", [1, 10, 42, 164])
+def test_container_inspect_verifies_bounded_public_identities_without_disclosure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
+    selected_count: int,
 ):
     problems = {
         f"HumanEval/{index}": {
@@ -1036,7 +1077,7 @@ def test_container_inspect_verifies_ten_public_identities_without_disclosure(
         }
         for index in range(164)
     }
-    selected = list(problems)[:10]
+    selected = list(problems)[:selected_count]
     request = {
         "schema_version": 1,
         "tasks": [
@@ -1072,13 +1113,41 @@ def test_container_inspect_verifies_ten_public_identities_without_disclosure(
     assert exit_code == 0
     assert captured.err == ""
     payload = json.loads(captured.out)
-    assert payload["verified_task_count"] == 10
+    assert payload["verified_task_count"] == selected_count
     assert payload["native_dataset_canonical_sha256"] == DATASET_SHA256
     assert payload["official_dataset_file_sha256"] == DATASET_FILE_SHA256
     assert payload["evalplus_commit"] == EVALPLUS_COMMIT
     assert payload["evalplus_evaluate_py_sha256"] == EVALPLUS_EVALUATE_PY_SHA256
     assert "PROMPT_CANARY" not in captured.out
     assert "HIDDEN_DATA" not in captured.out
+
+
+@pytest.mark.parametrize("selected_count", [0, 165])
+def test_container_inspect_rejects_task_counts_outside_native_dataset_bounds(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    selected_count: int,
+):
+    request = {
+        "schema_version": 1,
+        "tasks": [
+            {
+                "task_id": f"HumanEval/{index}",
+                "prompt_sha256": hashlib.sha256(f"prompt-{index}".encode()).hexdigest(),
+                "entry_point": f"candidate_{index}",
+            }
+            for index in range(selected_count)
+        ],
+    }
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+
+    exit_code = container_entrypoint.main(["inspect", str(request_path)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.err == ""
+    assert json.loads(captured.out)["error_type"] == "invalid_request"
 
 
 def test_container_run_filters_one_native_task_and_invokes_fixed_official_cli(
@@ -1397,6 +1466,34 @@ def test_real_pinned_image_preflight_is_explicitly_opt_in(tmp_path: Path):
     assert runtime["verified_task_count"] == 10
     assert len(runtime["official_dataset_file_sha256"]) == 64
     assert len(runtime["native_dataset_canonical_sha256"]) == 64
+
+
+@pytest.mark.docker
+@pytest.mark.skipif(
+    os.environ.get("TRACEJUDGE_RUN_DOCKER_INTEGRATION") != "1",
+    reason="set TRACEJUDGE_RUN_DOCKER_INTEGRATION=1 for the 42-task preflight",
+)
+def test_real_pinned_image_research_natural_42_task_preflight_is_explicitly_opt_in(
+    tmp_path: Path,
+):
+    """Verify the research cohort count without executing or disclosing a candidate."""
+
+    assert RESEARCH_NATURAL_PROBLEMS.is_file()
+    problems = load_problems(RESEARCH_NATURAL_PROBLEMS)
+    task_metadata = tuple(
+        HumanEvalPlusTaskMetadata(
+            problem_id=problem.problem_id,
+            prompt_sha256=hashlib.sha256(problem.requirement.encode("utf-8")).hexdigest(),
+            entry_point=problem.function_name,
+        )
+        for problem in problems[:42]
+    )
+    assert len(task_metadata) == 42
+
+    result = EvalPlusDockerRunner().preflight(task_metadata=task_metadata, workspace=tmp_path)
+
+    assert result.ready, result.infrastructure_error_type
+    assert result.runtime["runtime"]["verified_task_count"] == 42
 
 
 @pytest.mark.docker

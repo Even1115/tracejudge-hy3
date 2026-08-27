@@ -30,7 +30,6 @@ EVALPLUS_COMMIT = "f11cfb92c1d52896a87f988cbebbd74727d56c7e"
 EVALPLUS_EVALUATE_PY_SHA256 = "6fcd78d262eae6eff8af4ef6eb00b22909d37beebd90dc37b84b756053e981dd"
 HUMANEVAL_PLUS_VERSION = "v0.1.10"
 EXPECTED_DATASET_TASK_COUNT = 164
-EXPECTED_PREFLIGHT_TASK_COUNT = 10
 
 _REQUEST_SCHEMA_VERSION = 1
 _MAX_REQUEST_BYTES = 64 * 1024
@@ -138,7 +137,10 @@ def _request(path: Path, *, mode: str) -> tuple[dict[str, str], ...]:
         if set(payload) != {"schema_version", "tasks"}:
             raise _EntrypointError("invalid_request")
         tasks_value = payload.get("tasks")
-        if not isinstance(tasks_value, list) or len(tasks_value) != EXPECTED_PREFLIGHT_TASK_COUNT:
+        if (
+            not isinstance(tasks_value, list)
+            or not 1 <= len(tasks_value) <= EXPECTED_DATASET_TASK_COUNT
+        ):
             raise _EntrypointError("invalid_request")
         tasks = tuple(_task_identity(item) for item in tasks_value)
     else:

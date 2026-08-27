@@ -209,6 +209,38 @@ def test_evalplus_cli_rejects_unknown_executor_before_creating_a_run(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
+def test_evalplus_cli_rejects_empty_resume_run_id_before_generating_a_run(
+    tmp_path,
+    monkeypatch,
+):
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("empty resume ID must fail before creating a run")
+
+    monkeypatch.setattr(cli_module, "new_evalplus_run_id", forbidden)
+    monkeypatch.setattr(cli_module, "run_evalplus_experiment", forbidden)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evalplus",
+            "--baseline-run",
+            "phase1-run",
+            "--dataset-manifest",
+            "dataset-manifest.json",
+            "--output-dir",
+            str(tmp_path),
+            "--executor",
+            "mock",
+            "--resume-run-id",
+            "",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--resume-run-id 不能为空" in result.output
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_evalplus_cli_never_echoes_exception_or_summary_canaries(tmp_path, monkeypatch):
     canaries = (
         "PRIVATE_HIDDEN_TEST_CANARY",

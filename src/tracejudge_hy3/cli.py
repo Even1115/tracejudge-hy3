@@ -445,6 +445,8 @@ def evalplus_command(
         raise typer.BadParameter("--selection-policy 必须是 'all' 或 'phase1-success-only'")
     if batch_timeout < per_task_timeout:
         raise typer.BadParameter("--batch-timeout 不能小于 --per-task-timeout")
+    if resume_run_id is not None and not resume_run_id.strip():
+        raise typer.BadParameter("--resume-run-id 不能为空")
 
     effective_run_id = resume_run_id or new_evalplus_run_id()
     run_path = Path(output_dir).expanduser().resolve() / effective_run_id

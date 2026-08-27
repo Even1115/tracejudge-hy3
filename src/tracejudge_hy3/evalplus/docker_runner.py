@@ -41,7 +41,7 @@ EVALPLUS_COMMIT = "f11cfb92c1d52896a87f988cbebbd74727d56c7e"
 EVALPLUS_EVALUATE_PY_SHA256 = "6fcd78d262eae6eff8af4ef6eb00b22909d37beebd90dc37b84b756053e981dd"
 HUMANEVAL_PLUS_VERSION = "v0.1.10"
 IMAGE_PYTHON_VERSION = "3.11.10"
-EXPECTED_PILOT_TASK_COUNT = 10
+MAX_PREFLIGHT_TASK_COUNT = 164
 
 _IMAGE_DIGEST = "sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740"
 _CONTROL_OUTPUT_LIMIT = 16 * 1024
@@ -478,7 +478,7 @@ class EvalPlusDockerRunner:
         workspace: str | Path,
         tasks: Sequence[PublicTaskIdentity],
     ) -> PreflightResult:
-        """Verify image runtime, native dataset, and all ten public task identities."""
+        """Verify image runtime, native dataset, and the selected public task identities."""
 
         identities = self._validate_preflight_tasks(tasks)
         workspace_path = self._workspace(workspace)
@@ -1599,10 +1599,10 @@ class EvalPlusDockerRunner:
         if isinstance(tasks, str | bytes) or not isinstance(tasks, Sequence):
             raise ValueError("preflight tasks must be a sequence")
         identities = tuple(tasks)
-        if len(identities) != EXPECTED_PILOT_TASK_COUNT or any(
+        if not 1 <= len(identities) <= MAX_PREFLIGHT_TASK_COUNT or any(
             not isinstance(task, PublicTaskIdentity) for task in identities
         ):
-            raise ValueError("preflight requires exactly ten task identities")
+            raise ValueError("preflight requires between one and 164 task identities")
         if len({task.task_id for task in identities}) != len(identities):
             raise ValueError("preflight task IDs must be unique")
         return identities

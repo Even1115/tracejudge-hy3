@@ -103,6 +103,7 @@ class MockProvider(LLMProvider):
                 raw_output=None,
                 solution=None,
                 attempt_count=1,
+                attempt_outcomes=("provider_error",),
                 error=exc,
             )
         if fixture_name is None:
@@ -115,6 +116,7 @@ class MockProvider(LLMProvider):
                 raw_output=None,
                 solution=None,
                 attempt_count=1,
+                attempt_outcomes=("provider_error",),
                 error=error,
             )
 
@@ -129,6 +131,7 @@ class MockProvider(LLMProvider):
                 raw_output=None,
                 solution=None,
                 attempt_count=1,
+                attempt_outcomes=("provider_error",),
                 error=exc,
             )
         if solver_public_payload(problem) != solver_public_payload(built_in_problem):
@@ -141,23 +144,34 @@ class MockProvider(LLMProvider):
                 raw_output=None,
                 solution=None,
                 attempt_count=1,
+                attempt_outcomes=("provider_error",),
                 error=error,
             )
 
         fixture_path = _fixture_path(fixture_name)
         try:
             raw_output = fixture_path.read_text(encoding="utf-8")
-            solution = SolutionTrace.model_validate_json(raw_output)
-            validate_solution_for_problem(problem, solution)
-        except (OSError, ValueError) as exc:
-            preserved_raw = raw_output if "raw_output" in locals() else None
+        except OSError as exc:
             return SolutionGeneration(
-                status="parse_error",
-                raw_output=preserved_raw,
+                status="provider_error",
+                raw_output=None,
                 solution=None,
                 attempt_count=1,
+                attempt_outcomes=("provider_error",),
                 error=exc,
-                raw_output_attempt=1 if preserved_raw is not None else None,
+            )
+        try:
+            solution = SolutionTrace.model_validate_json(raw_output)
+            validate_solution_for_problem(problem, solution)
+        except ValueError as exc:
+            return SolutionGeneration(
+                status="parse_error",
+                raw_output=raw_output,
+                solution=None,
+                attempt_count=1,
+                attempt_outcomes=("parse_error",),
+                error=exc,
+                raw_output_attempt=1,
                 parse_attempted=True,
             )
         return SolutionGeneration(
@@ -165,6 +179,7 @@ class MockProvider(LLMProvider):
             raw_output=raw_output,
             solution=solution,
             attempt_count=1,
+            attempt_outcomes=("success",),
             raw_output_attempt=1,
             parse_attempted=True,
         )

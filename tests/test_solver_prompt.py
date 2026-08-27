@@ -141,6 +141,7 @@ async def test_all_initial_and_repair_messages_exclude_private_dataset_canaries(
 
     assert result.status == "success"
     assert result.attempt_count == 2
+    assert result.attempt_outcomes == ("parse_error", "success")
     assert result.retry_count == 1
     assert provider._call_model.await_count == 2
 
@@ -207,6 +208,7 @@ async def test_hy3_redacts_configured_key_from_raw_parsed_errors_and_logs(
     success = await provider.generate_solution_with_details(problem)
 
     assert success.status == "success"
+    assert success.attempt_outcomes == ("success",)
     assert configured_key not in (success.raw_output or "")
     assert success.solution is not None
     assert configured_key not in success.solution.model_dump_json()
@@ -218,6 +220,7 @@ async def test_hy3_redacts_configured_key_from_raw_parsed_errors_and_logs(
         failure = await provider.generate_solution_with_details(problem)
 
     assert failure.status == "parse_error"
+    assert failure.attempt_outcomes == ("parse_error",)
     assert configured_key not in (failure.raw_output or "")
     assert failure.error is not None
     assert configured_key not in str(failure.error)
@@ -240,6 +243,7 @@ async def test_hy3_repair_and_parse_error_exclude_unconfigured_header_values(mon
     repaired = await repairing_provider.generate_solution_with_details(problem)
 
     assert repaired.status == "success"
+    assert repaired.attempt_outcomes == ("parse_error", "success")
     repair_messages = repairing_provider._call_model.await_args_list[1].args[0]
     assert header_canary not in json.dumps(repair_messages, ensure_ascii=False)
 
@@ -248,6 +252,7 @@ async def test_hy3_repair_and_parse_error_exclude_unconfigured_header_values(mon
     failed = await failing_provider.generate_solution_with_details(problem)
 
     assert failed.status == "parse_error"
+    assert failed.attempt_outcomes == ("parse_error",)
     assert header_canary not in (failed.raw_output or "")
     assert failed.error is not None
     assert header_canary not in str(failed.error)

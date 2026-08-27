@@ -212,6 +212,7 @@ class _OfflineProvider:
             raw_output=solution.model_dump_json(),
             solution=solution,
             attempt_count=1,
+            attempt_outcomes=("success",),
             raw_output_attempt=1,
             parse_attempted=True,
         )

@@ -57,15 +57,20 @@ def _success(
     problem: ProblemSpec,
     *,
     attempt_count: int = 1,
+    attempt_outcomes: tuple[str, ...] | None = None,
     marker: str = "可审查中文解答",
 ) -> SolutionGeneration:
     solution = _solution(problem, marker=marker)
     raw = "  " + solution.model_dump_json() + "\n"
+    outcomes = attempt_outcomes or ("provider_error",) * (attempt_count - 1) + ("success",)
     return SolutionGeneration(
         status="success",
         raw_output=raw,
         solution=solution,
         attempt_count=attempt_count,
+        attempt_outcomes=outcomes,
+        raw_output_attempt=attempt_count,
+        parse_attempted=True,
     )
 
 
@@ -74,13 +79,18 @@ def _parse_error(
     raw_output: str = "BROKEN_RAW_OUTPUT",
     message: str = "invalid structured output",
     attempt_count: int = 2,
+    attempt_outcomes: tuple[str, ...] | None = None,
 ) -> SolutionGeneration:
+    outcomes = attempt_outcomes or tuple("parse_error" for _ in range(attempt_count))
     return SolutionGeneration(
         status="parse_error",
         raw_output=raw_output,
         solution=None,
         attempt_count=attempt_count,
+        attempt_outcomes=outcomes,
         error=ParsingError(message),
+        raw_output_attempt=attempt_count,
+        parse_attempted=True,
     )
 
 
@@ -88,12 +98,15 @@ def _provider_error(
     *,
     message: str = "temporary provider failure",
     attempt_count: int = 2,
+    attempt_outcomes: tuple[str, ...] | None = None,
 ) -> SolutionGeneration:
+    outcomes = attempt_outcomes or tuple("provider_error" for _ in range(attempt_count))
     return SolutionGeneration(
         status="provider_error",
         raw_output=None,
         solution=None,
         attempt_count=attempt_count,
+        attempt_outcomes=outcomes,
         error=ProviderResponseError(message),
     )
 
@@ -145,9 +158,42 @@ class _ScriptedProvider:
         self.closed = True
 
 
+class _InvalidGenerationDetails:
+    def __init__(
+        self,
+        *,
+        attempt_count: int,
+        attempt_outcomes: tuple[str, ...],
+        status: str = "provider_error",
+        parse_attempted: bool = False,
+    ) -> None:
+        self.status = status
+        self.raw_output = None
+        self.solution = None
+        self.attempt_count = attempt_count
+        self.attempt_outcomes = attempt_outcomes
+        self.retry_count = max(0, attempt_count - 1)
+        self.error = ProviderResponseError("invalid provider contract")
+        self.raw_output_attempt = None
+        self.parse_attempted = parse_attempted
+
+
 def _write_dataset(tmp_path: Path, *, count: int) -> tuple[Path, list[ProblemSpec]]:
     problems = load_problems(SAMPLE_DATASET)[:count]
     dataset = tmp_path / "小规模题目.jsonl"
+    dataset.write_text(
+        "".join(problem.model_dump_json() + "\n" for problem in problems),
+        encoding="utf-8",
+    )
+    return dataset, problems
+
+
+def _write_observability_dataset(tmp_path: Path) -> tuple[Path, list[ProblemSpec]]:
+    template = load_problems(SAMPLE_DATASET)[0]
+    problems = [
+        template.model_copy(update={"problem_id": f"observability_{index}"}) for index in range(5)
+    ]
+    dataset = tmp_path / "observability-problems.jsonl"
     dataset.write_text(
         "".join(problem.model_dump_json() + "\n" for problem in problems),
         encoding="utf-8",
@@ -207,6 +253,7 @@ async def test_success_artifacts_preserve_raw_parsed_utf8_and_reproducibility_me
         assert isinstance(record["solution_trace"], dict)
         assert record["attempt_count"] == 2
         assert record["retry_count"] == 1
+        assert record["attempt_outcomes"] == ["provider_error", "success"]
         assert record["raw_output_attempt"] == 2
         assert record["parse_attempted"] is True
         assert record["run_id"] == first.run_id
@@ -218,6 +265,7 @@ async def test_success_artifacts_preserve_raw_parsed_utf8_and_reproducibility_me
     assert "可审查中文解答" in response_bytes.decode("utf-8")
 
     manifest = json.loads(first.manifest_path.read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 2
     assert manifest["run_id"] == first.run_id
     assert manifest["experiment_label"] == "self_constructed_mvp_fixture_pilot"
     assert manifest["dataset"]["path"] == str(SAMPLE_DATASET.resolve())
@@ -255,6 +303,13 @@ async def test_success_artifacts_preserve_raw_parsed_utf8_and_reproducibility_me
     assert summary["record_count"] == 3
     assert summary["success_count"] == 3
     assert summary["failure_count"] == 0
+    assert summary["first_attempt_parse_success_count"] == 0
+    assert summary["parse_failure_encountered_count"] == 0
+    assert summary["repair_attempted_count"] == 0
+    assert summary["repair_success_count"] == 0
+    assert summary["terminal_parse_error_count"] == 0
+    assert summary["average_attempt_count"] == 2.0
+    assert summary["average_retry_count"] == 1.0
     forbidden_metric_keys = {
         key
         for key in _all_keys(summary)
@@ -283,11 +338,13 @@ async def test_parse_and_provider_failures_do_not_stop_later_problems(tmp_path):
         "success",
     ]
     assert records[0]["raw_output"] == "UNPARSEABLE_BUT_PRESERVED"
+    assert records[0]["attempt_outcomes"] == ["parse_error", "parse_error"]
     assert records[0]["raw_output_attempt"] == 2
     assert records[0]["parse_attempted"] is True
     assert records[0]["solution_trace"] is None
     assert records[0]["error"]["type"] == "ParsingError"
     assert records[1]["raw_output"] is None
+    assert records[1]["attempt_outcomes"] == ["provider_error"]
     assert records[1]["raw_output_attempt"] is None
     assert records[1]["parse_attempted"] is False
     assert records[1]["solution_trace"] is None
@@ -307,6 +364,13 @@ async def test_parse_and_provider_failures_do_not_stop_later_problems(tmp_path):
         "failure": 2,
     }
     assert summary["parse_success_rate"] == pytest.approx(0.5)
+    assert summary["first_attempt_parse_success_count"] == 1
+    assert summary["parse_failure_encountered_count"] == 1
+    assert summary["repair_attempted_count"] == 1
+    assert summary["repair_success_count"] == 0
+    assert summary["terminal_parse_error_count"] == 1
+    assert summary["average_attempt_count"] == pytest.approx(4 / 3)
+    assert summary["average_retry_count"] == pytest.approx(1 / 3)
     assert summary["record_status_counts"] == {
         "parse_error": 1,
         "provider_error": 1,
@@ -321,6 +385,7 @@ async def test_mixed_retry_records_which_raw_was_parsed_and_counts_parse_failure
         raw_output="first attempt was malformed",
         solution=None,
         attempt_count=2,
+        attempt_outcomes=("parse_error", "provider_error"),
         error=ProviderResponseError("second attempt timed out"),
         raw_output_attempt=1,
         parse_attempted=True,
@@ -337,10 +402,133 @@ async def test_mixed_retry_records_which_raw_was_parsed_and_counts_parse_failure
     assert record["raw_output"] == "first attempt was malformed"
     assert record["raw_output_attempt"] == 1
     assert record["attempt_count"] == 2
+    assert record["attempt_outcomes"] == ["parse_error", "provider_error"]
     assert result.summary["parse_attempted_count"] == 1
     assert result.summary["parse_success_count"] == 0
     assert result.summary["parse_failure_count"] == 1
     assert result.summary["parse_success_rate"] == 0.0
+    assert result.summary["parse_failure_encountered_count"] == 1
+    assert result.summary["repair_attempted_count"] == 1
+    assert result.summary["repair_success_count"] == 0
+    assert result.summary["terminal_parse_error_count"] == 0
+
+
+async def test_summary_rebuilds_parse_and_repair_metrics_from_final_attempt_histories(
+    tmp_path,
+    caplog,
+):
+    dataset, problems = _write_observability_dataset(tmp_path)
+    raw_canary = "RAW_OBSERVABILITY_CANARY_93c1"
+    error_canary = "ERROR_DETAIL_CANARY_93c1"
+    parse_then_provider = SolutionGeneration(
+        status="provider_error",
+        raw_output=raw_canary,
+        solution=None,
+        attempt_count=2,
+        attempt_outcomes=("parse_error", "provider_error"),
+        error=ProviderResponseError(error_canary),
+        raw_output_attempt=1,
+        parse_attempted=True,
+    )
+    provider = _ScriptedProvider(
+        {
+            problems[0].problem_id: [_success(problems[0])],
+            problems[1].problem_id: [
+                _success(
+                    problems[1],
+                    attempt_count=2,
+                    attempt_outcomes=("parse_error", "success"),
+                )
+            ],
+            problems[2].problem_id: [
+                _parse_error(
+                    raw_output=raw_canary,
+                    message=error_canary,
+                    attempt_outcomes=("parse_error", "parse_error"),
+                )
+            ],
+            problems[3].problem_id: [
+                _success(
+                    problems[3],
+                    attempt_count=2,
+                    attempt_outcomes=("provider_error", "success"),
+                )
+            ],
+            problems[4].problem_id: [parse_then_provider],
+        }
+    )
+
+    result = await run_baseline_experiment(dataset, provider, tmp_path / "runs")
+
+    records = _read_records(result.responses_path)
+    assert [record["attempt_outcomes"] for record in records] == [
+        ["success"],
+        ["parse_error", "success"],
+        ["parse_error", "parse_error"],
+        ["provider_error", "success"],
+        ["parse_error", "provider_error"],
+    ]
+    assert all(record["attempt_count"] == len(record["attempt_outcomes"]) for record in records)
+    summary = result.summary
+    assert summary["first_attempt_parse_success_count"] == 1
+    assert summary["parse_failure_encountered_count"] == 3
+    assert summary["repair_attempted_count"] == 3
+    assert summary["repair_success_count"] == 1
+    assert summary["terminal_parse_error_count"] == 1
+    assert summary["average_attempt_count"] == pytest.approx(1.8)
+    assert summary["average_retry_count"] == pytest.approx(0.8)
+    assert summary["parse_attempted_count"] == 5
+    assert summary["parse_success_count"] == 3
+    assert summary["parse_failure_count"] == 2
+    assert summary["parse_success_rate"] == pytest.approx(0.6)
+
+    safe_artifacts = result.manifest_path.read_text(
+        encoding="utf-8"
+    ) + result.summary_path.read_text(encoding="utf-8")
+    assert raw_canary not in safe_artifacts
+    assert error_canary not in safe_artifacts
+    assert raw_canary not in caplog.text
+    assert error_canary not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("case_name", "attempt_count", "attempt_outcomes", "status", "parse_attempted"),
+    [
+        ("count_mismatch", 2, ("provider_error",), "provider_error", False),
+        ("illegal_enum", 1, ("not_an_outcome",), "provider_error", False),
+        ("missing_raw", 1, ("parse_error",), "parse_error", True),
+    ],
+)
+async def test_runner_rejects_invalid_structural_provider_attempt_metadata(
+    tmp_path,
+    case_name,
+    attempt_count,
+    attempt_outcomes,
+    status,
+    parse_attempted,
+):
+    dataset, problems = _write_dataset(tmp_path, count=1)
+    invalid = _InvalidGenerationDetails(
+        attempt_count=attempt_count,
+        attempt_outcomes=attempt_outcomes,
+        status=status,
+        parse_attempted=parse_attempted,
+    )
+    provider = _ScriptedProvider(
+        {problems[0].problem_id: [invalid]},  # type: ignore[list-item]
+    )
+
+    with pytest.raises(BaselineExperimentError, match="attempt"):
+        await run_baseline_experiment(
+            dataset,
+            provider,
+            tmp_path / "runs",
+            run_id=f"invalid_attempt_metadata_{case_name}",
+        )
+
+    assert provider.closed is True
+    responses = tmp_path / "runs" / f"invalid_attempt_metadata_{case_name}" / "responses.jsonl"
+    assert responses.read_bytes() == b""
 
 
 async def test_resume_skips_success_retries_failure_and_summary_matches_event_log(tmp_path):
@@ -379,6 +567,7 @@ async def test_resume_skips_success_retries_failure_and_summary_matches_event_lo
     skipped = records[2]
     assert skipped["problem_id"] == problems[0].problem_id
     assert skipped["attempt_count"] == skipped["retry_count"] == 0
+    assert skipped["attempt_outcomes"] == []
     assert skipped["raw_output_attempt"] is None
     assert skipped["parse_attempted"] is False
     assert skipped["raw_output"] is None
@@ -408,9 +597,70 @@ async def test_resume_skips_success_retries_failure_and_summary_matches_event_lo
     assert summary["failure_count"] == 0
     assert summary["pending_count"] == 0
     assert summary["parse_success_rate"] == 1.0
+    assert summary["first_attempt_parse_success_count"] == 1
+    assert summary["parse_failure_encountered_count"] == 0
+    assert summary["repair_attempted_count"] == 0
+    assert summary["repair_success_count"] == 0
+    assert summary["terminal_parse_error_count"] == 0
+    assert summary["average_attempt_count"] == 1.5
+    assert summary["average_retry_count"] == 0.5
     assert summary["average_duration_seconds"] == pytest.approx(sum(durations) / len(durations))
     assert summary["skipped_count"] == 1
     assert summary["invocation"]["status_counts"] == {"skipped": 1, "success": 1}
+
+
+async def test_new_writer_refuses_to_resume_legacy_v1_artifact(tmp_path):
+    dataset, _ = _write_dataset(tmp_path, count=1)
+    first = await run_baseline_experiment(
+        dataset,
+        _ScriptedProvider(),
+        tmp_path / "runs",
+        run_id="legacy_resume_guard",
+    )
+    original_responses = first.responses_path.read_bytes()
+    manifest = json.loads(first.manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = 1
+    first.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    resumed_provider = _ScriptedProvider()
+
+    with pytest.raises(BaselineExperimentError, match="artifact schema"):
+        await run_baseline_experiment(
+            dataset,
+            resumed_provider,
+            tmp_path / "runs",
+            run_id="legacy_resume_guard",
+            resume=True,
+        )
+
+    assert resumed_provider.calls == []
+    assert resumed_provider.closed is True
+    assert first.responses_path.read_bytes() == original_responses
+
+
+async def test_v2_resume_rejects_response_without_attempt_outcomes(tmp_path):
+    dataset, _ = _write_dataset(tmp_path, count=1)
+    first = await run_baseline_experiment(
+        dataset,
+        _ScriptedProvider(),
+        tmp_path / "runs",
+        run_id="mixed_response_schema_guard",
+    )
+    record = _read_records(first.responses_path)[0]
+    record.pop("attempt_outcomes")
+    first.responses_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    resumed_provider = _ScriptedProvider()
+
+    with pytest.raises(BaselineExperimentError, match="attempt metadata"):
+        await run_baseline_experiment(
+            dataset,
+            resumed_provider,
+            tmp_path / "runs",
+            run_id="mixed_response_schema_guard",
+            resume=True,
+        )
+
+    assert resumed_provider.calls == []
+    assert resumed_provider.closed is True
 
 
 async def test_sensitive_configuration_raw_output_and_errors_are_redacted(tmp_path):
@@ -651,6 +901,7 @@ async def test_dataset_surrogates_normalize_consistently_and_resume_still_skips(
         raw_output=json.dumps(surrogate_solution.model_dump(mode="json"), ensure_ascii=True),
         solution=surrogate_solution,
         attempt_count=1,
+        attempt_outcomes=("success",),
         raw_output_attempt=1,
         parse_attempted=True,
     )
@@ -699,6 +950,7 @@ async def test_escaped_credentials_inside_valid_solution_are_redacted_from_both_
         raw_output=solution.model_dump_json(),
         solution=solution,
         attempt_count=1,
+        attempt_outcomes=("success",),
         raw_output_attempt=1,
         parse_attempted=True,
     )

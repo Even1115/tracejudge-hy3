@@ -441,6 +441,18 @@ working JSONL 的每行保留 packet 给定的 `annotation_item_id`、协议/标
 
 `report.json` 是确定性的聚合对象：包含分析口径、自然/反事实/总数量、原始与有效状态计数、每方法分子/分母及 Wilson 区间、有效结果混淆矩阵、两个自然 exact McNemar + Holm 比较、两个反事实父题聚类 percentile bootstrap 区间和五类反事实描述性拆分。它不包含 `trace_id`、`rationale`、逐条 judgment 或证书正文；`valid_only_confusion` 不能替代把失败计错的全分母主指标。
 
+### Gate F 脱敏报告
+
+`artifacts/experiments/phase3-reports/<report_id>/` 为 `0700`，内部五个文件均为 `0600` 且同名目录拒绝覆盖：
+
+- `manifest.json`：绑定 E4 manifest/report、E3 manifest/results/index、Gate D 证书 manifest/confirmed 证书/公开执行证据、报告实现、Git/Python/直接依赖与四个输出 payload 哈希；
+- `phase3_research_report.md`：脱敏结果解读，包含原始分子/分母、失败核算、预注册比较、探索性首错/反事实结果、限制、Material Passport 和 11/11 统计谬误扫描；
+- `validation.json`：机器可审计的 `ANALYZED / CAUTION / CANNOT_VERIFY` 验证记录；
+- `demo_certificate.json`：Gate D 公开 confirmed 工程 Fixture 证书的精确副本；
+- `replay_command.txt`：证书携带的精确公开重放命令，不表示 Gate F 已执行重放。
+
+Gate F 不写入逐轨迹标签/预测、标注理由、Provider raw、候选正文或隐藏评测内容。`demo_certificate.json` 只是公开工程 Fixture，不能当作五方法在研究 cohort 上的证书准确率。
+
 ## 流水线输出 JSON（`artifacts/*.json`）
 
 这是 `run` / `batch` / `demo` 现有完整评估链路的格式，**与上述阶段一基线产物不同**。它由 `reporting/serializer.py:pipeline_result_to_dict()` 生成，顶层字段：`problem` / `solution` / `static_evidence` / `execution_result` / `llm_assessment` / `process_assessment` / `counterexample` / `error_certificate`，均为对应 Pydantic 模型的 `model_dump(mode="json")`。`batch` 命令将多条这样的记录以 JSONL 形式写入同一个文件。

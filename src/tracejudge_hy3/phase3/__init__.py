@@ -1,4 +1,4 @@
-"""Stage-three research contracts and Gate-B/C/D entry points.
+"""Stage-three research contracts and Gate-B through Gate-F entry points.
 
 Importing this package has no execution side effect.  Natural freezing is
 read-only over safe upstream artifacts; public counterfactual code runs only
@@ -7,6 +7,8 @@ offline paired-method interface; real Provider execution remains separately
 authorized. Gate D exposes only exact-public certificate fixtures and replay;
 Gate E binds the frozen private annotation set to a read-only formal preflight,
 while real paired-method execution still requires explicit authorization.
+Gate F consumes only hash-bound aggregate/runtime accounting and public
+certificate fixtures to publish a de-identified, limitation-aware report.
 """
 
 from tracejudge_hy3.phase3.annotations import (
@@ -146,6 +148,14 @@ from tracejudge_hy3.phase3.replay import (
     PublicCertificateReplayResult,
     replay_public_certificate,
 )
+from tracejudge_hy3.phase3.report import (
+    Phase3ReportError,
+    Phase3ReportPreflight,
+    Phase3ReportResult,
+    generate_phase3_report,
+    preflight_phase3_report,
+    report_implementation_sha256,
+)
 from tracejudge_hy3.phase3.runner import (
     LoadedPairedCohort,
     Phase3ExecutionBindings,
@@ -249,6 +259,9 @@ __all__ = [
     "Phase3JudgeProvider",
     "Phase3ProviderCallError",
     "Phase3ResumeIdentity",
+    "Phase3ReportError",
+    "Phase3ReportPreflight",
+    "Phase3ReportResult",
     "Phase3RunResult",
     "Phase3RunManifest",
     "Phase3RunnerError",
@@ -307,6 +320,7 @@ __all__ = [
     "execute_public_counterfactual_evidence",
     "execute_phase3_evaluation",
     "generate_public_certificates",
+    "generate_phase3_report",
     "generate_phase3_statistics",
     "freeze_counterfactual_cohort",
     "implementation_sha256",
@@ -326,11 +340,13 @@ __all__ = [
     "preflight_public_certificates",
     "preflight_paired_interface",
     "preflight_phase3_evaluation",
+    "preflight_phase3_report",
     "preflight_phase3_statistics",
     "provider_config_sha256",
     "project_method_input",
     "public_evidence_policy_sha256",
     "replay_public_certificate",
+    "report_implementation_sha256",
     "run_paired_evaluation",
     "validate_materials",
     "validate_method_specs",

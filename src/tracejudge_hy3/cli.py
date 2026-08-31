@@ -47,6 +47,7 @@ from tracejudge_hy3.phase3 import (
     Phase3AnnotationError,
     Phase3FreezeError,
     Phase3PublicEvidenceError,
+    Phase3ReportError,
     Phase3RunnerError,
     Phase3StatisticsError,
     check_annotation_labels,
@@ -56,6 +57,7 @@ from tracejudge_hy3.phase3 import (
     freeze_annotation_labels,
     freeze_counterfactual_cohort,
     freeze_natural_cohort,
+    generate_phase3_report,
     generate_phase3_statistics,
     generate_public_certificates,
     preflight_annotation_labels_freeze,
@@ -64,6 +66,7 @@ from tracejudge_hy3.phase3 import (
     preflight_natural_cohort,
     preflight_paired_interface,
     preflight_phase3_evaluation,
+    preflight_phase3_report,
     preflight_phase3_statistics,
     preflight_public_certificates,
     preflight_public_counterfactual_source,
@@ -2064,6 +2067,196 @@ def phase3_statistics(
     console.print(f"[dim]report: {result.report_path}[/dim]")
     console.print(
         "[yellow]该产物是探索性聚合统计；尚未完成人工一致性，也不能把不显著解释为等效。[/yellow]"
+    )
+
+
+def _phase3_report_arguments(
+    *,
+    report_id: str,
+    statistics_run: str,
+    statistics_manifest_sha256: str,
+    statistics_report_sha256: str,
+    paired_run: str,
+    certificate_run: str,
+    certificate_manifest_sha256: str,
+    confirmed_certificate: str,
+    confirmed_certificate_sha256: str,
+    replay_evidence_sha256: str,
+    output_dir: str,
+    allow_dirty: bool,
+) -> dict[str, object]:
+    return {
+        "report_id": report_id,
+        "statistics_run_dir": statistics_run,
+        "expected_statistics_manifest_sha256": statistics_manifest_sha256,
+        "expected_statistics_report_sha256": statistics_report_sha256,
+        "paired_run_dir": paired_run,
+        "certificate_run_dir": certificate_run,
+        "expected_certificate_manifest_sha256": certificate_manifest_sha256,
+        "confirmed_certificate_path": confirmed_certificate,
+        "expected_confirmed_certificate_sha256": confirmed_certificate_sha256,
+        "expected_replay_evidence_sha256": replay_evidence_sha256,
+        "output_dir": output_dir,
+        "allow_dirty": allow_dirty,
+        "privacy_canaries": (),
+    }
+
+
+def _render_phase3_report_failure(exc: BaseException) -> None:
+    console.print(
+        "[red]阶段三脱敏报告校验失败；未输出逐轨迹标签、方法预测、Provider raw 或隐藏评测内容。[/red]"
+    )
+    console.print(f"[yellow]安全阶段码：{getattr(exc, 'safe_stage', 'P3F_UNCLASSIFIED')}[/yellow]")
+
+
+@phase3_app.command("report-preflight")
+def phase3_report_preflight(
+    report_id: str = typer.Option(..., "--report-id"),
+    statistics_run: str = typer.Option(..., "--statistics-run"),
+    statistics_manifest_sha256: str = typer.Option(
+        ...,
+        "--statistics-manifest-sha256",
+    ),
+    statistics_report_sha256: str = typer.Option(..., "--statistics-report-sha256"),
+    paired_run: str = typer.Option(..., "--paired-run"),
+    certificate_run: str = typer.Option(..., "--certificate-run"),
+    certificate_manifest_sha256: str = typer.Option(
+        ...,
+        "--certificate-manifest-sha256",
+    ),
+    confirmed_certificate: str = typer.Option(..., "--confirmed-certificate"),
+    confirmed_certificate_sha256: str = typer.Option(
+        ...,
+        "--confirmed-certificate-sha256",
+    ),
+    replay_evidence_sha256: str = typer.Option(..., "--replay-evidence-sha256"),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-reports",
+        "--output-dir",
+    ),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate F：只读解读冻结统计并在内存生成脱敏报告，不写产物。"""
+
+    arguments = _phase3_report_arguments(
+        report_id=report_id,
+        statistics_run=statistics_run,
+        statistics_manifest_sha256=statistics_manifest_sha256,
+        statistics_report_sha256=statistics_report_sha256,
+        paired_run=paired_run,
+        certificate_run=certificate_run,
+        certificate_manifest_sha256=certificate_manifest_sha256,
+        confirmed_certificate=confirmed_certificate,
+        confirmed_certificate_sha256=confirmed_certificate_sha256,
+        replay_evidence_sha256=replay_evidence_sha256,
+        output_dir=output_dir,
+        allow_dirty=allow_dirty,
+    )
+    try:
+        result = preflight_phase3_report(**arguments)
+    except (Phase3ReportError, OSError, ValueError) as exc:
+        _render_phase3_report_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三 Gate F 脱敏报告只读预检：{result.report_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "轨迹 / 方法 / 配对",
+        f"{result.trace_count} / {result.method_count} / {result.pair_count}",
+    )
+    table.add_row(
+        "原始结果状态",
+        f"valid_judgment={result.valid_judgment_count}, provider_error={result.provider_error_count}",
+    )
+    table.add_row("总体置信等级", result.overall_confidence)
+    table.add_row("统计谬误扫描", f"{result.fallacy_scan_coverage}/11")
+    table.add_row("统计 report SHA256", result.statistics_report_sha256)
+    table.add_row("报告实现 SHA256", result.report_implementation_sha256)
+    table.add_row("拟生成 Markdown SHA256", result.markdown_sha256)
+    table.add_row("拟生成 validation SHA256", result.validation_sha256)
+    table.add_row(
+        "Git commit / 分支 / dirty",
+        f"{result.git_commit} / {result.git_branch} / {result.git_dirty}",
+    )
+    table.add_row("创建目录 / 写入报告", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]该预检只核验聚合统计、公开证书和脱敏边界；不展示方法结果，也不自动重放证书。[/yellow]"
+    )
+
+
+@phase3_app.command("report")
+def phase3_report(
+    report_id: str = typer.Option(..., "--report-id"),
+    statistics_run: str = typer.Option(..., "--statistics-run"),
+    statistics_manifest_sha256: str = typer.Option(
+        ...,
+        "--statistics-manifest-sha256",
+    ),
+    statistics_report_sha256: str = typer.Option(..., "--statistics-report-sha256"),
+    paired_run: str = typer.Option(..., "--paired-run"),
+    certificate_run: str = typer.Option(..., "--certificate-run"),
+    certificate_manifest_sha256: str = typer.Option(
+        ...,
+        "--certificate-manifest-sha256",
+    ),
+    confirmed_certificate: str = typer.Option(..., "--confirmed-certificate"),
+    confirmed_certificate_sha256: str = typer.Option(
+        ...,
+        "--confirmed-certificate-sha256",
+    ),
+    replay_evidence_sha256: str = typer.Option(..., "--replay-evidence-sha256"),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-reports",
+        "--output-dir",
+    ),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate F：原子写入脱敏研究报告、验证记录和公开证书 Demo。"""
+
+    arguments = _phase3_report_arguments(
+        report_id=report_id,
+        statistics_run=statistics_run,
+        statistics_manifest_sha256=statistics_manifest_sha256,
+        statistics_report_sha256=statistics_report_sha256,
+        paired_run=paired_run,
+        certificate_run=certificate_run,
+        certificate_manifest_sha256=certificate_manifest_sha256,
+        confirmed_certificate=confirmed_certificate,
+        confirmed_certificate_sha256=confirmed_certificate_sha256,
+        replay_evidence_sha256=replay_evidence_sha256,
+        output_dir=output_dir,
+        allow_dirty=allow_dirty,
+    )
+    try:
+        result = generate_phase3_report(**arguments)
+    except (Phase3ReportError, OSError, ValueError) as exc:
+        _render_phase3_report_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三 Gate F 脱敏研究报告：{result.report_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "轨迹 / 方法 / 配对", f"{result.trace_count} / {result.method_count} / {result.pair_count}"
+    )
+    table.add_row("总体置信等级", result.overall_confidence)
+    table.add_row("统计谬误扫描", f"{result.fallacy_scan_coverage}/11")
+    table.add_row("公开 Markdown SHA256", result.markdown_sha256)
+    table.add_row("公开 validation SHA256", result.validation_sha256)
+    table.add_row("公开 manifest SHA256", result.manifest_sha256)
+    table.add_row("逐轨迹标签 / 方法预测 / Provider raw", "否 / 否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]report: {result.markdown_path}[/dim]")
+    console.print(f"[dim]validation: {result.validation_path}[/dim]")
+    console.print(f"[dim]certificate demo: {result.demo_certificate_path}[/dim]")
+    console.print(f"[dim]replay command: {result.replay_command_path}[/dim]")
+    console.print(
+        "[yellow]该报告的验证状态为 ANALYZED、总体置信为 CAUTION；不显著不等于方法等效。[/yellow]"
     )
 
 

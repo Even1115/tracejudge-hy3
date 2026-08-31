@@ -1,8 +1,8 @@
 # 阶段三研究协议与门槛状态
 
-版本：Gate A–D 已通过，Gate E1/E2 已冻结，Gate E3 正式运行已完成，Gate E4 统计入口已实现 / 2026-08-31
+版本：Gate A–E 已完成，Gate F 脱敏报告入口已实现 / 2026-08-31
 
-本文冻结阶段三的输入、输出、隐私、配对、公开证书、标注、续跑和统计契约。它不是阶段三实验报告；完整自然 + 反事实研究集已冻结为 57 条，Gate C 已通过，Gate D 三等级公开工程证书已发布且 confirmed 证书完成独立重放。Gate E1 盲法标注包与 Gate E2 单人首轮 57 条主标注已正式冻结；Gate E3 的真实 Hy3 运行已形成完整 285 配对，其中 283 条有效 judgment、2 条 Provider 失败。Gate E4 统计入口已实现但尚未正式生成统计产物，研究假设仍未完成解释与报告。
+本文冻结阶段三的输入、输出、隐私、配对、公开证书、标注、续跑和统计契约。它不是阶段三实验报告；完整自然 + 反事实研究集已冻结为 57 条，Gate C 已通过，Gate D 三等级公开工程证书已发布且 confirmed 证书完成独立重放。Gate E1 盲法标注包与 Gate E2 单人首轮 57 条主标注已正式冻结；Gate E3 的真实 Hy3 运行已形成完整 285 配对，其中 283 条有效 judgment、2 条 Provider 失败。Gate E4 正式统计 `phase3_stats_primary_round1_v1` 已冻结；Gate F 只读预检与脱敏 writer 已实现，正式研究报告尚未发布。
 
 ## 1. 已核验的上游锚点
 
@@ -27,7 +27,8 @@ Gate B 正式自然轨迹已原子冻结到 `artifacts/experiments/phase3-freeze
 | 公开动态反例 | 已固定 challenge 优先、最多 32 个确定性探针、最多 16 次列表最小化和精确白名单执行策略 | Gate D 已完成一个 confirmed 证书独立 replay；仍不支持任意外部代码或 HumanEval+ 候选 |
 | 错误证书 | 三等级生产器、原子 writer、正式证书 manifest 和 confirmed 独立 replay 均完成 | 工程 Fixture 只验证链路，不是五方法有效性结果 |
 | 人工标注 | 冻结指南/协议、完整材料再绑定、固定 seed opaque ID、packet/identity map 分离与 `0700/0600` 原子 writer 已实现；正式 57 条盲法 packet 和单人首轮主标注已冻结 | 尚无第二标注者或重测轮次，`agreement_kind=not_computed` |
-| 统计 | E4 已实现全分母指标、Wilson 区间、exact McNemar、父题聚类 bootstrap、Holm、严格输入绑定与聚合 writer | 正式统计预检和产物尚未运行；单标注者一致性仍为 `not_computed` |
+| 统计 | E4 已实现全分母指标、Wilson 区间、exact McNemar、父题聚类 bootstrap、Holm、严格输入绑定与聚合 writer；正式产物已冻结 | 单标注者一致性仍为 `not_computed` |
+| 脱敏报告 | Gate F 已实现哈希绑定、11/11 统计谬误扫描、Material Passport、公开证书 Demo 与原子 writer | 正式报告尚未发布；需先保持 clean worktree 并通过只读预检 |
 | 隐私 | 公共产物敏感键与 canary fail-closed 检查已实现 | 后续每个 writer 仍须强制调用并做端到端 canary 测试 |
 | Resume | 严格 identity、逐 invocation 私有 raw/公开结果、中断识别和 `reused` 精确行哈希已实现；E4 会解析复用链到原始终态，但仍保留最终 `reused` 数量 | 正式 E3 已完成，不应再次 resume 或重跑 |
 
@@ -104,9 +105,17 @@ clean 工作树不保存伪造指纹；dirty 工作树必须保存非空指纹�
 - 反事实轨迹对同两项比较报告准确率差；以 `parent_trace_id` 为聚类单位，固定 10,000 次、seed `20260828`，用 type-7 线性插值 percentile 规则给出 95% 区间。只有 3 个父题聚类，区间必须标注不稳定。
 - 所有结果仅称探索性证据。单标注者单轮次的 agreement 保持 `not_computed`；不显著不表示等效，关联也不建立因果。
 
+### 7.2 Gate F 解读口径
+
+- 主比较以原始分子/分母、配对差值和预注册区间为主；不以单一总体准确率排名替代自然/反事实分层。
+- E4 的反事实单方法 Wilson 区间未建模同父题相关性，Gate F 只报原始比例，推断仅使用父题 cluster bootstrap。
+- Test-only 不输出过程、推理和计划—代码字段；其对应 0 分子为结构性不适用，报告写作 N/A，不解释为能力为零。
+- 强制检查 Simpson、ecological、Berkson、collider、base-rate、regression-to-mean、survivorship、look-elsewhere、forking paths、correlation/causation 和 reverse causality 共 11 类统计谬误。
+- 当前验证状态为 `ANALYZED`、总体置信为 `CAUTION`、复现判定为 `CANNOT_VERIFY`：输入已精确哈希绑定，但 Gate F 不重跑外部 Hy3，且当前没有单独持久化的证书 replay receipt。
+
 ## 8. 最小目录和 CLI 边界
 
-Gate A–E4 当前实现：
+Gate A–F 当前实现：
 
 ```text
 src/tracejudge_hy3/phase3/
@@ -120,6 +129,7 @@ src/tracejudge_hy3/phase3/
 ├── annotations.py
 ├── labels.py
 ├── execution.py
+├── report.py
 ├── statistics.py
 └── runner.py
 tests/
@@ -128,6 +138,7 @@ tests/
 ├── test_phase3_contracts.py
 ├── test_phase3_parser.py
 ├── test_phase3_privacy.py
+├── test_phase3_report.py
 ├── test_phase3_statistics.py
 └── test_phase3_runner.py
 ```
@@ -146,9 +157,11 @@ src/tracejudge_hy3/phase3/
 └── report.py             # Gate F：脱敏报告
 ```
 
-`phase3 preflight` 与 `phase3 freeze` 处理自然轨迹；四个 `phase3 counterfactual-*` 命令处理精确白名单公开证据和 overlay。`phase3 paired-preflight` 是 Gate C 只读入口。Gate D 的 `certificate-preflight`、`certificate-generate` 和 `replay` 已完成正式工程验收。Gate E1 的 `annotation-packet-preflight` / `annotation-packet-export` 已完成正式 57 条私有 packet 导出。Gate E2 的 `annotation-labels-check`、`annotation-labels-freeze-preflight` 和 `annotation-labels-freeze` 已产生单人首轮 57 条正式冻结标签。Gate E3 的 `evaluate-preflight` 与显式授权 `evaluate` 已完成正式运行。Gate E4 的 `statistics-preflight` 在内存核算但不显示结果或写文件；`statistics` 原子发布无逐轨迹内容的聚合 report。正式 E4 统计与 Gate F `phase3 report` 尚未运行。
+`phase3 preflight` 与 `phase3 freeze` 处理自然轨迹；四个 `phase3 counterfactual-*` 命令处理精确白名单公开证据和 overlay。`phase3 paired-preflight` 是 Gate C 只读入口。Gate D 的 `certificate-preflight`、`certificate-generate` 和 `replay` 已完成正式工程验收。Gate E1 的 `annotation-packet-preflight` / `annotation-packet-export` 已完成正式 57 条私有 packet 导出。Gate E2 的 `annotation-labels-check`、`annotation-labels-freeze-preflight` 和 `annotation-labels-freeze` 已产生单人首轮 57 条正式冻结标签。Gate E3 的 `evaluate-preflight` 与显式授权 `evaluate` 已完成正式运行。Gate E4 正式聚合统计已发布。Gate F 的 `report-preflight` 只读验证脱敏报告身份且不展示方法成绩；`report` 原子发布 Markdown、validation、公开证书 Demo 和重放命令。正式 Gate F 报告尚未运行。
 
 E3 正式 run `phase3_hy3_57x5_v1` 的 run manifest / results / index SHA256 分别为 `685b25af287bfc973c5000573eac0cf4ff505f91d95fff2faa403f69626f1edc` / `332932e949281c84402046dbd25e0110fb7a7e7e224c71b17487226fa1098999` / `b1a6c6a61a4439d3e667ebd52ddba8cba98f8ee196c1cac8dce200f38c857247`；完整配对 285，`valid_judgment=283`、`provider_error=2`、恢复复用 0。
+
+E4 正式统计 `phase3_stats_primary_round1_v1` 的 manifest / report SHA256 分别为 `7efbdc9c36340593be09e192ea0e7b15297d5e69c4192fa4b49583558b368bf8` / `972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10`；仅包含聚合统计，不包含逐轨迹标签、预测或 Provider raw。
 
 Gate C 正式只读验收已通过：自然 42 + 反事实 15 = 57 条、五方法、完整配对 285；方法规格 SHA256 `4b8684852125ad3059b5001951479a2f164c7089eb64ff10cbdafafc39c534ff`，Prompt bundle SHA256 `c8d6c2c0f6bb1207af987746d912868bd102f90b334f5425528cbda5be9dd366`，输出 schema SHA256 `96da92777ee89bb69a65c61f4bdc9fc9e7cb7ac1ba94a52400f79ca1130821f3`。方法规格哈希绑定 `mock / deterministic-phase3-mock-v1 / temperature=0 / timeout=120s`，只用于接口身份验收；正式 Hy3 Provider、模型、参数与预算必须另行冻结并授权。
 
@@ -163,4 +176,4 @@ Gate C 正式只读验收已通过：自然 42 + 反事实 15 = 57 条、五方�
 
 每个门槛完成后停止，提交证据并等待是否进入下一门槛。
 
-当前门槛状态：Gate A–D 已退出；Gate E1–E3 已完成。E4 统计代码已实现但尚未形成正式产物；下一步必须先提交 E4 实现并保持 clean worktree，再运行 `statistics-preflight`。预检通过后才运行 `statistics`，且不得重跑 E3 或把两条 Provider 失败移出分母。
+当前门槛状态：Gate A–E 已完成。Gate F 代码与测试已实现但尚未形成正式报告；下一步必须先提交 Gate F 实现并保持 clean worktree，再运行 `report-preflight`。预检通过后才可运行 `report`；两条 Provider 失败仍保留在 285 全分母，Gate F 不重跑 E3、不自动重放证书。

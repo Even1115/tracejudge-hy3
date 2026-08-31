@@ -46,6 +46,8 @@ Gate E3 的 `phase3/execution.py` 在正式运行前重建同一 57 条白名单
 
 Gate E4 的 `phase3/statistics.py` 不读取 `provider_raw.jsonl`，而是严格绑定已完成 run manifest、最终 results、配对 index、所有逐行哈希和私有冻结标注。若结果含 `reused`，加载器只沿历史 invocation 的精确旧行哈希恢复原始终态；任何顺序、状态或来源偏差均失败关闭。分析层保留完整 285 分母，输出层只发布聚合数量、区间、两个预注册自然比较和父题聚类反事实区间；不发布 trace ID、人工理由或逐条预测。预检不写文件，正式 writer 以 `0700/0600` 原子不可覆盖发布。
 
+Gate F 的 `phase3/report.py` 只消费 E4 聚合 report、E3 结构化账本中的状态/耗时/token/成本可用性以及 Gate D 公开证书，不打开 Provider raw、候选正文、标注理由或隐藏评测内容。加载器先校验精确字节哈希与本轮 57×5 冻结结构，再渲染 Markdown 和机器可审计 `validation.json`。解读层强制 11 项统计谬误检查、将 Test-only 缺失字段作 N/A，反事实推断仅使用父题 cluster bootstrap，并以 `ANALYZED / CAUTION / CANNOT_VERIFY` 限定证据边界。预检只显示安全身份与拟输出哈希；正式 writer 原子发布脱敏报告、验证记录、公开证书副本和重放命令，不自动执行重放。
+
 ## 为什么规则证据优先于 LLM 判断
 
 设计文档的问题四明确指出，单纯依赖 LLM-as-judge 会产生误报、无法复现的缺陷描述、结果不稳定等问题。v0.1 的应对方式是：

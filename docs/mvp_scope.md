@@ -22,7 +22,7 @@
 - 阶段三 Gate E2 提供不打开 identity map 的 working 标签进度/结构检查，以及仅在全部完成后允许的身份回连预检和 Git-ignored 私有原子冻结；单人首轮 57 条主标注已正式冻结；
 - 阶段三 Gate E3 提供五方法正式运行的只读身份预检和显式 Hy3 执行入口；正式 `phase3_hy3_57x5_v1` 已完成 57 × 5 全部 285 配对，其中 283 条有效 judgment、2 条 Provider 失败；
 - 阶段三 Gate E4 提供严格哈希/顺序/复用链绑定、全分母聚合指标、精确 McNemar + Holm 和父题聚类 bootstrap，并以不含逐轨迹内容的私有原子 writer 发布；正式 `phase3_stats_primary_round1_v1` 已冻结；
-- 阶段三 Gate F 提供哈希绑定的脱敏结果解读、11/11 统计谬误扫描、Material Passport、公开错误证书 Demo 与原子不可覆盖 writer；入口已实现，正式报告尚未发布；
+- 阶段三 Gate F 提供哈希绑定的脱敏结果解读、11/11 统计谬误扫描、Material Passport、公开错误证书 Demo 与原子不可覆盖 writer；正式 `phase3_report_primary_round1_v1` 已发布并通过权限、哈希与脱敏验收；
 - Mock 模式（默认，无需 API Key）与真实 Hy3 Provider 接口（可选）；
 - 单元测试与 README。
 
@@ -38,7 +38,7 @@
 - 完整 mutation testing 框架；
 - 自动代码修复；
 - 复杂控制流图或符号执行；
-- Gate C 已实现五方法统一工程接口和 Mock 中断/resume 验证，Gate E1 packet 与 Gate E2 单人首轮正式标签已冻结，Gate E3 真实 Hy3 配对结果已产生，Gate E4 正式聚合统计已冻结，Gate F 脱敏解读入口已实现；但第二标注/重测一致性、正式 Gate F 报告和扩展消融仍不在当前证据内。当前证据只适用于本轮固定 cohort/模型/Prompt/标注设置，不产生因果、等效或完整 benchmark 结论。
+- Gate C 已实现五方法统一工程接口和 Mock 中断/resume 验证，Gate E1 packet 与 Gate E2 单人首轮正式标签已冻结，Gate E3 真实 Hy3 配对结果已产生，Gate E4 正式聚合统计和 Gate F 脱敏研究报告已发布；但第二标注/重测一致性与扩展消融仍不在当前证据内。当前证据只适用于本轮固定 cohort/模型/Prompt/标注设置，不产生因果、等效或完整 benchmark 结论。
 
 模型输出中的"过程"是面向用户、可审查的解题说明和实现计划，不要求也不试图暴露模型不可见的内部思维链。
 

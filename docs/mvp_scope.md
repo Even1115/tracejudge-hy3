@@ -20,7 +20,8 @@
 - 阶段三 Gate D 公开 challenge/确定性探针策略、三等级公开工程证书 writer、只读预检和单用例 `phase3 replay`；正式证书产物与 confirmed 证书独立重放已完成，但仍只是公开工程 Fixture 证据，不构成五方法研究结果；
 - 阶段三 Gate E1 冻结标注指南与机器可校验协议，正式 57 条私有盲法 packet 已导出；packet 与协调者 identity map 分离，不包含方法预测、其他标注者标签、反事实构造元数据或官方隐藏输入；
 - 阶段三 Gate E2 提供不打开 identity map 的 working 标签进度/结构检查，以及仅在全部完成后允许的身份回连预检和 Git-ignored 私有原子冻结；单人首轮 57 条主标注已正式冻结；
-- 阶段三 Gate E3 提供五方法正式运行的只读身份预检和显式 Hy3 执行入口；已绑定 57 × 5 完整分母、标签/材料/Provider/代码环境哈希和严格续跑，但真实 Hy3 尚未执行；
+- 阶段三 Gate E3 提供五方法正式运行的只读身份预检和显式 Hy3 执行入口；正式 `phase3_hy3_57x5_v1` 已完成 57 × 5 全部 285 配对，其中 283 条有效 judgment、2 条 Provider 失败；
+- 阶段三 Gate E4 提供严格哈希/顺序/复用链绑定、全分母聚合指标、精确 McNemar + Holm 和父题聚类 bootstrap，并以不含逐轨迹内容的私有原子 writer 发布；入口已实现，正式统计产物尚未生成；
 - Mock 模式（默认，无需 API Key）与真实 Hy3 Provider 接口（可选）；
 - 单元测试与 README。
 
@@ -36,7 +37,7 @@
 - 完整 mutation testing 框架；
 - 自动代码修复；
 - 复杂控制流图或符号执行；
-- Gate C 已实现五方法统一工程接口和 Mock 中断/resume 验证，Gate E1 packet 与 Gate E2 单人首轮正式标签已冻结，Gate E3 正式执行入口已实现；但真实 Hy3 配对结果、第二标注/重测一致性、配对统计和消融实验仍不在当前 MVP 证据内。Gate B 功能证据、Gate C Mock、Gate D 工程 Fixture 和尚未运行的 E3 入口都不产生方法有效性结论。
+- Gate C 已实现五方法统一工程接口和 Mock 中断/resume 验证，Gate E1 packet 与 Gate E2 单人首轮正式标签已冻结，Gate E3 真实 Hy3 配对结果已产生，Gate E4 统计入口已实现；但第二标注/重测一致性、正式配对统计产物、Gate F 报告和扩展消融仍不在当前证据内。Gate B 功能证据、Gate C Mock、Gate D 工程 Fixture、E3 运行完成本身和尚未运行的 E4 入口都不单独产生方法有效性结论。
 
 模型输出中的"过程"是面向用户、可审查的解题说明和实现计划，不要求也不试图暴露模型不可见的内部思维链。
 

@@ -435,6 +435,12 @@ working JSONL 的每行保留 packet 给定的 `annotation_item_id`、协议/标
 
 `Phase3ResumeIdentity` 精确绑定 overlay 与自然 manifest、轨迹顺序、方法材料组合哈希、五方法规格、Prompt bundle、输出 schema、完整实现、Provider 公开配置、人工标签 manifest/完成标签/回连记录哈希、Git、Python/依赖、AST、公开证据策略、标注协议和随机种子。clean Git 状态不保存伪造工作树指纹；dirty 状态必须有指纹。Gate B freeze 是不可变的一次性原子发布，不使用 resume。Gate E3 writer 每次 invocation 保存私有 `provider_raw.jsonl` 和通过敏感键/canary 检查的 `results.jsonl`；中断运行的 manifest 保持 `running`，续跑时先将前一 invocation 标为 `interrupted`。新 invocation 对历史已有终态的每一对只写 `reused` 和精确旧行 SHA256，不再调用 Provider；完成时输出完整 57 × 5 索引。
 
+### Gate E4 聚合统计
+
+`artifacts/experiments/phase3-statistics/<statistics_id>/` 只包含权限为 `0600` 的 `manifest.json` 与 `report.json`，目录权限为 `0700`，同名目录拒绝覆盖。manifest 绑定 cohort/natural manifest、人工标签 manifest/completed/annotation 三个哈希、E3 run manifest/results/index、统计实现、Git/Python/直接依赖和 report 精确字节哈希，并明确声明不含逐轨迹行、人工理由、Provider raw 或隐藏评测内容。
+
+`report.json` 是确定性的聚合对象：包含分析口径、自然/反事实/总数量、原始与有效状态计数、每方法分子/分母及 Wilson 区间、有效结果混淆矩阵、两个自然 exact McNemar + Holm 比较、两个反事实父题聚类 percentile bootstrap 区间和五类反事实描述性拆分。它不包含 `trace_id`、`rationale`、逐条 judgment 或证书正文；`valid_only_confusion` 不能替代把失败计错的全分母主指标。
+
 ## 流水线输出 JSON（`artifacts/*.json`）
 
 这是 `run` / `batch` / `demo` 现有完整评估链路的格式，**与上述阶段一基线产物不同**。它由 `reporting/serializer.py:pipeline_result_to_dict()` 生成，顶层字段：`problem` / `solution` / `static_evidence` / `execution_result` / `llm_assessment` / `process_assessment` / `counterexample` / `error_certificate`，均为对应 Pydantic 模型的 `model_dump(mode="json")`。`batch` 命令将多条这样的记录以 JSONL 形式写入同一个文件。

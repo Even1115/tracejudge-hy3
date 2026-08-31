@@ -7,7 +7,7 @@
 | 项目定位 | 面向 AI 生成代码的细粒度过程评估与首错定位系统 |
 | 方案版本 | v3.1 |
 | 实施形式 | 单人项目 |
-| 当前进度 | 阶段一、阶段二固定 10 题开发 Pilot 与 research-natural 正式运行已完成；阶段三 Gate A–D 已完成，冻结 42 条自然 + 15 条公开反事实 = 57 条轨迹，Gate C 确认五方法完整配对 285，Gate D confirmed 工程证书已独立重放；Gate E1 packet 与 E2 单人首轮 57 条人工标签已冻结，E3 只读预检/显式 Hy3 执行入口已实现，尚未运行真实五方法或计算配对统计 |
+| 当前进度 | 阶段一、阶段二固定 10 题开发 Pilot 与 research-natural 正式运行已完成；阶段三 Gate A–D 已完成，冻结 42 条自然 + 15 条公开反事实 = 57 条轨迹，Gate C 确认五方法完整配对 285，Gate D confirmed 工程证书已独立重放；Gate E1 packet 与 E2 单人首轮 57 条人工标签已冻结，E3 真实 Hy3 已完成 285 配对（283 有效、2 Provider 失败），E4 统计入口已实现但尚未生成正式统计产物 |
 | 更新日期 | 2026-08-31 |
 | 项目性质 | 犀牛鸟开源活动个人参赛作品，与腾讯官方发布无关 |
 
@@ -263,7 +263,7 @@ def safe_mean(nums):
 | 阶段 0 | 固定 10 题路径已完成；45 题自然研究 cohort bundle 已支持 | 已固定 HumanEval+ revision，建立 164 题公开投影能力和只依据公开题号选取的 10 题 bundle；新增排除 10 题 Pilot 的 45 题 schema v2 研究子集生成 | 为完整 164 题运行建立独立 bundle 和实验配置 |
 | 阶段一 | 固定 10 题 Pilot 与 45 题 research-natural 正式运行已完成 | 正式 run 来源 45，成功 42、parse error 0、Provider error 3；失败仍保留在来源分母；repair 独立硬上限为 1 | 保持冻结，不为阶段三重新生成或筛掉失败 |
 | 阶段二 | 固定 10 题 Pilot 与 42 候选 research-natural 正式运行已完成 | 正式 run 实际执行 42，Base 41/42，Base+Extra 40/42；timeout、基础设施错误和容器清理错误均为 0 | 阶段三只读取脱敏安全结果；完整 164 题仍为独立 P1 |
-| 阶段三 | Gate A–D 已完成；Gate E1 packet 与 E2 主标注已冻结，E3 执行入口已实现 | 正式证书 manifest SHA256 `4d4d2f8ce5ee86d96aaeffbec2f2d686a395427a340703534b8460a866f144e8`，confirmed 证书重放证据 SHA256 `cfd897334643853fc10901835a5203aa51ee7edd4442e314893c1e5bc152e670`；Gate E1 packet manifest SHA256 `b9897cb33631f21d6762fabadbafb84bf3ec8dfbafd9e026debf907be4851ee1`；E2 主标注 manifest SHA256 `fbf89aa950318392e49d01a5235461c4ce6ae94acb55842b963bb54048eac0a3`；E3 绑定 285 配对与最大 456 次 Provider 调用 | 在 clean worktree 上通过 E3 只读预检后单独授权真实 Hy3 配对运行；统计和 Gate F 报告尚未执行 |
+| 阶段三 | Gate A–D 与 E1–E3 已完成；E4 统计入口已实现 | 正式证书 manifest SHA256 `4d4d2f8ce5ee86d96aaeffbec2f2d686a395427a340703534b8460a866f144e8`；E2 主标注 manifest SHA256 `fbf89aa950318392e49d01a5235461c4ce6ae94acb55842b963bb54048eac0a3`；E3 results/index SHA256 为 `332932e949281c84402046dbd25e0110fb7a7e7e224c71b17487226fa1098999` / `b1a6c6a61a4439d3e667ebd52ddba8cba98f8ee196c1cac8dce200f38c857247`，285 配对中 283 有效、2 Provider 失败 | 提交 E4 实现后在 clean worktree 运行统计预检；正式统计和 Gate F 报告尚未执行 |
 
 当前真实审计锚点为：
 
@@ -1622,9 +1622,10 @@ tracejudge demo --mock --case faulty
 * **Gate D 已完成：** 固定预算确定性探针、有限列表最小化、三等级公开工程证书和 `tracejudge phase3 replay`；正式 confirmed 证书已独立重放，通用属性搜索与更强最小化仍是后续扩展；
 * **Gate E1 已正式导出：** 冻结标注指南与协议、白名单材料重建、固定随机顺序、盲法 packet/协调者 identity map 分离与私有原子导出；未填写模板不是人工标签；
 * **Gate E2 已冻结：** 不打开 identity map 的 working 进度检查、完成后身份回连预检、严格完成标签 Schema 和不可覆盖私有冻结已产生单人首轮 57 条正式主标注；
-* **Gate E3 工程入口已实现：** 只读预检绑定冻结标签、材料、Provider、代码和环境身份；真实 Hy3 运行必须显式授权，当前尚未执行；
+* **Gate E3 已正式运行：** 只读预检绑定冻结标签、材料、Provider、代码和环境身份；显式授权的真实 Hy3 已完成 285 配对，283 条有效、2 条 Provider 失败；
+* **Gate E4 工程入口已实现：** 严格绑定标签与 E3 manifest/results/index，提供全分母指标、精确 McNemar + Holm、父题聚类 bootstrap 和无逐轨迹内容的聚合 writer；正式统计产物尚未生成；
 * **已完成：** README、环境配置样例、安全/架构/数据格式文档与阶段二运行说明；
-* **计划：** 研究级指标、统计分析与可视化脚本。
+* **计划：** 在 clean worktree 上运行正式 E4 统计，再实现 Gate F 脱敏报告与可视化。
 
 ### 17.2 评测材料（阶段三计划）
 

@@ -48,6 +48,7 @@ from tracejudge_hy3.phase3 import (
     Phase3FreezeError,
     Phase3PublicEvidenceError,
     Phase3RunnerError,
+    Phase3StatisticsError,
     check_annotation_labels,
     execute_phase3_evaluation,
     execute_public_counterfactual_evidence,
@@ -55,6 +56,7 @@ from tracejudge_hy3.phase3 import (
     freeze_annotation_labels,
     freeze_counterfactual_cohort,
     freeze_natural_cohort,
+    generate_phase3_statistics,
     generate_public_certificates,
     preflight_annotation_labels_freeze,
     preflight_annotation_packet,
@@ -62,6 +64,7 @@ from tracejudge_hy3.phase3 import (
     preflight_natural_cohort,
     preflight_paired_interface,
     preflight_phase3_evaluation,
+    preflight_phase3_statistics,
     preflight_public_certificates,
     preflight_public_counterfactual_source,
     replay_public_certificate,
@@ -1878,6 +1881,190 @@ def phase3_evaluate(
     console.print(f"[dim]results: {run.results_path}[/dim]")
     console.print(f"[dim]index: {run.index_path}[/dim]")
     console.print("[yellow]该运行保留全部失败与 285 配对分母；尚未计算人工标签对比统计。[/yellow]")
+
+
+def _phase3_statistics_arguments(
+    *,
+    statistics_id: str,
+    paired_run: str,
+    paired_run_manifest_sha256: str,
+    results_sha256: str,
+    index_sha256: str,
+    cohort_manifest: str,
+    natural_manifest: str,
+    annotation_set_manifest: str,
+    annotation_set_manifest_sha256: str,
+    protocol: str,
+    guide: str,
+    output_dir: str,
+    allow_dirty: bool,
+) -> dict[str, object]:
+    return {
+        "statistics_id": statistics_id,
+        "paired_run_dir": paired_run,
+        "expected_paired_run_manifest_sha256": paired_run_manifest_sha256,
+        "expected_results_sha256": results_sha256,
+        "expected_index_sha256": index_sha256,
+        "cohort_manifest_path": cohort_manifest,
+        "natural_manifest_path": natural_manifest,
+        "annotation_set_manifest_path": annotation_set_manifest,
+        "expected_annotation_set_manifest_sha256": annotation_set_manifest_sha256,
+        "protocol_path": protocol,
+        "guide_path": guide,
+        "output_dir": output_dir,
+        "allow_dirty": allow_dirty,
+        "privacy_canaries": (),
+    }
+
+
+def _render_phase3_statistics_failure(exc: BaseException) -> None:
+    console.print(
+        "[red]阶段三配对统计校验失败；未输出逐轨迹标签、方法预测、Provider raw 或隐藏评测内容。[/red]"
+    )
+    console.print(f"[yellow]安全阶段码：{getattr(exc, 'safe_stage', 'P3E4_UNCLASSIFIED')}[/yellow]")
+
+
+@phase3_app.command("statistics-preflight")
+def phase3_statistics_preflight(
+    statistics_id: str = typer.Option(..., "--statistics-id"),
+    paired_run: str = typer.Option(..., "--paired-run"),
+    paired_run_manifest_sha256: str = typer.Option(..., "--paired-run-manifest-sha256"),
+    results_sha256: str = typer.Option(..., "--results-sha256"),
+    index_sha256: str = typer.Option(..., "--index-sha256"),
+    cohort_manifest: str = typer.Option(..., "--cohort-manifest"),
+    natural_manifest: str = typer.Option(..., "--natural-manifest"),
+    annotation_set_manifest: str = typer.Option(..., "--annotation-set-manifest"),
+    annotation_set_manifest_sha256: str = typer.Option(
+        ...,
+        "--annotation-set-manifest-sha256",
+    ),
+    protocol: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_PROTOCOL, "--protocol"),
+    guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--guide"),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-statistics",
+        "--output-dir",
+    ),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate E4：只读校验并在内存计算冻结配对统计，不写研究产物。"""
+
+    arguments = _phase3_statistics_arguments(
+        statistics_id=statistics_id,
+        paired_run=paired_run,
+        paired_run_manifest_sha256=paired_run_manifest_sha256,
+        results_sha256=results_sha256,
+        index_sha256=index_sha256,
+        cohort_manifest=cohort_manifest,
+        natural_manifest=natural_manifest,
+        annotation_set_manifest=annotation_set_manifest,
+        annotation_set_manifest_sha256=annotation_set_manifest_sha256,
+        protocol=protocol,
+        guide=guide,
+        output_dir=output_dir,
+        allow_dirty=allow_dirty,
+    )
+    try:
+        result = preflight_phase3_statistics(**arguments)
+    except (Phase3StatisticsError, OSError, ValueError) as exc:
+        _render_phase3_statistics_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    status_summary = ", ".join(
+        f"{status}={count}" for status, count in result.final_status_counts.items() if count
+    )
+    table = Table(title=f"阶段三 Gate E4 配对统计只读预检：{result.statistics_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.natural_trace_count} / {result.counterfactual_trace_count} / {result.trace_count}",
+    )
+    table.add_row(
+        "轨迹 / 方法 / 配对",
+        f"{result.trace_count} / {result.method_count} / {result.pair_count}",
+    )
+    table.add_row("原始结果状态", status_summary or "none")
+    table.add_row("配对 run manifest SHA256", result.paired_run_manifest_sha256)
+    table.add_row("配对 results SHA256", result.paired_results_sha256)
+    table.add_row("配对 index SHA256", result.paired_index_sha256)
+    table.add_row("人工标签 manifest SHA256", result.annotation_set_manifest_sha256)
+    table.add_row("统计实现 SHA256", result.statistics_implementation_sha256)
+    table.add_row("拟生成 report SHA256", result.report_sha256)
+    table.add_row(
+        "Git commit / 分支 / dirty",
+        f"{result.git_commit} / {result.git_branch} / {result.git_dirty}",
+    )
+    table.add_row("创建目录 / 写入统计", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]该预检已在内存核算聚合统计，但不展示标签分布或方法结果，也不写入研究产物。[/yellow]"
+    )
+
+
+@phase3_app.command("statistics")
+def phase3_statistics(
+    statistics_id: str = typer.Option(..., "--statistics-id"),
+    paired_run: str = typer.Option(..., "--paired-run"),
+    paired_run_manifest_sha256: str = typer.Option(..., "--paired-run-manifest-sha256"),
+    results_sha256: str = typer.Option(..., "--results-sha256"),
+    index_sha256: str = typer.Option(..., "--index-sha256"),
+    cohort_manifest: str = typer.Option(..., "--cohort-manifest"),
+    natural_manifest: str = typer.Option(..., "--natural-manifest"),
+    annotation_set_manifest: str = typer.Option(..., "--annotation-set-manifest"),
+    annotation_set_manifest_sha256: str = typer.Option(
+        ...,
+        "--annotation-set-manifest-sha256",
+    ),
+    protocol: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_PROTOCOL, "--protocol"),
+    guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--guide"),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-statistics",
+        "--output-dir",
+    ),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate E4：原子写入不含逐轨迹内容的冻结聚合统计。"""
+
+    arguments = _phase3_statistics_arguments(
+        statistics_id=statistics_id,
+        paired_run=paired_run,
+        paired_run_manifest_sha256=paired_run_manifest_sha256,
+        results_sha256=results_sha256,
+        index_sha256=index_sha256,
+        cohort_manifest=cohort_manifest,
+        natural_manifest=natural_manifest,
+        annotation_set_manifest=annotation_set_manifest,
+        annotation_set_manifest_sha256=annotation_set_manifest_sha256,
+        protocol=protocol,
+        guide=guide,
+        output_dir=output_dir,
+        allow_dirty=allow_dirty,
+    )
+    try:
+        result = generate_phase3_statistics(**arguments)
+    except (Phase3StatisticsError, OSError, ValueError) as exc:
+        _render_phase3_statistics_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三 Gate E4 冻结配对统计：{result.statistics_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.natural_trace_count} / {result.counterfactual_trace_count} / {result.trace_count}",
+    )
+    table.add_row("完整配对", str(result.pair_count))
+    table.add_row("公开 report SHA256", result.report_sha256)
+    table.add_row("公开 manifest SHA256", result.manifest_sha256)
+    table.add_row("逐轨迹标签 / 方法预测 / Provider raw", "否 / 否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]report: {result.report_path}[/dim]")
+    console.print(
+        "[yellow]该产物是探索性聚合统计；尚未完成人工一致性，也不能把不显著解释为等效。[/yellow]"
+    )
 
 
 def _render_result(result: PipelineResult) -> None:

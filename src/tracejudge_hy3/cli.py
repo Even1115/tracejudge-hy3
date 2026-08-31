@@ -38,6 +38,34 @@ from tracejudge_hy3.evalplus import (
     run_evalplus_experiment,
 )
 from tracejudge_hy3.exceptions import DatasetError, TraceJudgeError
+from tracejudge_hy3.phase3 import (
+    ANNOTATION_GUIDE_RELATIVE_PATH,
+    ANNOTATION_PROTOCOL_RELATIVE_PATH,
+    PHASE3_EVALUATION_RANDOM_SEED,
+    PUBLIC_CERTIFICATE_CLAIMS_RELATIVE_PATH,
+    PUBLIC_COUNTERFACTUAL_SOURCE_RELATIVE_PATH,
+    Phase3AnnotationError,
+    Phase3FreezeError,
+    Phase3PublicEvidenceError,
+    Phase3RunnerError,
+    check_annotation_labels,
+    execute_phase3_evaluation,
+    execute_public_counterfactual_evidence,
+    export_annotation_packet,
+    freeze_annotation_labels,
+    freeze_counterfactual_cohort,
+    freeze_natural_cohort,
+    generate_public_certificates,
+    preflight_annotation_labels_freeze,
+    preflight_annotation_packet,
+    preflight_counterfactual_freeze,
+    preflight_natural_cohort,
+    preflight_paired_interface,
+    preflight_phase3_evaluation,
+    preflight_public_certificates,
+    preflight_public_counterfactual_source,
+    replay_public_certificate,
+)
 from tracejudge_hy3.pipeline.runner import PipelineResult, run_pipeline, select_backend
 from tracejudge_hy3.providers.base import LLMProvider
 from tracejudge_hy3.providers.hy3_openai import Hy3OpenAIProvider
@@ -60,10 +88,19 @@ dataset_app = typer.Typer(
     add_completion=False,
     help="离线数据集转换、确定性抽样与 ProblemSpec 校验（不执行数据集代码）",
 )
+phase3_app = typer.Typer(
+    add_completion=False,
+    help="阶段三离线冻结、配对评估与公开证据工具（按研究门槛逐步开放）",
+)
 app.add_typer(dataset_app, name="dataset")
+app.add_typer(phase3_app, name="phase3")
 console = Console()
 
 DEFAULT_DATASET = str(data_path("sample_problems.jsonl"))
+DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE = str(data_path(PUBLIC_COUNTERFACTUAL_SOURCE_RELATIVE_PATH))
+DEFAULT_PHASE3_CERTIFICATE_CLAIMS = str(data_path(PUBLIC_CERTIFICATE_CLAIMS_RELATIVE_PATH))
+DEFAULT_PHASE3_ANNOTATION_PROTOCOL = str(data_path(ANNOTATION_PROTOCOL_RELATIVE_PATH))
+DEFAULT_PHASE3_ANNOTATION_GUIDE = ANNOTATION_GUIDE_RELATIVE_PATH
 
 
 def _reject_phase1_projection_execution(problems: list[ProblemSpec]) -> None:
@@ -537,6 +574,1310 @@ def evalplus_command(
         console.print("[yellow]Mock dry run 未执行任何候选代码或官方测试。[/yellow]")
     if summary["infrastructure_error_count"]:
         raise typer.Exit(code=1)
+
+
+def _render_phase3_validation_failure(exc: BaseException) -> None:
+    console.print("[red]阶段三校验失败；未输出 Provider raw、候选正文或隐藏评测内容。[/red]")
+    safe_stage = exc.safe_stage if isinstance(exc, Phase3FreezeError) else "P3B_UNCLASSIFIED"
+    console.print(f"[yellow]安全阶段码：{safe_stage}[/yellow]")
+
+
+def _render_phase3_interface_failure(exc: BaseException) -> None:
+    console.print(
+        "[red]阶段三配对接口校验失败；未输出 Provider raw、候选正文或隐藏评测内容。[/red]"
+    )
+    safe_stage = exc.safe_stage if isinstance(exc, Phase3RunnerError) else "P3C_UNCLASSIFIED"
+    console.print(f"[yellow]安全阶段码：{safe_stage}[/yellow]")
+
+
+def _render_phase3_public_evidence_failure(exc: BaseException) -> None:
+    console.print("[red]阶段三公开证书校验失败；未输出候选正文、隐藏评测内容或原始异常。[/red]")
+    safe_stage = (
+        exc.safe_stage if isinstance(exc, Phase3PublicEvidenceError) else "P3D_UNCLASSIFIED"
+    )
+    console.print(f"[yellow]安全阶段码：{safe_stage}[/yellow]")
+
+
+def _render_phase3_annotation_failure(exc: BaseException) -> None:
+    console.print("[red]阶段三盲法标注包校验失败；未输出方法预测、候选正文或隐藏评测内容。[/red]")
+    safe_stage = getattr(exc, "safe_stage", "P3E_UNCLASSIFIED")
+    console.print(f"[yellow]安全阶段码：{safe_stage}[/yellow]")
+
+
+@phase3_app.command("preflight")
+def phase3_preflight(
+    phase1_run: str = typer.Option(
+        ...,
+        "--phase1-run",
+        help="已完成的 45 题 research-natural 阶段一 run 目录",
+    ),
+    phase2_run: str = typer.Option(
+        ...,
+        "--phase2-run",
+        help="已完成的 research-natural 阶段二官方执行 run 目录",
+    ),
+    dataset_manifest: str = typer.Option(
+        ...,
+        "--dataset-manifest",
+        help="45 题 research-natural dataset_manifest.json",
+    ),
+    freeze_id: str = typer.Option(
+        ...,
+        "--freeze-id",
+        help="拟使用的冻结 ID；已有同名目录时预检失败",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-freezes",
+        "--output-dir",
+        help="拟使用的阶段三冻结目录父路径；预检不会创建它",
+    ),
+) -> None:
+    """Gate B：完成全链路只读预检，但不创建目录或 manifest。"""
+
+    try:
+        result = preflight_natural_cohort(
+            phase1_run_dir=phase1_run,
+            phase2_run_dir=phase2_run,
+            dataset_manifest_path=dataset_manifest,
+            output_dir=output_dir,
+            freeze_id=freeze_id,
+        )
+    except (Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_validation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三自然轨迹只读预检：{result.freeze_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("阶段一来源", str(result.source_problem_count))
+    table.add_row("拟冻结自然轨迹", str(result.natural_trace_count))
+    table.add_row("解析失败（保留来源核算）", str(result.parse_error_count))
+    table.add_row("Provider 失败（保留来源核算）", str(result.provider_error_count))
+    table.add_row("阶段一 run", result.phase1_run_id)
+    table.add_row("阶段二 run", result.phase2_run_id)
+    table.add_row("创建目录 / manifest", "否")
+    table.add_row("执行 Provider / Docker", "否")
+    console.print(table)
+    console.print("[yellow]预检通过不等于正式冻结；本命令没有写入研究产物。[/yellow]")
+
+
+@phase3_app.command("freeze")
+def phase3_freeze(
+    phase1_run: str = typer.Option(
+        ...,
+        "--phase1-run",
+        help="已完成的 45 题 research-natural 阶段一 run 目录",
+    ),
+    phase2_run: str = typer.Option(
+        ...,
+        "--phase2-run",
+        help="已完成的 research-natural 阶段二官方执行 run 目录",
+    ),
+    dataset_manifest: str = typer.Option(
+        ...,
+        "--dataset-manifest",
+        help="45 题 research-natural dataset_manifest.json",
+    ),
+    freeze_id: str = typer.Option(
+        ...,
+        "--freeze-id",
+        help="显式冻结 ID；已有同名目录时拒绝覆盖",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-freezes",
+        "--output-dir",
+        help="只含白名单 manifest 的阶段三冻结目录父路径",
+    ),
+) -> None:
+    """Gate B：只读校验阶段一/二并冻结全部 research-natural 成功轨迹。"""
+
+    try:
+        result = freeze_natural_cohort(
+            phase1_run_dir=phase1_run,
+            phase2_run_dir=phase2_run,
+            dataset_manifest_path=dataset_manifest,
+            output_dir=output_dir,
+            freeze_id=freeze_id,
+        )
+    except (Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_validation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三自然轨迹冻结：{result.freeze_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("阶段一来源", str(result.source_problem_count))
+    table.add_row("冻结自然轨迹", str(result.natural_trace_count))
+    table.add_row("解析失败（保留来源核算）", str(result.parse_error_count))
+    table.add_row("Provider 失败（保留来源核算）", str(result.provider_error_count))
+    table.add_row("公开 manifest SHA256", result.manifest_sha256)
+    table.add_row("执行 Provider / Docker", "否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(
+        "[yellow]该 manifest 只冻结自然轨迹；未运行五种方法，也不构成阶段三研究结果。[/yellow]"
+    )
+
+
+@phase3_app.command("counterfactual-preflight")
+def phase3_counterfactual_preflight(
+    execution_run_id: str = typer.Option(
+        ...,
+        "--execution-run-id",
+        help="拟使用的公开 Fixture 证据 run ID；已有同名目录时拒绝",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="仓库内置且 SHA256 精确白名单化的 15 条公开反事实源 bundle",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-public-evidence",
+        "--output-dir",
+        help="拟使用的公开证据目录父路径；预检不会创建它",
+    ),
+) -> None:
+    """Gate B：只读验证 15 条公开反事实源，不执行任何候选代码。"""
+
+    try:
+        result = preflight_public_counterfactual_source(
+            source_bundle_path=source_bundle,
+            output_dir=output_dir,
+            execution_run_id=execution_run_id,
+        )
+    except (Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_validation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三公开反事实源只读预检：{result.bundle_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("父 Fixture", str(result.parent_count))
+    table.add_row("拟冻结反事实", str(result.counterfactual_count))
+    table.add_row("五类配额", "每类 3 条")
+    table.add_row("拟执行独立代码主体", str(result.execution_subject_count))
+    table.add_row(
+        "预期通过 / 预期失败", f"{result.expected_pass_count} / {result.expected_fail_count}"
+    )
+    table.add_row("公开源 SHA256", result.source_bundle_sha256)
+    table.add_row("拟用证据 run", result.execution_run_id)
+    table.add_row("创建目录 / 产物", "否")
+    table.add_row("执行候选 / Provider / Docker", "否 / 否 / 否")
+    console.print(table)
+    console.print("[yellow]预检通过不等于已取得功能证据；本命令没有执行代码或写入产物。[/yellow]")
+
+
+@phase3_app.command("counterfactual-execute")
+def phase3_counterfactual_execute(
+    execution_run_id: str = typer.Option(
+        ...,
+        "--execution-run-id",
+        help="公开 Fixture 证据 run ID；已有同名目录时拒绝覆盖",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="仓库内置且 SHA256 精确白名单化的 15 条公开反事实源 bundle",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-public-evidence",
+        "--output-dir",
+        help="公开 Fixture 执行证据目录父路径",
+    ),
+    per_test_timeout_seconds: float = typer.Option(
+        2.0,
+        "--per-test-timeout-seconds",
+        min=0.1,
+        max=10.0,
+        help="每个公开测试的父进程强制超时；仅允许 0.1–10 秒",
+    ),
+) -> None:
+    """Gate B：只执行精确白名单化的公开自建 Fixture 代码。"""
+
+    try:
+        result = execute_public_counterfactual_evidence(
+            source_bundle_path=source_bundle,
+            output_dir=output_dir,
+            execution_run_id=execution_run_id,
+            per_test_timeout_seconds=per_test_timeout_seconds,
+        )
+    except (Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_validation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三公开 Fixture 独立证据：{result.run_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("独立执行主体", str(result.result_count))
+    table.add_row("实际通过", str(result.pass_count))
+    table.add_row("实际失败", str(result.fail_count))
+    table.add_row("超时", str(result.timeout_count))
+    table.add_row("基础设施错误", str(result.infrastructure_error_count))
+    table.add_row("与预期影响不一致", str(result.expectation_mismatch_count))
+    table.add_row("公开 results SHA256", result.results_sha256)
+    table.add_row("执行 Provider / Docker", "否 / 否")
+    table.add_row("受限本地公开 Fixture 执行", "是")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]results: {result.results_path}[/dim]")
+    if (
+        result.timeout_count
+        or result.infrastructure_error_count
+        or result.expectation_mismatch_count
+    ):
+        console.print("[red]证据 bundle 已完整保留实际结果，但不满足冻结条件；不会自动重试。[/red]")
+        raise typer.Exit(code=1)
+    console.print("[yellow]该命令只取得公开 Fixture 功能证据；尚未冻结反事实 overlay。[/yellow]")
+
+
+@phase3_app.command("counterfactual-freeze-preflight")
+def phase3_counterfactual_freeze_preflight(
+    natural_manifest: str = typer.Option(
+        ...,
+        "--natural-manifest",
+        help="已冻结且只含自然轨迹的阶段三 manifest.json",
+    ),
+    execution_run: str = typer.Option(
+        ...,
+        "--execution-run",
+        help="已完成的公开 Fixture 独立证据 run 目录",
+    ),
+    freeze_id: str = typer.Option(
+        ...,
+        "--freeze-id",
+        help="拟使用的反事实 overlay 冻结 ID",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="与执行证据完全相同的公开反事实源 bundle",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-freezes",
+        "--output-dir",
+        help="拟使用的阶段三冻结目录父路径；预检不会创建它",
+    ),
+) -> None:
+    """Gate B：只读验证自然集、反事实源和逐行证据的完整绑定。"""
+
+    try:
+        result = preflight_counterfactual_freeze(
+            natural_manifest_path=natural_manifest,
+            source_bundle_path=source_bundle,
+            execution_run_dir=execution_run,
+            output_dir=output_dir,
+            freeze_id=freeze_id,
+        )
+    except (Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_validation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三反事实 overlay 只读预检：{result.freeze_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("自然轨迹", str(result.natural_trace_count))
+    table.add_row("反事实轨迹", str(result.counterfactual_trace_count))
+    table.add_row("配对研究轨迹合计", str(result.combined_trace_count))
+    table.add_row("父 Fixture（不计入分母）", str(result.parent_count))
+    table.add_row("自然 freeze", result.natural_freeze_id)
+    table.add_row("公开证据 run", result.evidence_run_id)
+    table.add_row("创建目录 / manifest", "否")
+    table.add_row("执行候选 / Provider / Docker", "否 / 否 / 否")
+    console.print(table)
+    console.print("[yellow]预检通过不等于正式冻结；本命令没有写入研究产物。[/yellow]")
+
+
+@phase3_app.command("counterfactual-freeze")
+def phase3_counterfactual_freeze(
+    natural_manifest: str = typer.Option(
+        ...,
+        "--natural-manifest",
+        help="已冻结且只含自然轨迹的阶段三 manifest.json",
+    ),
+    execution_run: str = typer.Option(
+        ...,
+        "--execution-run",
+        help="已完成的公开 Fixture 独立证据 run 目录",
+    ),
+    freeze_id: str = typer.Option(
+        ...,
+        "--freeze-id",
+        help="反事实 overlay 冻结 ID；已有同名目录时拒绝覆盖",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="与执行证据完全相同的公开反事实源 bundle",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-freezes",
+        "--output-dir",
+        help="只含白名单反事实 overlay manifest 的目录父路径",
+    ),
+) -> None:
+    """Gate B：原子冻结自然集引用、15 条反事实和各自功能证据。"""
+
+    try:
+        result = freeze_counterfactual_cohort(
+            natural_manifest_path=natural_manifest,
+            source_bundle_path=source_bundle,
+            execution_run_dir=execution_run,
+            output_dir=output_dir,
+            freeze_id=freeze_id,
+        )
+    except (Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_validation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三反事实 overlay 冻结：{result.freeze_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("冻结自然轨迹引用", str(result.natural_trace_count))
+    table.add_row("冻结反事实轨迹", str(result.counterfactual_trace_count))
+    table.add_row("五方法配对轨迹合计", str(result.combined_trace_count))
+    table.add_row("父 Fixture（不计入分母）", str(result.parent_count))
+    table.add_row("公开 manifest SHA256", result.manifest_sha256)
+    table.add_row("本命令执行候选 / Provider / Docker", "否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(
+        "[yellow]该 overlay 只完成 Gate B 研究集冻结；尚未运行五种方法，不构成阶段三结果。[/yellow]"
+    )
+
+
+@phase3_app.command("paired-preflight")
+def phase3_paired_preflight(
+    cohort_manifest: str = typer.Option(
+        ...,
+        "--cohort-manifest",
+        help="Gate B 已冻结的自然 + 反事实 overlay manifest.json",
+    ),
+    natural_manifest: str = typer.Option(
+        ...,
+        "--natural-manifest",
+        help="overlay 精确引用的自然轨迹 manifest.json",
+    ),
+    provider: str = typer.Option(
+        "mock",
+        "--provider",
+        help="拟冻结的 Judge Provider 公开名称；预检不会连接它",
+    ),
+    model: str = typer.Option(
+        "deterministic-phase3-mock-v1",
+        "--model",
+        help="拟冻结的 Judge 模型名称；预检不会连接它",
+    ),
+    temperature: float = typer.Option(
+        0.0,
+        "--temperature",
+        min=0.0,
+        max=2.0,
+        help="四个 LLM 方法共用的拟冻结 temperature",
+    ),
+    timeout_seconds: float = typer.Option(
+        120.0,
+        "--timeout-seconds",
+        min=1.0,
+        max=600.0,
+        help="每次 Judge 调用的拟冻结超时",
+    ),
+) -> None:
+    """Gate C：只读验证同一 cohort 的五方法配对计划。"""
+
+    try:
+        result = preflight_paired_interface(
+            overlay_manifest_path=cohort_manifest,
+            natural_manifest_path=natural_manifest,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+        )
+    except (Phase3RunnerError, OSError, ValueError) as exc:
+        _render_phase3_interface_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三五方法配对只读预检：{result.freeze_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("自然轨迹", str(result.natural_trace_count))
+    table.add_row("反事实轨迹", str(result.counterfactual_trace_count))
+    table.add_row(
+        "冻结轨迹 / 方法 / 配对",
+        f"{result.trace_count} / {result.method_count} / {result.pair_count}",
+    )
+    table.add_row("Judge Provider / 模型", f"{result.provider} / {result.model}")
+    table.add_row("方法规格 SHA256", result.method_specs_sha256)
+    table.add_row("Prompt bundle SHA256", result.prompt_bundle_sha256)
+    table.add_row("输出 schema SHA256", result.output_schema_sha256)
+    table.add_row("创建目录 / 运行方法", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]该命令只校验 Gate C 接口身份；不会读取方法输入正文，也不构成方法运行结果。[/yellow]"
+    )
+
+
+@phase3_app.command("certificate-preflight")
+def phase3_certificate_preflight(
+    run_id: str = typer.Option(
+        ...,
+        "--run-id",
+        help="拟使用的 Gate D 公开证书工程 Fixture run ID",
+    ),
+    cohort_manifest: str = typer.Option(
+        ...,
+        "--cohort-manifest",
+        help="Gate B 已冻结的自然 + 反事实 overlay manifest.json",
+    ),
+    natural_manifest: str = typer.Option(
+        ...,
+        "--natural-manifest",
+        help="overlay 精确引用的自然轨迹 manifest.json",
+    ),
+    execution_run: str = typer.Option(
+        ...,
+        "--execution-run",
+        help="Gate B 已完成的公开 Fixture 独立证据 run 目录",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="SHA256 精确白名单化的公开反事实源 bundle",
+    ),
+    claims_bundle: str = typer.Option(
+        DEFAULT_PHASE3_CERTIFICATE_CLAIMS,
+        "--claims-bundle",
+        help="覆盖三等级证书的公开工程 claim bundle",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-public-certificates",
+        "--output-dir",
+        help="拟使用的公开证书目录父路径；预检不会创建它",
+    ),
+) -> None:
+    """Gate D：只读验证三等级公开证书输入和哈希，不执行代码。"""
+
+    try:
+        result = preflight_public_certificates(
+            run_id=run_id,
+            cohort_manifest_path=cohort_manifest,
+            natural_manifest_path=natural_manifest,
+            source_bundle_path=source_bundle,
+            execution_run_dir=execution_run,
+            claims_bundle_path=claims_bundle,
+            output_dir=output_dir,
+        )
+    except (Phase3PublicEvidenceError, Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_public_evidence_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三公开证书只读预检：{result.run_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("公开工程证书", str(result.certificate_count))
+    table.add_row(
+        "confirmed / strong / unverified",
+        f"{result.confirmed_bug_count} / {result.strongly_supported_count} / "
+        f"{result.unverified_suspicion_count}",
+    )
+    table.add_row("公开证据 run", result.public_evidence_run_id)
+    table.add_row("Claim bundle SHA256", result.claims_bundle_sha256)
+    table.add_row("证书策略 SHA256", result.certificate_policy_sha256)
+    table.add_row("证书 payloads SHA256", result.certificate_payloads_sha256)
+    table.add_row("创建目录 / 写证书", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]该预检只验证 Gate D 工程 Fixture；三等级覆盖不是五方法研究结果。[/yellow]"
+    )
+
+
+@phase3_app.command("certificate-generate")
+def phase3_certificate_generate(
+    run_id: str = typer.Option(..., "--run-id", help="Gate D 公开证书 run ID"),
+    cohort_manifest: str = typer.Option(
+        ...,
+        "--cohort-manifest",
+        help="Gate B 已冻结的自然 + 反事实 overlay manifest.json",
+    ),
+    natural_manifest: str = typer.Option(
+        ...,
+        "--natural-manifest",
+        help="overlay 精确引用的自然轨迹 manifest.json",
+    ),
+    execution_run: str = typer.Option(
+        ...,
+        "--execution-run",
+        help="Gate B 已完成的公开 Fixture 独立证据 run 目录",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="SHA256 精确白名单化的公开反事实源 bundle",
+    ),
+    claims_bundle: str = typer.Option(
+        DEFAULT_PHASE3_CERTIFICATE_CLAIMS,
+        "--claims-bundle",
+        help="覆盖三等级证书的公开工程 claim bundle",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-public-certificates",
+        "--output-dir",
+        help="公开证书目录父路径；同名 run 拒绝覆盖",
+    ),
+) -> None:
+    """Gate D：原子生成三等级公开脱敏工程证书，不执行候选代码。"""
+
+    try:
+        result = generate_public_certificates(
+            run_id=run_id,
+            cohort_manifest_path=cohort_manifest,
+            natural_manifest_path=natural_manifest,
+            source_bundle_path=source_bundle,
+            execution_run_dir=execution_run,
+            claims_bundle_path=claims_bundle,
+            output_dir=output_dir,
+        )
+    except (Phase3PublicEvidenceError, Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_public_evidence_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三公开工程证书：{result.run_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("公开工程证书", str(result.certificate_count))
+    table.add_row(
+        "confirmed / strong / unverified",
+        f"{result.confirmed_bug_count} / {result.strongly_supported_count} / "
+        f"{result.unverified_suspicion_count}",
+    )
+    table.add_row("公开 manifest SHA256", result.manifest_sha256)
+    table.add_row("证书 payloads SHA256", result.certificate_payloads_sha256)
+    table.add_row("本命令执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    for certificate_path in result.certificate_paths:
+        console.print(f"[dim]certificate: {certificate_path}[/dim]")
+    console.print(
+        "[yellow]这些是公开工程 Fixture 证书；confirmed 证书仍须用 phase3 replay 独立重放。[/yellow]"
+    )
+
+
+@phase3_app.command("replay")
+def phase3_replay(
+    certificate: str = typer.Option(
+        ...,
+        "--certificate",
+        help="certificate-generate 产生的单个 confirmed_bug JSON 证书",
+    ),
+    cohort_manifest: str = typer.Option(
+        ...,
+        "--cohort-manifest",
+        help="证书绑定的自然 + 反事实 overlay manifest.json",
+    ),
+    natural_manifest: str = typer.Option(
+        ...,
+        "--natural-manifest",
+        help="overlay 精确引用的自然轨迹 manifest.json",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="证书绑定的 SHA256 精确白名单公开源 bundle",
+    ),
+    per_test_timeout_seconds: float = typer.Option(
+        2.0,
+        "--per-test-timeout-seconds",
+        min=0.1,
+        max=10.0,
+        help="单个公开重放用例的父进程强制超时",
+    ),
+) -> None:
+    """Gate D：只执行证书绑定的单个精确白名单公开 Fixture 反例。"""
+
+    try:
+        result = replay_public_certificate(
+            certificate_path=certificate,
+            cohort_manifest_path=cohort_manifest,
+            natural_manifest_path=natural_manifest,
+            source_bundle_path=source_bundle,
+            per_test_timeout_seconds=per_test_timeout_seconds,
+        )
+    except (Phase3PublicEvidenceError, Phase3FreezeError, OSError, ValueError) as exc:
+        _render_phase3_public_evidence_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三公开错误证书重放：{result.certificate_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("Trace / Problem", f"{result.trace_id} / {result.problem_id}")
+    table.add_row("重现证书失败", "是" if result.reproduced_failure else "否")
+    table.add_row("证据哈希一致", "是" if result.verified else "否")
+    table.add_row("执行公开用例", str(result.executed_case_count))
+    table.add_row("公开执行证据 SHA256", result.execution_evidence_sha256)
+    table.add_row("执行 Provider / Docker / 网络", "否 / 否 / 否")
+    table.add_row("受限本地精确白名单执行", "是")
+    console.print(table)
+
+
+@phase3_app.command("annotation-packet-preflight")
+def phase3_annotation_packet_preflight(
+    packet_id: str = typer.Option(..., "--packet-id", help="拟创建的盲法标注包 ID"),
+    rater_id: str = typer.Option(..., "--rater-id", help="不含姓名或联系方式的稳定标注者 ID"),
+    annotation_round: int = typer.Option(
+        1,
+        "--annotation-round",
+        min=1,
+        help="独立标注轮次；主标注通常为 1",
+    ),
+    blinded_to_other_raters: bool = typer.Option(
+        True,
+        "--blinded-to-other-raters/--not-blinded-to-other-raters",
+        help="标注者是否看不到其他标注者标签",
+    ),
+    cohort_manifest: str = typer.Option(
+        ...,
+        "--cohort-manifest",
+        help="Gate B 自然 + 反事实 overlay manifest.json",
+    ),
+    natural_manifest: str = typer.Option(
+        ...,
+        "--natural-manifest",
+        help="overlay 精确引用的自然轨迹 manifest.json",
+    ),
+    phase1_run: str = typer.Option(
+        ...,
+        "--phase1-run",
+        help="冻结自然轨迹对应的阶段一 run",
+    ),
+    phase2_run: str = typer.Option(
+        ...,
+        "--phase2-run",
+        help="冻结自然轨迹对应的阶段二安全 run",
+    ),
+    dataset_manifest: str = typer.Option(
+        ...,
+        "--dataset-manifest",
+        help="阶段一 research-natural 公开投影 manifest",
+    ),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+        help="Gate B 精确冻结的公开反事实源",
+    ),
+    execution_run: str = typer.Option(
+        ...,
+        "--execution-run",
+        help="Gate B 公开 Fixture 功能证据 run",
+    ),
+    protocol: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_PROTOCOL,
+        "--protocol",
+        help="Gate E 冻结标注协议 JSON",
+    ),
+    guide: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_GUIDE,
+        "--guide",
+        help="Gate E 冻结标注指南 Markdown",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-annotations",
+        "--output-dir",
+        help="拟写入的 Git-ignored 私有标注包根目录",
+    ),
+) -> None:
+    """Gate E1：只读验证并哈希盲法标注包，不创建任何文件。"""
+
+    try:
+        result = preflight_annotation_packet(
+            packet_id=packet_id,
+            rater_id=rater_id,
+            annotation_round=annotation_round,
+            blinded_to_other_raters=blinded_to_other_raters,
+            cohort_manifest_path=cohort_manifest,
+            natural_manifest_path=natural_manifest,
+            phase1_run_dir=phase1_run,
+            phase2_run_dir=phase2_run,
+            dataset_manifest_path=dataset_manifest,
+            source_bundle_path=source_bundle,
+            execution_run_dir=execution_run,
+            protocol_path=protocol,
+            guide_path=guide,
+            output_dir=output_dir,
+        )
+    except (
+        Phase3AnnotationError,
+        Phase3FreezeError,
+        Phase3RunnerError,
+        OSError,
+        ValueError,
+    ) as exc:
+        _render_phase3_annotation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三盲法标注包只读预检：{result.packet_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.natural_item_count} / {result.counterfactual_item_count} / {result.item_count}",
+    )
+    table.add_row("标注者 / 轮次", f"{result.rater_id} / {result.annotation_round}")
+    table.add_row("标注协议 SHA256", result.annotation_protocol_sha256)
+    table.add_row("标注指南 SHA256", result.annotation_guide_sha256)
+    table.add_row("材料 payloads SHA256", result.material_payloads_sha256)
+    table.add_row("盲法 packet SHA256", result.packet_sha256)
+    table.add_row("身份映射 SHA256", result.identity_map_sha256)
+    table.add_row("标签模板 SHA256", result.labels_template_sha256)
+    table.add_row("创建目录 / 写入标注包", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]该命令会只读绑定候选正文以计算盲法包哈希，但不会打印正文、方法预测、"
+        "反事实注错元数据或隐藏评测内容。[/yellow]"
+    )
+
+
+@phase3_app.command("annotation-packet-export")
+def phase3_annotation_packet_export(
+    packet_id: str = typer.Option(..., "--packet-id", help="盲法标注包 ID"),
+    rater_id: str = typer.Option(..., "--rater-id", help="不含姓名或联系方式的稳定标注者 ID"),
+    annotation_round: int = typer.Option(
+        1,
+        "--annotation-round",
+        min=1,
+        help="独立标注轮次；主标注通常为 1",
+    ),
+    blinded_to_other_raters: bool = typer.Option(
+        True,
+        "--blinded-to-other-raters/--not-blinded-to-other-raters",
+        help="标注者是否看不到其他标注者标签",
+    ),
+    cohort_manifest: str = typer.Option(..., "--cohort-manifest"),
+    natural_manifest: str = typer.Option(..., "--natural-manifest"),
+    phase1_run: str = typer.Option(..., "--phase1-run"),
+    phase2_run: str = typer.Option(..., "--phase2-run"),
+    dataset_manifest: str = typer.Option(..., "--dataset-manifest"),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+    ),
+    execution_run: str = typer.Option(..., "--execution-run"),
+    protocol: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_PROTOCOL,
+        "--protocol",
+    ),
+    guide: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_GUIDE,
+        "--guide",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-annotations",
+        "--output-dir",
+    ),
+) -> None:
+    """Gate E1：原子写入私有盲法标注包、身份映射和未填写模板。"""
+
+    try:
+        result = export_annotation_packet(
+            packet_id=packet_id,
+            rater_id=rater_id,
+            annotation_round=annotation_round,
+            blinded_to_other_raters=blinded_to_other_raters,
+            cohort_manifest_path=cohort_manifest,
+            natural_manifest_path=natural_manifest,
+            phase1_run_dir=phase1_run,
+            phase2_run_dir=phase2_run,
+            dataset_manifest_path=dataset_manifest,
+            source_bundle_path=source_bundle,
+            execution_run_dir=execution_run,
+            protocol_path=protocol,
+            guide_path=guide,
+            output_dir=output_dir,
+        )
+    except (
+        Phase3AnnotationError,
+        Phase3FreezeError,
+        Phase3RunnerError,
+        OSError,
+        ValueError,
+    ) as exc:
+        _render_phase3_annotation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三私有盲法标注包：{result.packet_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.natural_item_count} / {result.counterfactual_item_count} / {result.item_count}",
+    )
+    table.add_row("标注者 / 轮次", f"{result.rater_id} / {result.annotation_round}")
+    table.add_row("标注包 manifest SHA256", result.manifest_sha256)
+    table.add_row("盲法 packet SHA256", result.packet_sha256)
+    table.add_row("身份映射 SHA256", result.identity_map_sha256)
+    table.add_row("标签模板 SHA256", result.labels_template_sha256)
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]packet: {result.packet_path}[/dim]")
+    console.print(f"[dim]coordinator identity map: {result.identity_map_path}[/dim]")
+    console.print(f"[dim]labels template: {result.labels_template_path}[/dim]")
+    console.print(
+        "[yellow]该目录为 Git-ignored 私有标注材料；identity_map 仅供协调者保管，"
+        "不得交给独立标注者。模板尚未填写，不构成人工标签。[/yellow]"
+    )
+
+
+@phase3_app.command("annotation-labels-check")
+def phase3_annotation_labels_check(
+    packet_run: str = typer.Option(
+        ...,
+        "--packet-run",
+        help="Gate E1 正式私有盲法标注包目录",
+    ),
+    packet_manifest_sha256: str = typer.Option(
+        ...,
+        "--packet-manifest-sha256",
+        help="Gate E1 导出时记录的 manifest SHA256",
+    ),
+    labels: str = typer.Option(
+        ...,
+        "--labels",
+        help="仅含 opaque item ID 的标注 working JSONL",
+    ),
+    protocol: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_PROTOCOL,
+        "--protocol",
+    ),
+    guide: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_GUIDE,
+        "--guide",
+    ),
+) -> None:
+    """Gate E2：只读检查标注进度，不打开协调者 identity map。"""
+
+    try:
+        result = check_annotation_labels(
+            packet_run_dir=packet_run,
+            expected_packet_manifest_sha256=packet_manifest_sha256,
+            completed_labels_path=labels,
+            protocol_path=protocol,
+            guide_path=guide,
+        )
+    except (Phase3AnnotationError, OSError, ValueError) as exc:
+        _render_phase3_annotation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三盲法标注进度：{result.packet_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("预期条目", str(result.expected_item_count))
+    table.add_row("已完成 / 待标注", f"{result.completed_count} / {result.pending_count}")
+    table.add_row(
+        "无效 / 缺失 / 额外 / 顺序偏差",
+        f"{result.invalid_count} / {result.missing_item_count} / "
+        f"{result.extra_line_count} / {result.order_mismatch_count}",
+    )
+    table.add_row("Working labels SHA256", result.working_labels_sha256)
+    table.add_row("可进入冻结预检", "是" if result.ready_to_freeze else "否")
+    table.add_row("读取 identity map / 写入文件", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    if result.invalid_line_numbers:
+        line_numbers = ", ".join(str(value) for value in result.invalid_line_numbers)
+        console.print(f"[yellow]无效行号：{line_numbers}[/yellow]")
+    console.print(
+        "[yellow]本命令只报告完成度和结构问题；不读取身份映射，"
+        "不计算人工标签分布或方法结果。[/yellow]"
+    )
+
+
+def _phase3_annotation_labels_freeze_preflight_impl(
+    *,
+    annotation_set_id: str,
+    packet_run: str,
+    packet_manifest_sha256: str,
+    labels: str,
+    cohort_manifest: str,
+    natural_manifest: str,
+    protocol: str,
+    guide: str,
+    output_dir: str,
+):
+    return preflight_annotation_labels_freeze(
+        annotation_set_id=annotation_set_id,
+        packet_run_dir=packet_run,
+        expected_packet_manifest_sha256=packet_manifest_sha256,
+        completed_labels_path=labels,
+        cohort_manifest_path=cohort_manifest,
+        natural_manifest_path=natural_manifest,
+        protocol_path=protocol,
+        guide_path=guide,
+        output_dir=output_dir,
+    )
+
+
+@phase3_app.command("annotation-labels-freeze-preflight")
+def phase3_annotation_labels_freeze_preflight(
+    annotation_set_id: str = typer.Option(..., "--annotation-set-id"),
+    packet_run: str = typer.Option(..., "--packet-run"),
+    packet_manifest_sha256: str = typer.Option(..., "--packet-manifest-sha256"),
+    labels: str = typer.Option(..., "--labels"),
+    cohort_manifest: str = typer.Option(..., "--cohort-manifest"),
+    natural_manifest: str = typer.Option(..., "--natural-manifest"),
+    protocol: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_PROTOCOL,
+        "--protocol",
+    ),
+    guide: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_GUIDE,
+        "--guide",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-labels",
+        "--output-dir",
+    ),
+) -> None:
+    """Gate E2：完整标签才能只读回连身份并核算冻结哈希。"""
+
+    try:
+        result = _phase3_annotation_labels_freeze_preflight_impl(
+            annotation_set_id=annotation_set_id,
+            packet_run=packet_run,
+            packet_manifest_sha256=packet_manifest_sha256,
+            labels=labels,
+            cohort_manifest=cohort_manifest,
+            natural_manifest=natural_manifest,
+            protocol=protocol,
+            guide=guide,
+            output_dir=output_dir,
+        )
+    except (Phase3AnnotationError, Phase3RunnerError, OSError, ValueError) as exc:
+        _render_phase3_annotation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三人工标签冻结只读预检：{result.annotation_set_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.natural_trace_count} / {result.counterfactual_trace_count} / "
+        f"{result.record_count}",
+    )
+    table.add_row("标注者 / 轮次", f"{result.rater_id} / {result.annotation_round}")
+    table.add_row("标注协议 SHA256", result.annotation_protocol_sha256)
+    table.add_row("源 packet manifest SHA256", result.source_packet_manifest_sha256)
+    table.add_row("完成标签 SHA256", result.completed_labels_sha256)
+    table.add_row("回连标注记录 SHA256", result.annotation_records_sha256)
+    table.add_row("创建目录 / 写入冻结集", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]该预检仅在 57 条全部完成后读取协调者 identity map；"
+        "不打印身份、标签正负分布或理由。[/yellow]"
+    )
+
+
+@phase3_app.command("annotation-labels-freeze")
+def phase3_annotation_labels_freeze(
+    annotation_set_id: str = typer.Option(..., "--annotation-set-id"),
+    packet_run: str = typer.Option(..., "--packet-run"),
+    packet_manifest_sha256: str = typer.Option(..., "--packet-manifest-sha256"),
+    labels: str = typer.Option(..., "--labels"),
+    cohort_manifest: str = typer.Option(..., "--cohort-manifest"),
+    natural_manifest: str = typer.Option(..., "--natural-manifest"),
+    protocol: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_PROTOCOL,
+        "--protocol",
+    ),
+    guide: str = typer.Option(
+        DEFAULT_PHASE3_ANNOTATION_GUIDE,
+        "--guide",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-labels",
+        "--output-dir",
+    ),
+) -> None:
+    """Gate E2：原子冻结一个完整的私有盲法人工标注集。"""
+
+    try:
+        result = freeze_annotation_labels(
+            annotation_set_id=annotation_set_id,
+            packet_run_dir=packet_run,
+            expected_packet_manifest_sha256=packet_manifest_sha256,
+            completed_labels_path=labels,
+            cohort_manifest_path=cohort_manifest,
+            natural_manifest_path=natural_manifest,
+            protocol_path=protocol,
+            guide_path=guide,
+            output_dir=output_dir,
+        )
+    except (Phase3AnnotationError, Phase3RunnerError, OSError, ValueError) as exc:
+        _render_phase3_annotation_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三私有人工标注冻结集：{result.annotation_set_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.natural_trace_count} / {result.counterfactual_trace_count} / "
+        f"{result.record_count}",
+    )
+    table.add_row("标注者 / 轮次", f"{result.rater_id} / {result.annotation_round}")
+    table.add_row("私有 manifest SHA256", result.manifest_sha256)
+    table.add_row("完成标签 SHA256", result.completed_labels_sha256)
+    table.add_row("回连标注记录 SHA256", result.annotation_records_sha256)
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]completed labels: {result.completed_labels_path}[/dim]")
+    console.print(f"[dim]annotation records: {result.annotation_records_path}[/dim]")
+    console.print(
+        "[yellow]该目录为 Git-ignored 私有人工标签；尚未执行五种方法，"
+        "agreement_kind 仍为 not_computed。[/yellow]"
+    )
+
+
+def _phase3_evaluation_arguments(
+    *,
+    run_id: str,
+    cohort_manifest: str,
+    natural_manifest: str,
+    annotation_set_manifest: str,
+    annotation_set_manifest_sha256: str,
+    phase1_run: str,
+    phase2_run: str,
+    dataset_manifest: str,
+    source_bundle: str,
+    execution_run: str,
+    protocol: str,
+    guide: str,
+    provider: str,
+    model: str,
+    temperature: float,
+    timeout_seconds: float,
+    output_dir: str,
+    resume: bool,
+    allow_dirty: bool,
+) -> dict[str, object]:
+    return {
+        "run_id": run_id,
+        "cohort_manifest_path": cohort_manifest,
+        "natural_manifest_path": natural_manifest,
+        "annotation_set_manifest_path": annotation_set_manifest,
+        "expected_annotation_set_manifest_sha256": annotation_set_manifest_sha256,
+        "phase1_run_dir": phase1_run,
+        "phase2_run_dir": phase2_run,
+        "dataset_manifest_path": dataset_manifest,
+        "source_bundle_path": source_bundle,
+        "execution_run_dir": execution_run,
+        "protocol_path": protocol,
+        "guide_path": guide,
+        "provider": provider,
+        "model": model,
+        "temperature": temperature,
+        "timeout_seconds": timeout_seconds,
+        "output_dir": output_dir,
+        "resume": resume,
+        "allow_dirty": allow_dirty,
+        "random_seed": PHASE3_EVALUATION_RANDOM_SEED,
+        "settings": None,
+        "privacy_canaries": (),
+    }
+
+
+@phase3_app.command("evaluate-preflight")
+def phase3_evaluate_preflight(
+    run_id: str = typer.Option(..., "--run-id"),
+    cohort_manifest: str = typer.Option(..., "--cohort-manifest"),
+    natural_manifest: str = typer.Option(..., "--natural-manifest"),
+    annotation_set_manifest: str = typer.Option(..., "--annotation-set-manifest"),
+    annotation_set_manifest_sha256: str = typer.Option(
+        ...,
+        "--annotation-set-manifest-sha256",
+    ),
+    phase1_run: str = typer.Option(..., "--phase1-run"),
+    phase2_run: str = typer.Option(..., "--phase2-run"),
+    dataset_manifest: str = typer.Option(..., "--dataset-manifest"),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+    ),
+    execution_run: str = typer.Option(..., "--execution-run"),
+    protocol: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_PROTOCOL, "--protocol"),
+    guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--guide"),
+    provider: str = typer.Option("hy3", "--provider"),
+    model: str = typer.Option(..., "--model"),
+    temperature: float = typer.Option(0.0, "--temperature", min=0.0, max=2.0),
+    timeout_seconds: float = typer.Option(
+        120.0,
+        "--timeout-seconds",
+        min=1.0,
+        max=600.0,
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-runs",
+        "--output-dir",
+    ),
+    resume: bool = typer.Option(False, "--resume"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty"),
+) -> None:
+    """Gate E3：只读绑定冻结标签、方法材料、Provider 与恢复身份。"""
+
+    arguments = _phase3_evaluation_arguments(
+        run_id=run_id,
+        cohort_manifest=cohort_manifest,
+        natural_manifest=natural_manifest,
+        annotation_set_manifest=annotation_set_manifest,
+        annotation_set_manifest_sha256=annotation_set_manifest_sha256,
+        phase1_run=phase1_run,
+        phase2_run=phase2_run,
+        dataset_manifest=dataset_manifest,
+        source_bundle=source_bundle,
+        execution_run=execution_run,
+        protocol=protocol,
+        guide=guide,
+        provider=provider,
+        model=model,
+        temperature=temperature,
+        timeout_seconds=timeout_seconds,
+        output_dir=output_dir,
+        resume=resume,
+        allow_dirty=allow_dirty,
+    )
+    try:
+        result = preflight_phase3_evaluation(**arguments)
+    except (Phase3RunnerError, OSError, ValueError) as exc:
+        _render_phase3_interface_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"阶段三五方法正式运行只读预检：{result.run_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.natural_trace_count} / {result.counterfactual_trace_count} / "
+        f"{result.trace_count}",
+    )
+    table.add_row(
+        "轨迹 / 方法 / 配对", f"{result.trace_count} / {result.method_count} / {result.pair_count}"
+    )
+    table.add_row(
+        "Provider 配对 / 最大 Provider 调用",
+        f"{result.provider_pair_count} / {result.maximum_provider_call_count}",
+    )
+    table.add_row("Judge Provider / 模型", f"{result.provider} / {result.model}")
+    table.add_row("人工标签集", result.annotation_set_id)
+    table.add_row("人工标签 manifest SHA256", result.annotation_set_manifest_sha256)
+    table.add_row("方法材料 SHA256", result.material_payloads_sha256)
+    table.add_row("方法规格 SHA256", result.method_specs_sha256)
+    table.add_row("Provider 配置 SHA256", result.provider_config_sha256)
+    table.add_row("Resume identity SHA256", result.resume_identity_sha256)
+    table.add_row(
+        "Git commit / 分支 / dirty",
+        f"{result.git_commit} / {result.git_branch} / {result.git_dirty}",
+    )
+    table.add_row("创建目录 / 写入产物", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]该预检只核算正式运行身份；不打印人工标签内容或分布，也不连接 Hy3。[/yellow]"
+    )
+
+
+@phase3_app.command("evaluate")
+def phase3_evaluate(
+    run_id: str = typer.Option(..., "--run-id"),
+    cohort_manifest: str = typer.Option(..., "--cohort-manifest"),
+    natural_manifest: str = typer.Option(..., "--natural-manifest"),
+    annotation_set_manifest: str = typer.Option(..., "--annotation-set-manifest"),
+    annotation_set_manifest_sha256: str = typer.Option(
+        ...,
+        "--annotation-set-manifest-sha256",
+    ),
+    phase1_run: str = typer.Option(..., "--phase1-run"),
+    phase2_run: str = typer.Option(..., "--phase2-run"),
+    dataset_manifest: str = typer.Option(..., "--dataset-manifest"),
+    source_bundle: str = typer.Option(
+        DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE,
+        "--source-bundle",
+    ),
+    execution_run: str = typer.Option(..., "--execution-run"),
+    protocol: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_PROTOCOL, "--protocol"),
+    guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--guide"),
+    provider: str = typer.Option("hy3", "--provider"),
+    model: str = typer.Option(..., "--model"),
+    temperature: float = typer.Option(0.0, "--temperature", min=0.0, max=2.0),
+    timeout_seconds: float = typer.Option(
+        120.0,
+        "--timeout-seconds",
+        min=1.0,
+        max=600.0,
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase3-runs",
+        "--output-dir",
+    ),
+    resume: bool = typer.Option(False, "--resume"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty"),
+    confirm_real_provider: bool = typer.Option(False, "--confirm-real-provider"),
+) -> None:
+    """Gate E3：显式确认后执行同一 57×5 冻结配对积。"""
+
+    arguments = _phase3_evaluation_arguments(
+        run_id=run_id,
+        cohort_manifest=cohort_manifest,
+        natural_manifest=natural_manifest,
+        annotation_set_manifest=annotation_set_manifest,
+        annotation_set_manifest_sha256=annotation_set_manifest_sha256,
+        phase1_run=phase1_run,
+        phase2_run=phase2_run,
+        dataset_manifest=dataset_manifest,
+        source_bundle=source_bundle,
+        execution_run=execution_run,
+        protocol=protocol,
+        guide=guide,
+        provider=provider,
+        model=model,
+        temperature=temperature,
+        timeout_seconds=timeout_seconds,
+        output_dir=output_dir,
+        resume=resume,
+        allow_dirty=allow_dirty,
+    )
+    try:
+        result = asyncio.run(
+            execute_phase3_evaluation(
+                confirm_real_provider=confirm_real_provider,
+                **arguments,
+            )
+        )
+    except (Phase3RunnerError, OSError, ValueError) as exc:
+        _render_phase3_interface_failure(exc)
+        raise typer.Exit(code=1) from exc
+
+    run = result.run
+    status_summary = ", ".join(
+        f"{status.value}={count}" for status, count in run.status_counts.items() if count
+    )
+    table = Table(title=f"阶段三五方法正式配对运行：{run.run_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("完整配对", str(run.result_count))
+    table.add_row("恢复复用", str(run.reused_count))
+    table.add_row("结果状态", status_summary or "none")
+    table.add_row("公开 results SHA256", run.results_sha256)
+    table.add_row("公开 index SHA256", run.index_sha256)
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 是 / 否 / 是")
+    console.print(table)
+    console.print(f"[dim]manifest: {run.manifest_path}[/dim]")
+    console.print(f"[dim]results: {run.results_path}[/dim]")
+    console.print(f"[dim]index: {run.index_path}[/dim]")
+    console.print("[yellow]该运行保留全部失败与 285 配对分母；尚未计算人工标签对比统计。[/yellow]")
 
 
 def _render_result(result: PipelineResult) -> None:

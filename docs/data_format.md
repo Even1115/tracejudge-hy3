@@ -333,6 +333,108 @@ summary 从脱敏逐题记录重建，主要包含阶段一来源题数、成功
 
 `execution.log` 只是最多 64 KiB 的基础设施事件 JSONL；不保存 Docker/EvalPlus stdout/stderr 原文或失败输入，仅允许时间、题号、耗时、安全错误类别、输出字节数/SHA256、退出码和清理状态等白名单字段。
 
+## 阶段三 Gate A/B 契约与自然/反事实冻结产物
+
+阶段三契约位于 `tracejudge_hy3.phase3.contracts`，完整研究协议见 [`docs/experiments/phase3_protocol.md`](experiments/phase3_protocol.md)。Gate A 定义 schema 与离线隐私/哈希校验；Gate B 的 `tracejudge phase3 preflight` 完成全链路只读校验和内存 manifest 构造但不写文件，`tracejudge phase3 freeze` 在相同校验通过后原子生成一个只含白名单字段的自然轨迹 manifest。失败输出只含固定安全阶段码，不回显内部异常内容。
+
+### `FrozenCohortManifest`
+
+冻结 manifest 的核心字段包括：
+
+- `phase1` / `phase2`：上游 run ID 及安全 bundle 文件 SHA256；
+- `source_accounting` / `source_outcomes`：保留 45 条来源的 `success`、`parse_error`、`provider_error` 完整核算；
+- `selection_rule`：在方法预测和人工标签前冻结的纳入、备用和停止规则；
+- `traces` / `ordered_trace_ids`：顺序必须完全一致；
+- `paired_method_ids`：按固定顺序声明 Test-only、Direct LLM Judge、四层结构化 Judge、四层 + AST、完整 TraceJudge；Prompt、模型和方法参数到 Gate C 的运行计划再冻结；
+- `privacy_policy_version`：公共 writer 使用的白名单/阻断策略版本。
+
+自然轨迹通过 `Phase1ResponseReference` 绑定阶段一精确 JSONL 行和 `code_sha256`，通过 `Phase2FunctionalEvidenceRef` 绑定阶段二脱敏结果行及同一代码哈希。反事实通过 `CounterfactualMutation` 绑定 parent、唯一修改和前后哈希；代码变化时禁止 `reuse_same_code`，必须取得独立 EvalPlus 或公开 Fixture 证据。
+
+Gate B 自然冻结目录为：
+
+```text
+artifacts/experiments/phase3-freezes/<freeze_id>/
+└── manifest.json
+```
+
+目录权限为 `0700`、文件为 `0600`，同名目录存在时拒绝覆盖。冻结器会验证阶段一、阶段二和公开数据集的完整身份，但阶段二代码只打开 `manifest.json`、`summary.json`、脱敏 `results.jsonl` 与白名单 `execution.log`；不会打开 `samples.jsonl` 或 `evalplus_raw_results.json`。输出不含题面正文、候选代码正文、结构化说明正文或 Provider raw，只保存公开数据身份、顺序、状态、逐行引用和 SHA256。
+
+### 公开反事实源、独立证据与 overlay
+
+公开反事实源为 `data/phase3/public_counterfactuals_v1.json`，`kind` 固定为 `tracejudge_phase3_public_counterfactual_source`，精确文件 SHA256 固定为 `a6195fb0867c69607bfa7a346b8112c49dfbe4d9d85700e2238d5bb1e22731df`。它包含 3 个不计入研究分母的公开父 Fixture，以及按 `reasoning_swap`、`code_defect`、`boundary_deletion`、`shortcut`、`equivalent_implementation` type-major 顺序排列的 15 条反事实。每类恰有 3 条；同一父题每类最多一条。reasoning 变体必须保持代码字节完全相同且只改变结构化说明；其余四类必须保持说明完全相同、只改变代码，并为每个变体使用唯一代码字节。
+
+`phase3 counterfactual-execute` 不接受任意 source：只有上述精确 SHA256 可进入 `TrustedLocalSandbox`。执行主体是 3 个父代码和 12 个改码变体；3 个 reasoning 变体不重复执行，而是复用父版本的同代码证据。执行 bundle 为：
+
+```text
+artifacts/experiments/phase3-public-evidence/<execution_run_id>/
+├── manifest.json
+└── results.jsonl
+```
+
+`PublicFixtureExecutionManifest` 固定 source bundle、15 个执行主体顺序、每个主体的 `code_sha256` / `public_fixture_sha256` / `replay_spec_sha256`、预期状态及 `results.jsonl` 哈希。每个 `PublicFixtureExecutionResult` 保存公开 case 的 expected/actual/异常类型、通过标记和关联需求，但不保存代码正文、stdout/stderr、异常消息或耗时；冻结校验会根据源 Fixture 重新核对 case 顺序、expected、关联需求和 pass 语义。timeout、基础设施错误、任一预期影响不一致或记录篡改都会阻断 overlay 冻结；执行产物本身仍保留真实失败，不自动重试。
+
+`CounterfactualCohortManifest` 是不可变 overlay，而不是改写已冻结自然 manifest。它包含：
+
+- `natural_cohort`：自然 freeze ID、精确 manifest SHA256、自然轨迹数、原顺序及顺序哈希；
+- `source` / `execution`：公开源和独立执行 bundle 身份；
+- `parents`：只含父 Fixture 的题面/说明/代码哈希及父证据引用，不进入配对分母；
+- `counterfactuals`：15 条 `CounterfactualTrace`，逐条绑定 parent、唯一修改、预期影响、前后哈希和自身功能证据；
+- `paired_ordered_trace_ids`：自然顺序在前、反事实 type-major 顺序在后，并带独立哈希；
+- `paired_method_ids`：固定五种方法顺序。
+
+正式 overlay 已将 42 条自然轨迹与 15 条反事实冻结为 57 条配对研究轨迹；自然和反事实结果仍必须分开汇总。该 evidence run/overlay 只构成 Gate B 功能证据与研究输入，不能表述为五方法已运行或研究假设已验证。
+
+### 方法结果与配对索引
+
+单个方法事件使用 `MethodOutcome`，终态严格区分：
+
+```text
+valid_judgment
+provider_error
+parse_error
+ast_error
+public_execution_timeout
+infrastructure_error
+skipped
+reused
+```
+
+只有 `valid_judgment` 可以带结构化 `judgment`。`reused` 必须引用旧结果行 SHA256；Provider/Judge、AST、公开执行和基础设施错误不得相互伪装。最终 `PairedEvaluationIndex` 必须按 trace-major 顺序列出“全部冻结轨迹 × 五种方法”的每一对，即使该对的状态是失败，也不能漏行。
+
+Gate C 的 `MethodOutcome.usage` 另行保存 `prompt_tokens`、`completion_tokens`、`reported_cost_microusd` 和 `cost_status`。Provider 不报价时 `cost_status=unavailable` 且成本为 `null`，不得把未知成本写成零；Test-only 与 resume 复用行为 `not_applicable`。四个 LLM 方法只接受完整严格 JSON，不从围栏或前后文中抽取局部对象；第二次 Provider 调用只能是首次 schema 失败后的唯一脱敏修复，Provider 错误不自动重试。
+
+### 公开错误证书
+
+`Phase3ErrorCertificate` 使用三个等级：
+
+- `confirmed_bug` 必须有公开反例与 replay 命令；
+- `strongly_supported` 必须有可公开复算的静态证据，且没有可执行反例；
+- `unverified_suspicion` 不得携带可复现证据或 replay 命令。
+
+Gate D 的 `PublicCertificateClaimsBundle` 是明确标记为 `self_constructed_phase3_gate_d_engineering_fixture` 的公开工程输入，固定 SHA256 为 `3b1df5e5a1e43c1b91e626c8656495a03d332bd4a5231550eb88c8928b93bb5f`。三个 claim 分别要求公开执行证据、可复算 AST/对齐规则或仅 Judge claim；生产器依据证据强度得到三个等级，不把 `judge_claim_only` 升级为可复现错误。
+
+`Phase3PublicCertificateManifest` 绑定自然/overlay manifest、公开反事实源、Gate B 公开证据 manifest/results、claim bundle、证书策略、证书顺序、逐证书文件 SHA256 和三等级原始数量。证书文件不保存候选代码、参考实现、stdout/stderr、异常消息、官方测试或隐藏输入。`confirmed_bug` 的执行证据哈希由公开输入、预期/实际结果、异常类型、代码/公开源/replay spec 哈希共同计算；`phase3 replay` 从精确白名单源恢复代码并重新计算同一哈希，而不是执行证书提供的代码。
+
+### Gate E1 盲法标注包
+
+`AnnotationPacketManifest` 绑定 cohort、标注协议/指南、57 条材料组合哈希、固定随机种子、标注者/轮次、opaque item 顺序及三个 JSONL 哈希。`packet.jsonl` 包含标注者可见材料；`identity_map.jsonl` 将 item 连回真实 `trace_id`，仅由协调者保管；`labels_template.jsonl` 只含 `pending` 空字段。三者按精确字节 SHA256 绑定，全部位于 Git-ignored 私有目录。未填写模板不是人工标签，不得进入统计。
+
+`BlindedAnnotationTask` 只保留 opaque `annotation_item_id`、题号与三个来源哈希、公开题面、结构化说明/候选代码、脱敏功能证据和公开动态证据可用性。方法预测、Provider raw、其他标注者标签、反事实修改/预期影响/预期状态、官方隐藏输入和 EvalPlus raw 都在白名单之外。
+
+### Gate E2 人工标签冻结
+
+working JSONL 的每行保留 packet 给定的 `annotation_item_id`、协议/标注者/轮次/盲法元数据和八个标签字段。`status=pending` 时标签字段必须为 `null`；`status=completed` 时 `process_correct`、`has_error`、`reasoning_correct`、`plan_code_aligned` 必须为布尔值，`rationale` 必须非空。`process_correct` 必须与 `has_error` 互为补集；无错误时推理/对齐为真且故障字段全为 `null`，有错误时至少给出首错层级、错误类型和理由。行数、顺序、item ID 和所有元数据必须与 packet 精确一致。
+
+`AnnotationSetManifest` schema v2 仅代表已完成的私有冻结集。它绑定协议/指南/cohort、源 packet manifest/packet/identity map/template、用户 working 文件原始字节、规范化 `completed_labels.jsonl`、trace-major `annotations.jsonl`、标注者/轮次和自然/反事实数量。首轮主标注的 `agreement_kind=not_computed`；不得把单人一轮标记为 inter-rater 或 intra-rater 一致性。
+
+正式 `phase3_labels_primary_round1_v1` 已冻结 57 条。其 manifest、`completed_labels.jsonl`、`annotations.jsonl` 精确 SHA256 分别为 `fbf89aa950318392e49d01a5235461c4ce6ae94acb55842b963bb54048eac0a3`、`17b4e1b43fd2161aff7a0b3d63a7f5f31a89992db9fe75823697d2ac4c32d98d`、`ffbee2c546a6e0f560a96c8c610661258216c9ef627af8ffd3e6ff60ca1e8299`。
+
+公共 payload 发布前必须通过 `assert_public_payload_safe()`；它拒绝 canonical solution、官方测试/失败输入、EvalPlus raw、reference code、Provider raw、请求头、Cookie、token/secret 等敏感字段及调用方 canary，异常消息不回显秘密值。身份哈希使用 `canonical_sha256()`；精确 JSONL 行使用包含末尾 LF 的 `jsonl_record_sha256()`。
+
+### Resume identity
+
+`Phase3ResumeIdentity` 精确绑定 overlay 与自然 manifest、轨迹顺序、方法材料组合哈希、五方法规格、Prompt bundle、输出 schema、完整实现、Provider 公开配置、人工标签 manifest/完成标签/回连记录哈希、Git、Python/依赖、AST、公开证据策略、标注协议和随机种子。clean Git 状态不保存伪造工作树指纹；dirty 状态必须有指纹。Gate B freeze 是不可变的一次性原子发布，不使用 resume。Gate E3 writer 每次 invocation 保存私有 `provider_raw.jsonl` 和通过敏感键/canary 检查的 `results.jsonl`；中断运行的 manifest 保持 `running`，续跑时先将前一 invocation 标为 `interrupted`。新 invocation 对历史已有终态的每一对只写 `reused` 和精确旧行 SHA256，不再调用 Provider；完成时输出完整 57 × 5 索引。
+
 ## 流水线输出 JSON（`artifacts/*.json`）
 
 这是 `run` / `batch` / `demo` 现有完整评估链路的格式，**与上述阶段一基线产物不同**。它由 `reporting/serializer.py:pipeline_result_to_dict()` 生成，顶层字段：`problem` / `solution` / `static_evidence` / `execution_result` / `llm_assessment` / `process_assessment` / `counterexample` / `error_certificate`，均为对应 Pydantic 模型的 `model_dump(mode="json")`。`batch` 命令将多条这样的记录以 JSONL 形式写入同一个文件。

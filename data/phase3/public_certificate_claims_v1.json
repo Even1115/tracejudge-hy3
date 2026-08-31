@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "kind": "tracejudge_phase3_public_certificate_claims",
+  "bundle_id": "phase3_public_certificate_claims_3_v1",
+  "source": "self_constructed_phase3_gate_d_engineering_fixture",
+  "license": "MIT",
+  "claims": [
+    {
+      "claim_id": "gate-d-confirmed-safe-mean-empty-v1",
+      "trace_id": "counterfactual:safe_mean:boundary_deletion:v1",
+      "problem_id": "safe_mean",
+      "violated_requirement_id": "R1",
+      "first_faulty_layer": "implementation",
+      "first_faulty_step": "S1",
+      "code_span": "safe_mean function body",
+      "error_type": "C01_BOUNDARY_ERROR",
+      "claim_summary": "The empty-input guard is absent and the public empty-list challenge raises an exception.",
+      "evidence_mode": "public_execution",
+      "public_case_id": "c1_empty",
+      "static_rule_id": null,
+      "expected_verdict": "confirmed_bug"
+    },
+    {
+      "claim_id": "gate-d-strong-safe-mean-reasoning-v1",
+      "trace_id": "counterfactual:safe_mean:reasoning_swap:v1",
+      "problem_id": "safe_mean",
+      "violated_requirement_id": "R1",
+      "first_faulty_layer": "reasoning",
+      "first_faulty_step": "S1",
+      "code_span": "safe_mean empty-input branch",
+      "error_type": "R01_REQUIREMENT_MISREAD",
+      "claim_summary": "The public explanation claims a different empty-input return literal than the public requirement and code.",
+      "evidence_mode": "public_static_rule",
+      "public_case_id": null,
+      "static_rule_id": "empty_guard_return_literal_mismatch_v1",
+      "expected_verdict": "strongly_supported"
+    },
+    {
+      "claim_id": "gate-d-unverified-safe-mean-equivalent-v1",
+      "trace_id": "counterfactual:safe_mean:equivalent_implementation:v1",
+      "problem_id": "safe_mean",
+      "violated_requirement_id": "R2",
+      "first_faulty_layer": "implementation",
+      "first_faulty_step": "S2",
+      "code_span": "safe_mean accumulation loop",
+      "error_type": "P01_ALGORITHM_ERROR",
+      "claim_summary": "An engineering-only judge claim suspects the accumulation loop but has no reproducible public static or execution evidence.",
+      "evidence_mode": "judge_claim_only",
+      "public_case_id": null,
+      "static_rule_id": null,
+      "expected_verdict": "unverified_suspicion"
+    }
+  ]
+}

@@ -589,9 +589,7 @@ def _load_run(
         label="paired results",
     )
     expected_pairs = tuple(
-        (trace_id, method_id)
-        for trace_id in cohort.ordered_trace_ids
-        for method_id in MethodId
+        (trace_id, method_id) for trace_id in cohort.ordered_trace_ids for method_id in MethodId
     )
     if tuple((item.trace_id, item.method_id) for item in final_rows) != expected_pairs:
         raise Phase3StatisticsError(
@@ -1296,9 +1294,7 @@ def generate_phase3_statistics(**kwargs: Any) -> Phase3StatisticsResult:
             "paired_run_manifest_sha256": prepared.preflight.paired_run_manifest_sha256,
             "paired_results_sha256": prepared.preflight.paired_results_sha256,
             "paired_index_sha256": prepared.preflight.paired_index_sha256,
-            "annotation_set_manifest_sha256": (
-                prepared.preflight.annotation_set_manifest_sha256
-            ),
+            "annotation_set_manifest_sha256": (prepared.preflight.annotation_set_manifest_sha256),
             "completed_labels_sha256": prepared.preflight.completed_labels_sha256,
             "annotation_records_sha256": prepared.preflight.annotation_records_sha256,
             "annotation_protocol_sha256": prepared.preflight.protocol_sha256,

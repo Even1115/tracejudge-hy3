@@ -1,0 +1,42 @@
+{
+  "certificate_id": "certificate:gate-d-confirmed-safe-mean-empty-v1",
+  "certificate_manifest_sha256": "4d4d2f8ce5ee86d96aaeffbec2f2d686a395427a340703534b8460a866f144e8",
+  "certificate_sha256": "d332ce1fbe601547763b580fbe0e22286737711627ae8f45937ff568e62c9cdb",
+  "cohort_manifest_sha256": "3290221625d687e6d7412a0544247dc81a34857b114a545458b93cc04e35d255",
+  "evidence_hash_verified": true,
+  "execution_evidence_sha256": "cfd897334643853fc10901835a5203aa51ee7edd4442e314893c1e5bc152e670",
+  "kind": "tracejudge_phase4_public_replay_receipt",
+  "natural_manifest_sha256": "a4116a7ddb7ac910b79bd52e9530db79dd0f05c9edee8ecd947fc78c35c03692",
+  "problem_id": "safe_mean",
+  "public_source_sha256": "a6195fb0867c69607bfa7a346b8112c49dfbe4d9d85700e2238d5bb1e22731df",
+  "receipt_id": "phase4_public_replay_receipt_v1",
+  "replay_command": "tracejudge phase3 replay --certificate artifacts/experiments/phase3-public-certificates/phase3_gate_d_public_certificates_v1/certificates/certificate_001.json --cohort-manifest artifacts/experiments/phase3-freezes/phase3_cohort_42_plus_15_v1/manifest.json --natural-manifest artifacts/experiments/phase3-freezes/phase3_natural_42_v1/manifest.json --source-bundle data/phase3/public_counterfactuals_v1.json",
+  "replay_completed_at": "2026-09-01T07:08:16Z",
+  "replay_started_at": "2026-09-01T07:07:55Z",
+  "reproduced_failure": true,
+  "runtime": {
+    "direct_dependencies_sha256": "9b9f8a792daa2516008bd80732c98b76f4d7e6a86ac2bbc040ae488f84a6e4fa",
+    "python_version": "3.12.14",
+    "replay_implementation_sha256": "0c94426c64959f9213ca12a2df4da940f253eae6c807a6a56ba678c663abd677",
+    "sandbox_backend": "trusted-local"
+  },
+  "safety": {
+    "contains_candidate_source": false,
+    "contains_counterexample_inputs": false,
+    "contains_hidden_evaluation_content": false,
+    "contains_per_trace_predictions": false,
+    "contains_provider_raw": false,
+    "docker_call_count": 0,
+    "exact_public_allowlist": true,
+    "executed_public_case_count": 1,
+    "network_call_count": 0,
+    "provider_call_count": 0
+  },
+  "schema_version": 1,
+  "source_git": {
+    "branch": "phase4-reproducibility-release",
+    "commit": "1de193266d4be57df412614cbc06f4da0eb5868c",
+    "dirty": false
+  },
+  "trace_id": "counterfactual:safe_mean:boundary_deletion:v1"
+}

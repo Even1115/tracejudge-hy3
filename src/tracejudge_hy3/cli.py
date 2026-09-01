@@ -72,6 +72,14 @@ from tracejudge_hy3.phase3 import (
     preflight_public_counterfactual_source,
     replay_public_certificate,
 )
+from tracejudge_hy3.phase4 import (
+    Phase4ReproducibilityError,
+    freeze_artifact_inventory,
+    preflight_artifact_inventory,
+    prepare_public_replay_receipt,
+    verify_artifact_inventory,
+    write_public_replay_receipt,
+)
 from tracejudge_hy3.pipeline.runner import PipelineResult, run_pipeline, select_backend
 from tracejudge_hy3.providers.base import LLMProvider
 from tracejudge_hy3.providers.hy3_openai import Hy3OpenAIProvider
@@ -98,8 +106,13 @@ phase3_app = typer.Typer(
     add_completion=False,
     help="阶段三离线冻结、配对评估与公开证据工具（按研究门槛逐步开放）",
 )
+phase4_app = typer.Typer(
+    add_completion=False,
+    help="阶段四复现清单、恢复验证与公开 replay receipt 工具",
+)
 app.add_typer(dataset_app, name="dataset")
 app.add_typer(phase3_app, name="phase3")
+app.add_typer(phase4_app, name="phase4")
 console = Console()
 
 DEFAULT_DATASET = str(data_path("sample_problems.jsonl"))
@@ -107,6 +120,21 @@ DEFAULT_PHASE3_COUNTERFACTUAL_SOURCE = str(data_path(PUBLIC_COUNTERFACTUAL_SOURC
 DEFAULT_PHASE3_CERTIFICATE_CLAIMS = str(data_path(PUBLIC_CERTIFICATE_CLAIMS_RELATIVE_PATH))
 DEFAULT_PHASE3_ANNOTATION_PROTOCOL = str(data_path(ANNOTATION_PROTOCOL_RELATIVE_PATH))
 DEFAULT_PHASE3_ANNOTATION_GUIDE = ANNOTATION_GUIDE_RELATIVE_PATH
+DEFAULT_PHASE4_CERTIFICATE = (
+    "artifacts/experiments/phase3-public-certificates/"
+    "phase3_gate_d_public_certificates_v1/certificates/certificate_001.json"
+)
+DEFAULT_PHASE4_CERTIFICATE_MANIFEST = (
+    "artifacts/experiments/phase3-public-certificates/"
+    "phase3_gate_d_public_certificates_v1/manifest.json"
+)
+DEFAULT_PHASE4_COHORT_MANIFEST = (
+    "artifacts/experiments/phase3-freezes/phase3_cohort_42_plus_15_v1/manifest.json"
+)
+DEFAULT_PHASE4_NATURAL_MANIFEST = (
+    "artifacts/experiments/phase3-freezes/phase3_natural_42_v1/manifest.json"
+)
+DEFAULT_PHASE4_SOURCE_BUNDLE = f"data/{PUBLIC_COUNTERFACTUAL_SOURCE_RELATIVE_PATH}"
 
 
 def _reject_phase1_projection_execution(problems: list[ProblemSpec]) -> None:
@@ -2258,6 +2286,223 @@ def phase3_report(
     console.print(
         "[yellow]该报告的验证状态为 ANALYZED、总体置信为 CAUTION；不显著不等于方法等效。[/yellow]"
     )
+
+
+def _render_phase4_failure(exc: BaseException) -> None:
+    console.print("[red]阶段四复现加固校验失败；未输出敏感正文。[/red]")
+    console.print(f"[yellow]安全阶段码：{getattr(exc, 'safe_stage', 'P4B_UNCLASSIFIED')}[/yellow]")
+
+
+@phase4_app.command("artifact-preflight")
+def phase4_artifact_preflight(
+    inventory_id: str = typer.Option("phase4_artifact_inventory_v1", "--inventory-id"),
+    digest_id: str = typer.Option("phase4_public_artifact_digest_v1", "--digest-id"),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+    allow_permission_warnings: bool = typer.Option(
+        False,
+        "--allow-permission-warnings",
+        help="仅用于记录现状；正式封版前仍须消除所有私有权限警告",
+    ),
+) -> None:
+    """Gate B：只读计算关键 Git-ignored 产物的哈希与权限清单。"""
+
+    try:
+        result = preflight_artifact_inventory(
+            repo_root=repo_root,
+            inventory_id=inventory_id,
+            digest_id=digest_id,
+            allow_dirty=allow_dirty,
+            allow_permission_warnings=allow_permission_warnings,
+        )
+    except (Phase4ReproducibilityError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四关键产物清单只读预检：{result.inventory.inventory_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("关键产物", str(result.inventory.artifact_count))
+    table.add_row("公开哈希锚点", str(result.public_digest.public_anchor_count))
+    table.add_row("权限警告", str(result.inventory.permission_warning_count))
+    table.add_row("确定性 artifact-set SHA256", result.inventory.artifact_set_sha256)
+    table.add_row("私有 manifest SHA256", result.private_manifest_sha256)
+    table.add_row("解析或打印正文 / 写入文件", "否 / 否")
+    table.add_row("执行候选 / Provider / Docker / 网络", "否 / 否 / 否 / 否")
+    console.print(table)
+
+
+@phase4_app.command("artifact-freeze")
+def phase4_artifact_freeze(
+    inventory_id: str = typer.Option("phase4_artifact_inventory_v1", "--inventory-id"),
+    digest_id: str = typer.Option("phase4_public_artifact_digest_v1", "--digest-id"),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    private_output_dir: str = typer.Option(
+        "artifacts/experiments/phase4-reproducibility",
+        "--private-output-dir",
+    ),
+    public_output_dir: str = typer.Option("docs/releases/phase4", "--public-output-dir"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+    allow_permission_warnings: bool = typer.Option(
+        False,
+        "--allow-permission-warnings",
+        help="仅用于记录现状；正式封版前仍须消除所有私有权限警告",
+    ),
+) -> None:
+    """Gate B：原子冻结私有完整清单与不含私有路径的公开摘要。"""
+
+    try:
+        result = freeze_artifact_inventory(
+            repo_root=repo_root,
+            inventory_id=inventory_id,
+            digest_id=digest_id,
+            private_output_dir=private_output_dir,
+            public_output_dir=public_output_dir,
+            allow_dirty=allow_dirty,
+            allow_permission_warnings=allow_permission_warnings,
+        )
+    except (Phase4ReproducibilityError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四关键产物清单：{result.inventory_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "关键产物 / 权限警告", f"{result.artifact_count} / {result.permission_warning_count}"
+    )
+    table.add_row("确定性 artifact-set SHA256", result.artifact_set_sha256)
+    table.add_row("私有 manifest SHA256", result.private_manifest_sha256)
+    table.add_row("公开 digest SHA256", result.public_digest_sha256)
+    table.add_row("公开摘要含私有路径/正文", "否 / 否")
+    console.print(table)
+    console.print(f"[dim]private manifest: {result.private_manifest_path}[/dim]")
+    console.print(f"[dim]public digest: {result.public_digest_path}[/dim]")
+
+
+@phase4_app.command("artifact-verify")
+def phase4_artifact_verify(
+    manifest: str = typer.Option(..., "--manifest"),
+    repo_root: str = typer.Option(".", "--repo-root"),
+) -> None:
+    """Gate B：验证原目录或恢复目录的文件大小、mode 与 SHA256。"""
+
+    try:
+        result = verify_artifact_inventory(repo_root=repo_root, manifest_path=manifest)
+    except (Phase4ReproducibilityError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    console.print(
+        f"[green]恢复验证通过：{result.inventory_id}，{result.artifact_count} 个关键产物。[/green]"
+    )
+
+
+def _phase4_replay_arguments(
+    *,
+    receipt_id: str,
+    certificate: str,
+    certificate_manifest: str,
+    cohort_manifest: str,
+    natural_manifest: str,
+    source_bundle: str,
+    repo_root: str,
+    allow_dirty: bool,
+) -> dict[str, object]:
+    return {
+        "receipt_id": receipt_id,
+        "certificate_path": certificate,
+        "certificate_manifest_path": certificate_manifest,
+        "cohort_manifest_path": cohort_manifest,
+        "natural_manifest_path": natural_manifest,
+        "source_bundle_path": source_bundle,
+        "repo_root": repo_root,
+        "allow_dirty": allow_dirty,
+    }
+
+
+@phase4_app.command("replay-receipt-preflight")
+def phase4_replay_receipt_preflight(
+    receipt_id: str = typer.Option("phase4_public_replay_receipt_v1", "--receipt-id"),
+    certificate: str = typer.Option(DEFAULT_PHASE4_CERTIFICATE, "--certificate"),
+    certificate_manifest: str = typer.Option(
+        DEFAULT_PHASE4_CERTIFICATE_MANIFEST,
+        "--certificate-manifest",
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    source_bundle: str = typer.Option(DEFAULT_PHASE4_SOURCE_BUNDLE, "--source-bundle"),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate B：执行一个公开白名单用例，在内存生成 receipt，不写文件。"""
+
+    try:
+        receipt = prepare_public_replay_receipt(
+            **_phase4_replay_arguments(
+                receipt_id=receipt_id,
+                certificate=certificate,
+                certificate_manifest=certificate_manifest,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+                source_bundle=source_bundle,
+                repo_root=repo_root,
+                allow_dirty=allow_dirty,
+            )
+        )
+    except (Phase4ReproducibilityError, Phase3PublicEvidenceError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四公开 replay receipt 只读预检：{receipt.receipt_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("重现失败 / 证据哈希一致", "是 / 是")
+    table.add_row("公开执行证据 SHA256", receipt.execution_evidence_sha256)
+    table.add_row("执行公开用例", str(receipt.safety.executed_public_case_count))
+    table.add_row("写入文件", "否")
+    table.add_row("Provider / Docker / 网络", "否 / 否 / 否")
+    console.print(table)
+
+
+@phase4_app.command("replay-receipt")
+def phase4_replay_receipt(
+    receipt_id: str = typer.Option("phase4_public_replay_receipt_v1", "--receipt-id"),
+    certificate: str = typer.Option(DEFAULT_PHASE4_CERTIFICATE, "--certificate"),
+    certificate_manifest: str = typer.Option(
+        DEFAULT_PHASE4_CERTIFICATE_MANIFEST,
+        "--certificate-manifest",
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    source_bundle: str = typer.Option(DEFAULT_PHASE4_SOURCE_BUNDLE, "--source-bundle"),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    output_dir: str = typer.Option("docs/releases/phase4", "--output-dir"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate B：执行一个公开白名单用例并原子持久化脱敏 receipt。"""
+
+    try:
+        result = write_public_replay_receipt(
+            output_dir=output_dir,
+            **_phase4_replay_arguments(
+                receipt_id=receipt_id,
+                certificate=certificate,
+                certificate_manifest=certificate_manifest,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+                source_bundle=source_bundle,
+                repo_root=repo_root,
+                allow_dirty=allow_dirty,
+            ),
+        )
+    except (Phase4ReproducibilityError, Phase3PublicEvidenceError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四公开 replay receipt：{result.receipt.receipt_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("重现失败 / 证据哈希一致", "是 / 是")
+    table.add_row("receipt SHA256", result.receipt_sha256)
+    table.add_row("Provider / Docker / 网络", "否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]receipt: {result.receipt_path}[/dim]")
 
 
 def _render_result(result: PipelineResult) -> None:

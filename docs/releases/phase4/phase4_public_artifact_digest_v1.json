@@ -1,0 +1,92 @@
+{
+  "artifact_set_sha256": "84c584a116700430b7fea14c5f81d8b23f6094badc1dc410a013c7bd7615f13b",
+  "contains_absolute_paths": false,
+  "contains_annotation_records": false,
+  "contains_artifact_content": false,
+  "contains_hidden_evaluation_content": false,
+  "contains_per_trace_predictions": false,
+  "contains_private_relative_paths": false,
+  "contains_provider_raw": false,
+  "created_at": "2026-09-01T09:16:39.065428Z",
+  "digest_id": "phase4_public_artifact_digest_v1",
+  "inventory_id": "phase4_artifact_inventory_v1",
+  "kind": "tracejudge_phase4_public_artifact_digest",
+  "permission_warning_count": 0,
+  "privacy_review_status": "passed",
+  "private_artifact_count": 103,
+  "private_inventory_sha256": "ad2e4489d608b8bdb21a3a108eb4eba5ca078f8db5b748cd6d6669d58d1ab997",
+  "public_anchor_count": 13,
+  "public_anchors": [
+    {
+      "artifact_id": "phase3_natural_manifest",
+      "sha256": "a4116a7ddb7ac910b79bd52e9530db79dd0f05c9edee8ecd947fc78c35c03692",
+      "size_bytes": 79846
+    },
+    {
+      "artifact_id": "phase3_counterfactual_evidence_results",
+      "sha256": "19a138ecc2ce784b940e88e085a85ddddf92a564be7235bbd5a3e97bb39d2776",
+      "size_bytes": 27084
+    },
+    {
+      "artifact_id": "phase3_cohort_manifest",
+      "sha256": "3290221625d687e6d7412a0544247dc81a34857b114a545458b93cc04e35d255",
+      "size_bytes": 49079
+    },
+    {
+      "artifact_id": "phase3_certificate_001",
+      "sha256": "d332ce1fbe601547763b580fbe0e22286737711627ae8f45937ff568e62c9cdb",
+      "size_bytes": 2201
+    },
+    {
+      "artifact_id": "phase3_certificate_manifest",
+      "sha256": "4d4d2f8ce5ee86d96aaeffbec2f2d686a395427a340703534b8460a866f144e8",
+      "size_bytes": 2342
+    },
+    {
+      "artifact_id": "phase3_run_manifest",
+      "sha256": "685b25af287bfc973c5000573eac0cf4ff505f91d95fff2faa403f69626f1edc",
+      "size_bytes": 2616
+    },
+    {
+      "artifact_id": "phase3_run_results",
+      "sha256": "332932e949281c84402046dbd25e0110fb7a7e7e224c71b17487226fa1098999",
+      "size_bytes": 293173
+    },
+    {
+      "artifact_id": "phase3_run_index",
+      "sha256": "b1a6c6a61a4439d3e667ebd52ddba8cba98f8ee196c1cac8dce200f38c857247",
+      "size_bytes": 78223
+    },
+    {
+      "artifact_id": "phase3_statistics_manifest",
+      "sha256": "7efbdc9c36340593be09e192ea0e7b15297d5e69c4192fa4b49583558b368bf8",
+      "size_bytes": 1535
+    },
+    {
+      "artifact_id": "phase3_statistics_report",
+      "sha256": "972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10",
+      "size_bytes": 73493
+    },
+    {
+      "artifact_id": "phase3_report_manifest",
+      "sha256": "0b8285ec04344e29670d752a37c4d5ecb41ea07d5dfc18a5715b56de3e800b06",
+      "size_bytes": 2174
+    },
+    {
+      "artifact_id": "phase3_report_markdown",
+      "sha256": "29eaef9f44a964308ab26b9821c472b0d13837eee587a3e687faa861edb4d725",
+      "size_bytes": 12307
+    },
+    {
+      "artifact_id": "phase3_report_validation",
+      "sha256": "702bf96be5d0911088dfea5cb95562d6b8e25d147d972c78b0b6870cecbae113",
+      "size_bytes": 8011
+    }
+  ],
+  "schema_version": 1,
+  "source_git": {
+    "branch": "phase4-reproducibility-release",
+    "commit": "065085bfa27795d6432e1fcf8b6421103f0b00e8",
+    "dirty": false
+  }
+}

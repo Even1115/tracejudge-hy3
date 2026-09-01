@@ -105,3 +105,24 @@ def test_formal_public_replay_receipt_is_schema_valid_and_hash_bound():
         "0c94426c64959f9213ca12a2df4da940f253eae6c807a6a56ba678c663abd677"
     )
     assert_public_payload_safe(receipt)
+
+
+def test_formal_public_artifact_digest_is_schema_valid_hash_bound_and_deidentified():
+    digest_path = (
+        Path(__file__).parents[1] / "docs/releases/phase4/phase4_public_artifact_digest_v1.json"
+    )
+    digest = Phase4PublicArtifactDigest.model_validate_json(digest_path.read_bytes())
+
+    assert digest.source_git.commit == "065085bfa27795d6432e1fcf8b6421103f0b00e8"
+    assert digest.source_git.dirty is False
+    assert digest.artifact_set_sha256 == (
+        "84c584a116700430b7fea14c5f81d8b23f6094badc1dc410a013c7bd7615f13b"
+    )
+    assert digest.private_inventory_sha256 == (
+        "ad2e4489d608b8bdb21a3a108eb4eba5ca078f8db5b748cd6d6669d58d1ab997"
+    )
+    assert digest.private_artifact_count == 103
+    assert digest.public_anchor_count == 13
+    assert digest.permission_warning_count == 0
+    assert digest.privacy_review_status == "passed"
+    assert_public_payload_safe(digest)

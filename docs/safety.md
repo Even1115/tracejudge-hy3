@@ -27,9 +27,20 @@
 `src/tracejudge_hy3/sandbox/trusted_local.py` 只做同机进程级隔离：外层 runner 由宿主进程设置整体超时，runner 内部为每个用例新建 Python 子进程，单例超时时终止整个进程组，并对 stdout/stderr 做有界捕获。它仍然**没有网络隔离、没有 CPU/内存等资源限制、没有权限降级**。因此：
 
 - CLI/流水线默认只允许仓库内置、且生成结果与 Fixture 精确匹配的 Mock 解答（如 `tracejudge demo --mock`）；
+- 阶段三 `counterfactual-execute` 是独立入口，只接受 `data/phase3/public_counterfactuals_v1.json` 的固定 SHA256 `a6195fb0867c69607bfa7a346b8112c49dfbe4d9d85700e2238d5bb1e22731df`；执行前还要求每段代码只有一个与公开签名匹配的顶层函数、不得 import、不得调用 `eval`/`exec`/`open`/`compile`/`__import__` 等危险入口。任何字节变化都会在本地执行前拒绝；
+- Gate C `phase3 paired-preflight` 只读两份冻结 manifest 和方法/Prompt/schema 身份，不读取候选正文、不执行候选或方法、不创建产物，不连接 Provider、Docker 或网络；
+- Gate D `certificate-preflight` / `certificate-generate` 只读取并重新绑定冻结 manifest、SHA256 精确白名单公开源和 Gate B 脱敏证据，不执行候选；`phase3 replay` 不接受证书携带代码，只从同一精确白名单源恢复候选并执行一个公开用例。证书/manifest 发布前经过敏感键和 canary fail-closed 检查；
+- Gate E1 `annotation-packet-preflight` 仅重建和哈希 57 条冻结白名单材料，不执行候选、Provider、Docker 或网络，也不写入文件；`annotation-packet-export` 只把盲法 packet、未填写模板和协调者专用 identity map 原子写入 Git-ignored 的 `0700/0600` 私有目录。packet 在写入前去除反事实构造/预期元数据、方法预测与官方隐藏输入，identity map 不得交给独立标注者；
+- Gate E2 `annotation-labels-check` 只读 packet manifest/模板和 opaque working 标签，不打开 identity map；其他人可见的文件权限会被拒绝。只有完成 57/57 且行顺序、协议、标注者、轮次和盲法元数据全部一致时，冻结预检才读取 identity map 并回连 cohort。冻结产物仅写入新的 Git-ignored `0700/0600` 目录，不覆盖旧版本，不打印标签分布、理由或真实 trace 身份；
+- Gate E3 `evaluate-preflight` 只按字节哈希绑定已冻结私有标签，标签内容不进入任一方法 Prompt；预检不创建目录、不连接 Provider/网络。`evaluate` 必须显式确认真实 Provider，拒绝未配置或模型不一致的 Hy3；非敏感 Provider 配置、标签三个哈希和完整实现哈希全部进入 resume identity。交通层禁止自动重试，仅解析失败允许一次脱敏结构化修复；
+- Gate E4 `statistics-preflight` / `statistics` 不打开 Provider raw、候选正文或隐藏评测内容，只读取冻结标签记录与 E3 的结构化结果。输入必须匹配用户显式给出的 run manifest/results/index SHA256、完整 trace-major 顺序和标签三个哈希；公共 report 只含聚合计数并通过敏感键/canary 检查，不含 trace ID、标注理由或逐条方法预测。正式统计默认拒绝 dirty worktree；
+- Gate F `report-preflight` / `report` 不打开 Provider raw、候选正文、标注理由或隐藏评测内容；只对 E4 聚合统计、E3 结构化用量/状态账本与 Gate D 公开 confirmed 证书进行精确哈希绑定。预检不写文件且不显示方法成绩；正式 writer 在敏感键/canary 检查后以 `0700/0600` 原子发布且默认拒绝 dirty worktree。`replay_command.txt` 只保存公开重放指令，Gate F 不自动执行候选、Provider、Docker 或网络；
+- Gate C 内部 writer 把 Provider raw 仅写入 Git-ignored、`0700/0600` 的 invocation 目录；公开 `results.jsonl` 不保存 raw 正文，并对敏感键和调用方 canary 执行 fail-closed 检查。严格解析器不从 Markdown 围栏或前后文中抽取 JSON，只允许一次脱敏 schema 修复，不对 Provider 错误自动重试；
 - `MockProvider` 对未知题目会复用数据集的 `reference_code` 作为 fallback，但这不是仓库内置可信 Fixture，默认同样会拒绝本地执行；
 - 真实模型输出、外部数据集代码、Mock fallback 或其他无可信来源的代码，应使用 Docker。只有用户显式传入 `--allow-unsafe-local-exec` 时才会跳过该来源检查，并由用户承担风险；
 - 直接调用底层 `TrustedLocalSandbox.run()` 不会自动识别代码来源；来源强制位于 CLI/流水线。
+
+上述阶段三白名单和 AST 检查是来源完整性措施，不把 `TrustedLocalSandbox` 升级为网络/资源/权限隔离环境。正式证据只运行仓库公开自建 Fixture；HumanEval+ 候选、外部代码或真实模型输出不进入该入口。
 
 ## Docker 不可用时的行为
 

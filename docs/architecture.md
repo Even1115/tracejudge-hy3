@@ -28,6 +28,26 @@
 
 Mock executor 只验证这条输入与产物链；它不调用 `run_task()`，不启动 Docker，并将所有题显式记为 `mocked` 而非通过、失败或基础设施错误。
 
+## 阶段三 Gate B 独立冻结边界
+
+`src/tracejudge_hy3/phase3/cohort.py` 只读验证阶段一/二安全产物并冻结自然轨迹；`phase3/counterfactual.py` 是另一条不调用 Provider、Judge 或 EvalPlus 的公开反事实链。后者只接受固定 SHA256 的仓库自建 source bundle，先构造 3 个父代码 + 12 个改码变体的执行主体，再通过 `TrustedLocalSandbox` 对公开 visible/challenge case 逐例子执行。执行 bundle 的每行重新绑定 source、fixture、replay spec、代码和 case 语义；timeout、基础设施错误或预期状态偏差均阻断 overlay。
+
+最终 `CounterfactualCohortManifest` 只引用自然 manifest 的精确字节哈希，不复制或改写自然记录。父 Fixture 是派生快照，不进入研究分母；五种方法的配对顺序固定为全部自然轨迹后接 15 条 type-major 反事实。该 Gate B 执行只验证公开自建反事实的功能证据，不运行四层方法，也不等同于 Gate D 的通用动态反例搜索或证书 replay。
+
+Gate C 的 `phase3/runner.py` 先验证自然 manifest 与 overlay 的精确引用，再将每条私有输入材料与题面、完整轨迹、结构化说明、代码和功能证据哈希绑定。同一材料通过 `MethodSpec.visible_inputs` 投影到 Test-only、Direct Judge、四层结构化、+AST 和完整 TraceJudge，不为不同方法重新抽样。`phase3/parser.py` 只接受完整严格 JSON；`prompts/phase3.py` 对四个 Judge Prompt 分别版本化和哈希。writer 将 Provider raw 留在 Git-ignored 私有 invocation 文件，公开结果只留结构化 judgment、raw 哈希、费用/时间与明确失败状态，并在发布前做敏感键/canary fail-closed 检查。
+
+Gate D 的 `phase3/public_evidence.py` 固定公开 challenge、确定性探针和列表最小化的顺序与硬预算，并用三条自建公开工程 claim 验证证书降级规则。`certificate-generate` 不重新执行候选，而是复用并再次校验 Gate B 的公开执行行；`phase3/replay.py` 不信任证书中的代码，只从固定 SHA256 的公开源恢复冻结候选，绑定两份 cohort manifest 和 replay spec 后执行一个公开反例。重放必须同时复现失败字段和执行证据哈希；超时、基础设施错误、证书篡改或非 `confirmed_bug` 均显式拒绝。
+
+Gate E1 的 `phase3/materials.py` 复用 Gate B 严格加载器重建 57 条白名单材料，不打开 EvalPlus raw 或官方失败输入。`phase3/annotations.py` 先校验冻结协议、指南和 cohort 哈希，再用固定 seed 生成 opaque item 顺序；标注 packet 只含题面、结构化说明、候选代码和可发布功能证据，真实 trace 身份单独写入协调者 identity map。反事实类型、预期影响/状态和五方法预测在盲法边界外；只读预检不创建目录，导出只写 Git-ignored 的 `0700/0600` 私有产物。
+
+Gate E2 的 `phase3/labels.py` 把进度检查与身份回连分成两个安全边界。进度检查只验证 packet manifest、模板和 opaque working 行，不打开 identity map；待 57 条全部通过完成标签 Schema 后，冻结预检才将 item ID 回连到精确 cohort，再按 trace-major 顺序生成 `AnnotationRecord`。最终 manifest 同时绑定源 packet、identity map、空模板、原始 working 字节、规范化 opaque 标签和回连记录哈希；新版本只能写入新的 Git-ignored `0700/0600` 目录，不覆盖旧标签集。
+
+Gate E3 的 `phase3/execution.py` 在正式运行前重建同一 57 条白名单材料，只用私有标签文件的精确字节哈希做身份绑定，不将标签内容投影给任一方法。只读预检同时冻结 Hy3 的非敏感公开配置、Git/Python/依赖与全实现哈希；显式执行才创建私有 run 目录并连接 Hy3。Provider 交通不自动重试，仅严格 JSON 解析失败允许 runner 发起一次结构化修复。
+
+Gate E4 的 `phase3/statistics.py` 不读取 `provider_raw.jsonl`，而是严格绑定已完成 run manifest、最终 results、配对 index、所有逐行哈希和私有冻结标注。若结果含 `reused`，加载器只沿历史 invocation 的精确旧行哈希恢复原始终态；任何顺序、状态或来源偏差均失败关闭。分析层保留完整 285 分母，输出层只发布聚合数量、区间、两个预注册自然比较和父题聚类反事实区间；不发布 trace ID、人工理由或逐条预测。预检不写文件，正式 writer 以 `0700/0600` 原子不可覆盖发布。
+
+Gate F 的 `phase3/report.py` 只消费 E4 聚合 report、E3 结构化账本中的状态/耗时/token/成本可用性以及 Gate D 公开证书，不打开 Provider raw、候选正文、标注理由或隐藏评测内容。加载器先校验精确字节哈希与本轮 57×5 冻结结构，再渲染 Markdown 和机器可审计 `validation.json`。解读层强制 11 项统计谬误检查、将 Test-only 缺失字段作 N/A，反事实推断仅使用父题 cluster bootstrap，并以 `ANALYZED / CAUTION / CANNOT_VERIFY` 限定证据边界。预检只显示安全身份与拟输出哈希；正式 writer 原子发布脱敏报告、验证记录、公开证书副本和重放命令，不自动执行重放。
+
 ## 为什么规则证据优先于 LLM 判断
 
 设计文档的问题四明确指出，单纯依赖 LLM-as-judge 会产生误报、无法复现的缺陷描述、结果不稳定等问题。v0.1 的应对方式是：
@@ -50,4 +70,5 @@ Mock executor 只验证这条输入与产物链；它不调用 `run_task()`，�
 | `counterexample/` | 差分执行、最小化 | 判断"是否算错误" |
 | `pipeline/` | 固定编排顺序 | 具体算法细节 |
 | `evalplus/` | 阶段一严格导出、官方 EvalPlus 容器执行、脱敏与续跑 | Provider/LLM、宿主执行、四层评估 |
+| `phase3/` | 冻结 cohort、五方法配对接口、公开证书重放与盲法标注包 | 官方隐藏输入发布、任意外部代码宿主执行 |
 | `reporting/` | 指标计算、结果序列化 | 数据采集 |

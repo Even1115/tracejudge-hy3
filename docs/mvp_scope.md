@@ -16,6 +16,13 @@
 - 基础需求—步骤—代码对齐（规则命中 + LLM 判断交叉验证）；
 - 基础反例验证（challenge/hidden 测试复用 + 有限边界候选差分执行 + 简单 delta-debugging）；
 - 结构化错误证书：新疑似问题使用 `confirmed_bug` / `strongly_supported` / `unverified_suspicion`；首次正确运行无证书，`cleared` 仅表示显式传入既有证书后的复核转移；
+- 阶段三 Gate A/B 契约、42 条正式自然轨迹冻结，以及 15 条公开自建单因素反事实的预注册 source、精确白名单证据执行和 overlay 冻结工具；正式公开 evidence run 与 42 + 15 overlay 已完成；
+- 阶段三 Gate D 公开 challenge/确定性探针策略、三等级公开工程证书 writer、只读预检和单用例 `phase3 replay`；正式证书产物与 confirmed 证书独立重放已完成，但仍只是公开工程 Fixture 证据，不构成五方法研究结果；
+- 阶段三 Gate E1 冻结标注指南与机器可校验协议，正式 57 条私有盲法 packet 已导出；packet 与协调者 identity map 分离，不包含方法预测、其他标注者标签、反事实构造元数据或官方隐藏输入；
+- 阶段三 Gate E2 提供不打开 identity map 的 working 标签进度/结构检查，以及仅在全部完成后允许的身份回连预检和 Git-ignored 私有原子冻结；单人首轮 57 条主标注已正式冻结；
+- 阶段三 Gate E3 提供五方法正式运行的只读身份预检和显式 Hy3 执行入口；正式 `phase3_hy3_57x5_v1` 已完成 57 × 5 全部 285 配对，其中 283 条有效 judgment、2 条 Provider 失败；
+- 阶段三 Gate E4 提供严格哈希/顺序/复用链绑定、全分母聚合指标、精确 McNemar + Holm 和父题聚类 bootstrap，并以不含逐轨迹内容的私有原子 writer 发布；正式 `phase3_stats_primary_round1_v1` 已冻结；
+- 阶段三 Gate F 提供哈希绑定的脱敏结果解读、11/11 统计谬误扫描、Material Passport、公开错误证书 Demo 与原子不可覆盖 writer；正式 `phase3_report_primary_round1_v1` 已发布并通过权限、哈希与脱敏验收；
 - Mock 模式（默认，无需 API Key）与真实 Hy3 Provider 接口（可选）；
 - 单元测试与 README。
 
@@ -31,7 +38,7 @@
 - 完整 mutation testing 框架；
 - 自动代码修复；
 - 复杂控制流图或符号执行；
-- 反事实配对集、人工标注集、对照实验、消融实验（这些属于方案文档中更完整版本的内容）。
+- Gate C 已实现五方法统一工程接口和 Mock 中断/resume 验证，Gate E1 packet 与 Gate E2 单人首轮正式标签已冻结，Gate E3 真实 Hy3 配对结果已产生，Gate E4 正式聚合统计和 Gate F 脱敏研究报告已发布；但第二标注/重测一致性与扩展消融仍不在当前证据内。当前证据只适用于本轮固定 cohort/模型/Prompt/标注设置，不产生因果、等效或完整 benchmark 结论。
 
 模型输出中的"过程"是面向用户、可审查的解题说明和实现计划，不要求也不试图暴露模型不可见的内部思维链。
 

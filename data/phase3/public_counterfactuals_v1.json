@@ -1,0 +1,464 @@
+{
+  "schema_version": 1,
+  "kind": "tracejudge_phase3_public_counterfactual_source",
+  "bundle_id": "phase3_public_counterfactuals_15_v1",
+  "selection_policy": "five_types_type_major_parent_order_v1",
+  "parents": [
+    {
+      "parent_trace_id": "public-parent:safe_mean:v1",
+      "fixture": {
+        "public_fixture_id": "phase3_fixture_safe_mean_v1",
+        "problem_id": "safe_mean",
+        "title": "Safe arithmetic mean",
+        "requirement": "Return 0.0 for an empty numeric list; otherwise return sum(nums) / len(nums).",
+        "function_signature": "def safe_mean(nums: list[float]) -> float:",
+        "requirements": [
+          {
+            "requirement_id": "R1",
+            "content": "An empty list returns 0.0 without raising an exception.",
+            "verification_hint": "safe_mean([]) == 0.0"
+          },
+          {
+            "requirement_id": "R2",
+            "content": "A non-empty list returns its arithmetic mean.",
+            "verification_hint": "safe_mean([1, 2, 3]) == 2.0"
+          }
+        ],
+        "test_cases": [
+          {"case_id": "v1", "args": [[1, 2, 3]], "kwargs": {}, "expected": 2.0, "category": "visible", "related_requirements": ["R2"]},
+          {"case_id": "v2", "args": [[10.0]], "kwargs": {}, "expected": 10.0, "category": "visible", "related_requirements": ["R2"]},
+          {"case_id": "c1_empty", "args": [[]], "kwargs": {}, "expected": 0.0, "category": "challenge", "related_requirements": ["R1"]},
+          {"case_id": "c2_balanced", "args": [[-5, 5]], "kwargs": {}, "expected": 0.0, "category": "challenge", "related_requirements": ["R2"]},
+          {"case_id": "c3_unseen", "args": [[2, 4]], "kwargs": {}, "expected": 3.0, "category": "challenge", "related_requirements": ["R2"]},
+          {"case_id": "c4_repeated", "args": [[1, 1, 1, 1]], "kwargs": {}, "expected": 1.0, "category": "challenge", "related_requirements": ["R2"]}
+        ],
+        "source": "self_constructed_phase3_public_fixture",
+        "license": "MIT"
+      },
+      "solution_trace": {
+        "problem_id": "safe_mean",
+        "requirement_understanding": "The function must special-case an empty list and compute the ordinary arithmetic mean otherwise.",
+        "design_summary": "Guard the empty boundary first, then divide the sum by the number of elements.",
+        "edge_cases_considered": ["empty list", "single element", "negative and positive values"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return 0.0 when nums is empty.", "related_requirements": ["R1"], "expected_code_behavior": "An explicit empty-list guard returns before division."},
+          {"step_id": "S2", "content": "For non-empty nums, divide sum(nums) by len(nums).", "related_requirements": ["R2"], "expected_code_behavior": "The returned value is the arithmetic mean."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(1)",
+        "code": "def safe_mean(nums: list[float]) -> float:\n    if not nums:\n        return 0.0\n    return sum(nums) / len(nums)\n"
+      }
+    },
+    {
+      "parent_trace_id": "public-parent:clamp:v1",
+      "fixture": {
+        "public_fixture_id": "phase3_fixture_clamp_v1",
+        "problem_id": "clamp",
+        "title": "Clamp a value to a closed interval",
+        "requirement": "Raise ValueError when low > high; otherwise clamp value to the inclusive interval [low, high].",
+        "function_signature": "def clamp(value: float, low: float, high: float) -> float:",
+        "requirements": [
+          {"requirement_id": "R1", "content": "Raise ValueError when low is greater than high.", "verification_hint": "clamp(5, 10, 0) raises ValueError"},
+          {"requirement_id": "R2", "content": "Values below low return low.", "verification_hint": "clamp(-5, 0, 10) == 0"},
+          {"requirement_id": "R3", "content": "Values above high return high.", "verification_hint": "clamp(15, 0, 10) == 10"},
+          {"requirement_id": "R4", "content": "Values inside the inclusive interval return unchanged.", "verification_hint": "clamp(5, 0, 10) == 5"}
+        ],
+        "test_cases": [
+          {"case_id": "v1_inside", "args": [5, 0, 10], "kwargs": {}, "expected": 5, "category": "visible", "related_requirements": ["R4"]},
+          {"case_id": "v2_below", "args": [-5, 0, 10], "kwargs": {}, "expected": 0, "category": "visible", "related_requirements": ["R2"]},
+          {"case_id": "c1_above", "args": [15, 0, 10], "kwargs": {}, "expected": 10, "category": "challenge", "related_requirements": ["R3"]},
+          {"case_id": "c2_low_edge", "args": [0, 0, 10], "kwargs": {}, "expected": 0, "category": "challenge", "related_requirements": ["R4"]},
+          {"case_id": "c3_high_edge", "args": [10, 0, 10], "kwargs": {}, "expected": 10, "category": "challenge", "related_requirements": ["R4"]},
+          {"case_id": "c4_invalid", "args": [5, 10, 0], "kwargs": {}, "expected": {"raises": "ValueError"}, "category": "challenge", "related_requirements": ["R1"]},
+          {"case_id": "c5_negative", "args": [-100, -50, 50], "kwargs": {}, "expected": -50, "category": "challenge", "related_requirements": ["R2"]}
+        ],
+        "source": "self_constructed_phase3_public_fixture",
+        "license": "MIT"
+      },
+      "solution_trace": {
+        "problem_id": "clamp",
+        "requirement_understanding": "Reject an invalid interval, then return the nearest endpoint for out-of-range values and the value itself otherwise.",
+        "design_summary": "Validate bounds before applying lower and upper comparisons in order.",
+        "edge_cases_considered": ["low greater than high", "value equal to low", "value equal to high", "negative bounds"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Raise ValueError for low > high.", "related_requirements": ["R1"], "expected_code_behavior": "Invalid intervals stop before clamping."},
+          {"step_id": "S2", "content": "Return low when value is below low.", "related_requirements": ["R2"], "expected_code_behavior": "The lower endpoint is returned."},
+          {"step_id": "S3", "content": "Return high when value is above high.", "related_requirements": ["R3"], "expected_code_behavior": "The upper endpoint is returned."},
+          {"step_id": "S4", "content": "Return value when it is inside the interval.", "related_requirements": ["R4"], "expected_code_behavior": "Inclusive boundary values remain unchanged."}
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def clamp(value: float, low: float, high: float) -> float:\n    if low > high:\n        raise ValueError(\"low must not exceed high\")\n    if value < low:\n        return low\n    if value > high:\n        return high\n    return value\n"
+      }
+    },
+    {
+      "parent_trace_id": "public-parent:deduplicate_preserve_order:v1",
+      "fixture": {
+        "public_fixture_id": "phase3_fixture_deduplicate_v1",
+        "problem_id": "deduplicate_preserve_order",
+        "title": "Remove duplicates while preserving first occurrence order",
+        "requirement": "Return a new list containing each hashable item once, in the order of its first appearance; an empty input returns an empty list.",
+        "function_signature": "def deduplicate_preserve_order(items: list) -> list:",
+        "requirements": [
+          {"requirement_id": "R1", "content": "Keep only the first occurrence of each item.", "verification_hint": "[1, 2, 1, 3, 2] becomes [1, 2, 3]"},
+          {"requirement_id": "R2", "content": "Preserve first-occurrence order.", "verification_hint": "['b', 'a', 'b'] becomes ['b', 'a']"},
+          {"requirement_id": "R3", "content": "An empty list returns an empty list.", "verification_hint": "deduplicate_preserve_order([]) == []"}
+        ],
+        "test_cases": [
+          {"case_id": "v1_duplicates", "args": [[1, 2, 1, 3, 2]], "kwargs": {}, "expected": [1, 2, 3], "category": "visible", "related_requirements": ["R1", "R2"]},
+          {"case_id": "v2_empty", "args": [[]], "kwargs": {}, "expected": [], "category": "visible", "related_requirements": ["R3"]},
+          {"case_id": "c1_all_equal", "args": [[1, 1, 1, 1]], "kwargs": {}, "expected": [1], "category": "challenge", "related_requirements": ["R1"]},
+          {"case_id": "c2_unique", "args": [[1, 2, 3, 4]], "kwargs": {}, "expected": [1, 2, 3, 4], "category": "challenge", "related_requirements": ["R2"]},
+          {"case_id": "c3_strings", "args": [["b", "a", "b", "c", "a"]], "kwargs": {}, "expected": ["b", "a", "c"], "category": "challenge", "related_requirements": ["R1", "R2"]},
+          {"case_id": "c4_single", "args": [[5]], "kwargs": {}, "expected": [5], "category": "challenge", "related_requirements": ["R1", "R2"]},
+          {"case_id": "c5_empty_boundary", "args": [[]], "kwargs": {}, "expected": [], "category": "challenge", "related_requirements": ["R3"]}
+        ],
+        "source": "self_constructed_phase3_public_fixture",
+        "license": "MIT"
+      },
+      "solution_trace": {
+        "problem_id": "deduplicate_preserve_order",
+        "requirement_understanding": "Return first occurrences in their original order and handle the empty list explicitly.",
+        "design_summary": "Guard empty input, seed the result with the first item, then append unseen later items while tracking a set.",
+        "edge_cases_considered": ["empty list", "single element", "all equal", "already unique"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return an empty list when items is empty.", "related_requirements": ["R3"], "expected_code_behavior": "No first-element access occurs for empty input."},
+          {"step_id": "S2", "content": "Seed seen and result with the first item.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "The first occurrence starts the ordered output."},
+          {"step_id": "S3", "content": "Append each later item only when it has not been seen.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "Later duplicates are skipped and order is retained."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def deduplicate_preserve_order(items: list) -> list:\n    if not items:\n        return []\n    seen = {items[0]}\n    result = [items[0]]\n    for item in items[1:]:\n        if item not in seen:\n            seen.add(item)\n            result.append(item)\n    return result\n"
+      }
+    }
+  ],
+  "counterfactuals": [
+    {
+      "trace_id": "counterfactual:safe_mean:reasoning_swap:v1",
+      "parent_trace_id": "public-parent:safe_mean:v1",
+      "mutation_kind": "reasoning_swap",
+      "sole_change": "Replace only the safe_mean structured explanation with a claim that empty input returns 1.0 and non-empty values use the maximum.",
+      "expected_impact": "Public execution remains passing because code is unchanged, while reasoning-to-code alignment becomes incorrect.",
+      "expected_execution_status": "pass",
+      "solution_trace": {
+        "problem_id": "safe_mean",
+        "requirement_understanding": "The function should return 1.0 for an empty list and otherwise return the maximum element.",
+        "design_summary": "Use an empty-input constant and select the maximum for all non-empty inputs.",
+        "edge_cases_considered": ["empty list returns one", "negative values use the maximum"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return 1.0 when nums is empty.", "related_requirements": ["R1"], "expected_code_behavior": "The empty branch returns one."},
+          {"step_id": "S2", "content": "Return max(nums) for non-empty input.", "related_requirements": ["R2"], "expected_code_behavior": "The largest element is returned."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(1)",
+        "code": "def safe_mean(nums: list[float]) -> float:\n    if not nums:\n        return 0.0\n    return sum(nums) / len(nums)\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:clamp:reasoning_swap:v1",
+      "parent_trace_id": "public-parent:clamp:v1",
+      "mutation_kind": "reasoning_swap",
+      "sole_change": "Replace only the clamp explanation with a claim that reversed bounds are silently swapped.",
+      "expected_impact": "Public execution remains passing because code is unchanged, while the stated invalid-interval behavior contradicts code and requirements.",
+      "expected_execution_status": "pass",
+      "solution_trace": {
+        "problem_id": "clamp",
+        "requirement_understanding": "If low is greater than high, swap the endpoints and continue clamping without an exception.",
+        "design_summary": "Normalize endpoint order, then return the closest endpoint or the unchanged value.",
+        "edge_cases_considered": ["reversed bounds are normalized", "inclusive endpoints"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Swap low and high when low > high.", "related_requirements": ["R1"], "expected_code_behavior": "No exception is raised for reversed bounds."},
+          {"step_id": "S2", "content": "Clamp against the normalized endpoints.", "related_requirements": ["R2", "R3", "R4"], "expected_code_behavior": "The normalized interval is used."}
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def clamp(value: float, low: float, high: float) -> float:\n    if low > high:\n        raise ValueError(\"low must not exceed high\")\n    if value < low:\n        return low\n    if value > high:\n        return high\n    return value\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:deduplicate_preserve_order:reasoning_swap:v1",
+      "parent_trace_id": "public-parent:deduplicate_preserve_order:v1",
+      "mutation_kind": "reasoning_swap",
+      "sole_change": "Replace only the deduplication explanation with a claim that last occurrences are returned in reverse order.",
+      "expected_impact": "Public execution remains passing because code is unchanged, while the described ordering policy is wrong.",
+      "expected_execution_status": "pass",
+      "solution_trace": {
+        "problem_id": "deduplicate_preserve_order",
+        "requirement_understanding": "Keep the last occurrence of each item and return the unique values in reverse order.",
+        "design_summary": "Traverse from right to left and retain last occurrences.",
+        "edge_cases_considered": ["empty input", "repeated values", "reverse ordering"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Traverse the input from right to left.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "Last occurrences are encountered first."},
+          {"step_id": "S2", "content": "Append unseen items in reverse traversal order.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "The final output is reverse ordered."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def deduplicate_preserve_order(items: list) -> list:\n    if not items:\n        return []\n    seen = {items[0]}\n    result = [items[0]]\n    for item in items[1:]:\n        if item not in seen:\n            seen.add(item)\n            result.append(item)\n    return result\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:safe_mean:code_defect:v1",
+      "parent_trace_id": "public-parent:safe_mean:v1",
+      "mutation_kind": "code_defect",
+      "sole_change": "Change only the non-empty divisor from len(nums) to len(nums) + 1.",
+      "expected_impact": "The explanation remains correct, but ordinary non-empty means fail public tests.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "safe_mean",
+        "requirement_understanding": "The function must special-case an empty list and compute the ordinary arithmetic mean otherwise.",
+        "design_summary": "Guard the empty boundary first, then divide the sum by the number of elements.",
+        "edge_cases_considered": ["empty list", "single element", "negative and positive values"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return 0.0 when nums is empty.", "related_requirements": ["R1"], "expected_code_behavior": "An explicit empty-list guard returns before division."},
+          {"step_id": "S2", "content": "For non-empty nums, divide sum(nums) by len(nums).", "related_requirements": ["R2"], "expected_code_behavior": "The returned value is the arithmetic mean."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(1)",
+        "code": "def safe_mean(nums: list[float]) -> float:\n    if not nums:\n        return 0.0\n    return sum(nums) / (len(nums) + 1)\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:clamp:code_defect:v1",
+      "parent_trace_id": "public-parent:clamp:v1",
+      "mutation_kind": "code_defect",
+      "sole_change": "Change only the above-high return value from high to low.",
+      "expected_impact": "The explanation remains correct, but values above high are clamped to the wrong endpoint.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "clamp",
+        "requirement_understanding": "Reject an invalid interval, then return the nearest endpoint for out-of-range values and the value itself otherwise.",
+        "design_summary": "Validate bounds before applying lower and upper comparisons in order.",
+        "edge_cases_considered": ["low greater than high", "value equal to low", "value equal to high", "negative bounds"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Raise ValueError for low > high.", "related_requirements": ["R1"], "expected_code_behavior": "Invalid intervals stop before clamping."},
+          {"step_id": "S2", "content": "Return low when value is below low.", "related_requirements": ["R2"], "expected_code_behavior": "The lower endpoint is returned."},
+          {"step_id": "S3", "content": "Return high when value is above high.", "related_requirements": ["R3"], "expected_code_behavior": "The upper endpoint is returned."},
+          {"step_id": "S4", "content": "Return value when it is inside the interval.", "related_requirements": ["R4"], "expected_code_behavior": "Inclusive boundary values remain unchanged."}
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def clamp(value: float, low: float, high: float) -> float:\n    if low > high:\n        raise ValueError(\"low must not exceed high\")\n    if value < low:\n        return low\n    if value > high:\n        return low\n    return value\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:deduplicate_preserve_order:code_defect:v1",
+      "parent_trace_id": "public-parent:deduplicate_preserve_order:v1",
+      "mutation_kind": "code_defect",
+      "sole_change": "Change only the insertion operation for unseen later items from append to insertion at index zero.",
+      "expected_impact": "The explanation remains correct and duplicates are removed, but first-occurrence order is reversed for later items.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "deduplicate_preserve_order",
+        "requirement_understanding": "Return first occurrences in their original order and handle the empty list explicitly.",
+        "design_summary": "Guard empty input, seed the result with the first item, then append unseen later items while tracking a set.",
+        "edge_cases_considered": ["empty list", "single element", "all equal", "already unique"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return an empty list when items is empty.", "related_requirements": ["R3"], "expected_code_behavior": "No first-element access occurs for empty input."},
+          {"step_id": "S2", "content": "Seed seen and result with the first item.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "The first occurrence starts the ordered output."},
+          {"step_id": "S3", "content": "Append each later item only when it has not been seen.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "Later duplicates are skipped and order is retained."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def deduplicate_preserve_order(items: list) -> list:\n    if not items:\n        return []\n    seen = {items[0]}\n    result = [items[0]]\n    for item in items[1:]:\n        if item not in seen:\n            seen.add(item)\n            result.insert(0, item)\n    return result\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:safe_mean:boundary_deletion:v1",
+      "parent_trace_id": "public-parent:safe_mean:v1",
+      "mutation_kind": "boundary_deletion",
+      "sole_change": "Delete only the empty-list guard from safe_mean.",
+      "expected_impact": "The public empty-list challenge raises ZeroDivisionError while non-empty behavior is unchanged.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "safe_mean",
+        "requirement_understanding": "The function must special-case an empty list and compute the ordinary arithmetic mean otherwise.",
+        "design_summary": "Guard the empty boundary first, then divide the sum by the number of elements.",
+        "edge_cases_considered": ["empty list", "single element", "negative and positive values"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return 0.0 when nums is empty.", "related_requirements": ["R1"], "expected_code_behavior": "An explicit empty-list guard returns before division."},
+          {"step_id": "S2", "content": "For non-empty nums, divide sum(nums) by len(nums).", "related_requirements": ["R2"], "expected_code_behavior": "The returned value is the arithmetic mean."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(1)",
+        "code": "def safe_mean(nums: list[float]) -> float:\n    return sum(nums) / len(nums)\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:clamp:boundary_deletion:v1",
+      "parent_trace_id": "public-parent:clamp:v1",
+      "mutation_kind": "boundary_deletion",
+      "sole_change": "Delete only the invalid-interval guard from clamp.",
+      "expected_impact": "The public low-greater-than-high challenge no longer raises ValueError.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "clamp",
+        "requirement_understanding": "Reject an invalid interval, then return the nearest endpoint for out-of-range values and the value itself otherwise.",
+        "design_summary": "Validate bounds before applying lower and upper comparisons in order.",
+        "edge_cases_considered": ["low greater than high", "value equal to low", "value equal to high", "negative bounds"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Raise ValueError for low > high.", "related_requirements": ["R1"], "expected_code_behavior": "Invalid intervals stop before clamping."},
+          {"step_id": "S2", "content": "Return low when value is below low.", "related_requirements": ["R2"], "expected_code_behavior": "The lower endpoint is returned."},
+          {"step_id": "S3", "content": "Return high when value is above high.", "related_requirements": ["R3"], "expected_code_behavior": "The upper endpoint is returned."},
+          {"step_id": "S4", "content": "Return value when it is inside the interval.", "related_requirements": ["R4"], "expected_code_behavior": "Inclusive boundary values remain unchanged."}
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def clamp(value: float, low: float, high: float) -> float:\n    if value < low:\n        return low\n    if value > high:\n        return high\n    return value\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:deduplicate_preserve_order:boundary_deletion:v1",
+      "parent_trace_id": "public-parent:deduplicate_preserve_order:v1",
+      "mutation_kind": "boundary_deletion",
+      "sole_change": "Delete only the empty-list guard before first-element access in deduplicate_preserve_order.",
+      "expected_impact": "The public empty-list case raises IndexError while non-empty logic remains unchanged.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "deduplicate_preserve_order",
+        "requirement_understanding": "Return first occurrences in their original order and handle the empty list explicitly.",
+        "design_summary": "Guard empty input, seed the result with the first item, then append unseen later items while tracking a set.",
+        "edge_cases_considered": ["empty list", "single element", "all equal", "already unique"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return an empty list when items is empty.", "related_requirements": ["R3"], "expected_code_behavior": "No first-element access occurs for empty input."},
+          {"step_id": "S2", "content": "Seed seen and result with the first item.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "The first occurrence starts the ordered output."},
+          {"step_id": "S3", "content": "Append each later item only when it has not been seen.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "Later duplicates are skipped and order is retained."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def deduplicate_preserve_order(items: list) -> list:\n    seen = {items[0]}\n    result = [items[0]]\n    for item in items[1:]:\n        if item not in seen:\n            seen.add(item)\n            result.append(item)\n    return result\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:safe_mean:shortcut:v1",
+      "parent_trace_id": "public-parent:safe_mean:v1",
+      "mutation_kind": "shortcut",
+      "sole_change": "Replace only the general safe_mean body with hard-coded visible-example branches and a constant fallback.",
+      "expected_impact": "Visible examples pass, but unseen non-zero-mean public challenges fail.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "safe_mean",
+        "requirement_understanding": "The function must special-case an empty list and compute the ordinary arithmetic mean otherwise.",
+        "design_summary": "Guard the empty boundary first, then divide the sum by the number of elements.",
+        "edge_cases_considered": ["empty list", "single element", "negative and positive values"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return 0.0 when nums is empty.", "related_requirements": ["R1"], "expected_code_behavior": "An explicit empty-list guard returns before division."},
+          {"step_id": "S2", "content": "For non-empty nums, divide sum(nums) by len(nums).", "related_requirements": ["R2"], "expected_code_behavior": "The returned value is the arithmetic mean."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(1)",
+        "code": "def safe_mean(nums: list[float]) -> float:\n    if nums == [1, 2, 3]:\n        return 2.0\n    if nums == [10.0]:\n        return 10.0\n    return 0.0\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:clamp:shortcut:v1",
+      "parent_trace_id": "public-parent:clamp:v1",
+      "mutation_kind": "shortcut",
+      "sole_change": "Replace only the general clamp body with hard-coded visible examples and an identity fallback.",
+      "expected_impact": "Visible examples pass, but above-high, invalid-interval, and unseen lower-bound challenges fail.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "clamp",
+        "requirement_understanding": "Reject an invalid interval, then return the nearest endpoint for out-of-range values and the value itself otherwise.",
+        "design_summary": "Validate bounds before applying lower and upper comparisons in order.",
+        "edge_cases_considered": ["low greater than high", "value equal to low", "value equal to high", "negative bounds"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Raise ValueError for low > high.", "related_requirements": ["R1"], "expected_code_behavior": "Invalid intervals stop before clamping."},
+          {"step_id": "S2", "content": "Return low when value is below low.", "related_requirements": ["R2"], "expected_code_behavior": "The lower endpoint is returned."},
+          {"step_id": "S3", "content": "Return high when value is above high.", "related_requirements": ["R3"], "expected_code_behavior": "The upper endpoint is returned."},
+          {"step_id": "S4", "content": "Return value when it is inside the interval.", "related_requirements": ["R4"], "expected_code_behavior": "Inclusive boundary values remain unchanged."}
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def clamp(value: float, low: float, high: float) -> float:\n    if (value, low, high) == (5, 0, 10):\n        return 5\n    if (value, low, high) == (-5, 0, 10):\n        return 0\n    return value\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:deduplicate_preserve_order:shortcut:v1",
+      "parent_trace_id": "public-parent:deduplicate_preserve_order:v1",
+      "mutation_kind": "shortcut",
+      "sole_change": "Replace only the general deduplication body with hard-coded visible examples and an identity fallback.",
+      "expected_impact": "Visible examples pass, but unseen repeated-item challenges keep duplicates.",
+      "expected_execution_status": "fail",
+      "solution_trace": {
+        "problem_id": "deduplicate_preserve_order",
+        "requirement_understanding": "Return first occurrences in their original order and handle the empty list explicitly.",
+        "design_summary": "Guard empty input, seed the result with the first item, then append unseen later items while tracking a set.",
+        "edge_cases_considered": ["empty list", "single element", "all equal", "already unique"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return an empty list when items is empty.", "related_requirements": ["R3"], "expected_code_behavior": "No first-element access occurs for empty input."},
+          {"step_id": "S2", "content": "Seed seen and result with the first item.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "The first occurrence starts the ordered output."},
+          {"step_id": "S3", "content": "Append each later item only when it has not been seen.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "Later duplicates are skipped and order is retained."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def deduplicate_preserve_order(items: list) -> list:\n    if items == [1, 2, 1, 3, 2]:\n        return [1, 2, 3]\n    if items == []:\n        return []\n    return list(items)\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:safe_mean:equivalent_implementation:v1",
+      "parent_trace_id": "public-parent:safe_mean:v1",
+      "mutation_kind": "equivalent_implementation",
+      "sole_change": "Replace only sum(nums) with an explicit accumulation loop before the same division.",
+      "expected_impact": "All public behavior remains correct under a legal equivalent implementation.",
+      "expected_execution_status": "pass",
+      "solution_trace": {
+        "problem_id": "safe_mean",
+        "requirement_understanding": "The function must special-case an empty list and compute the ordinary arithmetic mean otherwise.",
+        "design_summary": "Guard the empty boundary first, then divide the sum by the number of elements.",
+        "edge_cases_considered": ["empty list", "single element", "negative and positive values"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return 0.0 when nums is empty.", "related_requirements": ["R1"], "expected_code_behavior": "An explicit empty-list guard returns before division."},
+          {"step_id": "S2", "content": "For non-empty nums, divide sum(nums) by len(nums).", "related_requirements": ["R2"], "expected_code_behavior": "The returned value is the arithmetic mean."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(1)",
+        "code": "def safe_mean(nums: list[float]) -> float:\n    if not nums:\n        return 0.0\n    total = 0\n    for value in nums:\n        total += value\n    return total / len(nums)\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:clamp:equivalent_implementation:v1",
+      "parent_trace_id": "public-parent:clamp:v1",
+      "mutation_kind": "equivalent_implementation",
+      "sole_change": "Replace only the ordered endpoint branches with min(high, max(low, value)) after the same validation.",
+      "expected_impact": "All public behavior remains correct under a legal equivalent implementation.",
+      "expected_execution_status": "pass",
+      "solution_trace": {
+        "problem_id": "clamp",
+        "requirement_understanding": "Reject an invalid interval, then return the nearest endpoint for out-of-range values and the value itself otherwise.",
+        "design_summary": "Validate bounds before applying lower and upper comparisons in order.",
+        "edge_cases_considered": ["low greater than high", "value equal to low", "value equal to high", "negative bounds"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Raise ValueError for low > high.", "related_requirements": ["R1"], "expected_code_behavior": "Invalid intervals stop before clamping."},
+          {"step_id": "S2", "content": "Return low when value is below low.", "related_requirements": ["R2"], "expected_code_behavior": "The lower endpoint is returned."},
+          {"step_id": "S3", "content": "Return high when value is above high.", "related_requirements": ["R3"], "expected_code_behavior": "The upper endpoint is returned."},
+          {"step_id": "S4", "content": "Return value when it is inside the interval.", "related_requirements": ["R4"], "expected_code_behavior": "Inclusive boundary values remain unchanged."}
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def clamp(value: float, low: float, high: float) -> float:\n    if low > high:\n        raise ValueError(\"low must not exceed high\")\n    return min(high, max(low, value))\n"
+      }
+    },
+    {
+      "trace_id": "counterfactual:deduplicate_preserve_order:equivalent_implementation:v1",
+      "parent_trace_id": "public-parent:deduplicate_preserve_order:v1",
+      "mutation_kind": "equivalent_implementation",
+      "sole_change": "Replace only the explicit seen-set loop with ordered dictionary-key construction.",
+      "expected_impact": "All public behavior remains correct under a legal equivalent implementation.",
+      "expected_execution_status": "pass",
+      "solution_trace": {
+        "problem_id": "deduplicate_preserve_order",
+        "requirement_understanding": "Return first occurrences in their original order and handle the empty list explicitly.",
+        "design_summary": "Guard empty input, seed the result with the first item, then append unseen later items while tracking a set.",
+        "edge_cases_considered": ["empty list", "single element", "all equal", "already unique"],
+        "implementation_steps": [
+          {"step_id": "S1", "content": "Return an empty list when items is empty.", "related_requirements": ["R3"], "expected_code_behavior": "No first-element access occurs for empty input."},
+          {"step_id": "S2", "content": "Seed seen and result with the first item.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "The first occurrence starts the ordered output."},
+          {"step_id": "S3", "content": "Append each later item only when it has not been seen.", "related_requirements": ["R1", "R2"], "expected_code_behavior": "Later duplicates are skipped and order is retained."}
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def deduplicate_preserve_order(items: list) -> list:\n    return list(dict.fromkeys(items))\n"
+      }
+    }
+  ]
+}

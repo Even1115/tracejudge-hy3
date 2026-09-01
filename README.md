@@ -65,14 +65,16 @@ TraceJudge-Hy3 不只判断代码是否通过测试，还尝试验证它是否"�
 - 可选的 Hy3 OpenAI-compatible Provider：环境变量配置、超时与可配置的有限重试、JSON Schema/上下文引用校验后的修复重试（`HY3_MAX_RETRIES` 控制总额外调用，`HY3_MAX_PARSE_REPAIRS` 单独控制 JSON 修复调用硬上限）、耗时记录、日志中不暴露密钥片段（[`src/tracejudge_hy3/providers/hy3_openai.py`](src/tracejudge_hy3/providers/hy3_openai.py)）。
 - 阶段一基线生成器：为每次运行创建唯一 `run_id`，逐题原子持久化原始输出与解析后 `SolutionTrace`，支持断点续跑、单题失败隔离和非敏感实验元数据（[`src/tracejudge_hy3/baseline/`](src/tracejudge_hy3/baseline/)）。
 - 基于 `ast` 的静态分析：`if` / `for` / `while` 分类计数、输入相关循环、最大嵌套深度、比较运算符、数据结构、函数调用、返回行号、空输入与可疑硬编码启发式（[`src/tracejudge_hy3/static_analysis/ast_analyzer.py`](src/tracejudge_hy3/static_analysis/ast_analyzer.py)）。
-- 沙盒执行：`DockerSandbox`（默认，用于真实模型代码，仅提供基础隔离）与 `TrustedLocalSandbox`（默认仅允许仓库内置且精确匹配的 Mock Fixture；其他代码需显式 `--allow-unsafe-local-exec`）（[`src/tracejudge_hy3/sandbox/`](src/tracejudge_hy3/sandbox/)）。
+- 沙盒执行：`DockerSandbox`（默认，用于真实模型代码，仅提供基础隔离）与 `TrustedLocalSandbox`（默认仅允许仓库内置且精确匹配的 Mock Fixture；阶段三另只放行 SHA256 精确匹配的公开反事实 bundle；其他代码需显式 `--allow-unsafe-local-exec`）（[`src/tracejudge_hy3/sandbox/`](src/tracejudge_hy3/sandbox/)）。
 - 测试运行器：位置/关键字参数从 JSON 加载，不使用 `eval()`；父进程为每个用例创建新子进程并强制超时，有界捕获 stdout/stderr，独立记录输出、异常、超时和退出码（[`src/tracejudge_hy3/sandbox/test_runner.py`](src/tracejudge_hy3/sandbox/test_runner.py)）。
 - 规则证据 + LLM 判断的四层评估：空输入声明—代码不一致、集合声明—代码不一致、单次遍历声明—嵌套循环不一致、复杂度声明不一致、执行失败归因（[`src/tracejudge_hy3/evaluator/`](src/tracejudge_hy3/evaluator/)）。
 - 反例生成：优先复用与当前违反需求条款相关的 challenge/hidden 测试失败结果，其次基于相关测试的参数形状生成有限边界候选并与参考实现差分执行，并对列表参数做简单 delta-debugging 最小化（[`src/tracejudge_hy3/counterexample/`](src/tracejudge_hy3/counterexample/)）。
 - 可执行错误证书聚合：新疑似问题直接产生 `confirmed_bug` / `strongly_supported` / `unverified_suspicion` 三种裁决。普通首次运行正确时不产生证书；`cleared` 仅用于显式传入既有证书后，复核的完整执行证据表明原疑似问题不再成立的状态转移（[`src/tracejudge_hy3/evaluator/evidence.py`](src/tracejudge_hy3/evaluator/evidence.py)）。
-- CLI（Typer + Rich）：`doctor` / `demo` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `evalplus` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
+- CLI（Typer + Rich）：`doctor` / `demo` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `evalplus` / Gate B 四个 `phase3 counterfactual-*` 命令 / Gate C `phase3 paired-preflight` / Gate D `phase3 certificate-preflight`、`certificate-generate`、`replay` / Gate E1 `phase3 annotation-packet-preflight`、`annotation-packet-export` / Gate E2 `phase3 annotation-labels-check`、`annotation-labels-freeze-preflight`、`annotation-labels-freeze` / Gate E3 `phase3 evaluate-preflight`、`evaluate` / Gate E4 `phase3 statistics-preflight`、`statistics` / Gate F `phase3 report-preflight`、`report` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
 - HumanEval+ 阶段一公开投影适配器：校验本地固定 revision 快照及其受控来源 manifest，把 164 道公开题面转换为不含答案/测试的 `ProblemSpec`，并仅依据公开 `problem_id` 生成固定种子 10 题 Pilot（`20260824`）或排除 Pilot 后的 45 题自然研究子集（`20260825`，schema v2）（[`src/tracejudge_hy3/dataset/humanevalplus.py`](src/tracejudge_hy3/dataset/humanevalplus.py)）。
 - HumanEval+ 阶段二官方执行适配器：严格验证阶段一产物后只导出 `solution_trace.code`，支持 `all` 与 `phase1-success-only` 两种选择策略；在固定 digest 的官方镜像中逐题运行 Base 和 Extra 测试，并生成脱敏的单样本工程结果（[`src/tracejudge_hy3/evalplus/`](src/tracejudge_hy3/evalplus/)）。
+- 阶段三 Gate A–C 已完成：正式自然 manifest 冻结 42 条轨迹，SHA256 `a4116a7ddb7ac910b79bd52e9530db79dd0f05c9edee8ecd947fc78c35c03692`；公开反事实证据 run 独立执行 15 个主体，实际 `6 pass / 9 fail`、0 超时、0 基础设施错误、0 预期偏差，results SHA256 `19a138ecc2ce784b940e88e085a85ddddf92a564be7235bbd5a3e97bb39d2776`；最终 overlay 冻结 42 + 15 = 57 条五方法配对顺序，SHA256 `3290221625d687e6d7412a0544247dc81a34857b114a545458b93cc04e35d255`。Gate C 只读验收核算 57 × 5 = 285 个配对，方法规格、Prompt bundle、输出 schema SHA256 分别为 `4b8684852125ad3059b5001951479a2f164c7089eb64ff10cbdafafc39c534ff`、`c8d6c2c0f6bb1207af987746d912868bd102f90b334f5425528cbda5be9dd366`、`96da92777ee89bb69a65c61f4bdc9fc9e7cb7ac1ba94a52400f79ca1130821f3`，且未执行方法、Provider、Docker 或网络（[`src/tracejudge_hy3/phase3/`](src/tracejudge_hy3/phase3/)）。
+- 阶段三 Gate D 已完成三等级公开工程证书发布与 confirmed 证书独立重放；Gate E1 正式私有盲法 packet 已导出，Gate E2 单人首轮 57 条标签已冻结。Gate E3 正式运行 `phase3_hy3_57x5_v1` 已产出完整 285 配对，其中 `valid_judgment=283`、`provider_error=2`；results / index SHA256 分别为 `332932e949281c84402046dbd25e0110fb7a7e7e224c71b17487226fa1098999` / `b1a6c6a61a4439d3e667ebd52ddba8cba98f8ee196c1cac8dce200f38c857247`。Gate E4 正式聚合统计已冻结，manifest / report SHA256 分别为 `7efbdc9c36340593be09e192ea0e7b15297d5e69c4192fa4b49583558b368bf8` / `972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10`。Gate F 正式脱敏报告 `phase3_report_primary_round1_v1` 已发布，manifest / Markdown / validation SHA256 分别为 `0b8285ec04344e29670d752a37c4d5ecb41ea07d5dfc18a5715b56de3e800b06` / `29eaef9f44a964308ab26b9821c472b0d13837eee587a3e687faa861edb4d725` / `702bf96be5d0911088dfea5cb95562d6b8e25d147d972c78b0b6870cecbae113`，验证状态为 `ANALYZED`、总体置信为 `CAUTION`。
 - 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`），来源标记为 `self_constructed_mvp_fixture`（见 §10 和 §15）。
 - 指标计算：10 个纯函数指标，缺少人工标注时返回 `not_computable` 而不是伪造数值（[`src/tracejudge_hy3/reporting/metrics.py`](src/tracejudge_hy3/reporting/metrics.py)）。
 - 单元测试与集成测试（`pytest`），Lint（`ruff`）。
@@ -82,7 +84,7 @@ TraceJudge-Hy3 不只判断代码是否通过测试，还尝试验证它是否"�
 见 [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) 的完整分类，摘要如下：
 
 - HumanEval+ 数据的项目内自动下载、完整 164 题正式评测，以及 MBPP+ 接入与大规模评测；
-- 反事实配对挑战集、人工标注集、消融实验、对照实验；
+- 第二标注者/重测一致性、扩展消融与更大规模复现；
 - Web 前端、多 Agent 编排；
 - 仓库级代码修改、多文件生成、多语言执行；
 - 完整控制流图 / 符号执行 / mutation testing；
@@ -331,6 +333,95 @@ Docker task 使用只读 control、只读根文件系统、无网络、资源/PI
 
 该固定 EvalPlus commit 的官方 raw 只报告 `pass` / `fail` / `timeout`；`fail` 同时包含错误答案、语法错误、缺失入口和普通候选异常，因此 summary 不伪造可细分的 execution-error 数。Base+Extra 通过只在 Base 和 Plus 状态都为 `pass` 时成立；通过率分母是实际完成官方执行的题数，不把基础设施失败当作代码失败。
 
+### 阶段三 Gate B：冻结 research-natural 自然轨迹
+
+`tracejudge phase3 preflight` 执行与冻结相同的全链路只读校验和内存 manifest 构造，但不创建输出目录或文件；失败时只报告固定安全阶段码。预检通过后，`tracejudge phase3 freeze` 才按预注册的 `all_phase1_successes` 规则原子冻结全部阶段一成功轨迹。两者都不调用 Hy3、Judge 或 Docker，不执行候选代码，也不打开阶段二 `samples.jsonl` / `evalplus_raw_results.json`。
+
+先执行预检，并在安全阶段码或成功核算得到确认后单独决定是否执行冻结：
+
+```bash
+tracejudge phase3 preflight \
+  --phase1-run artifacts/experiments/phase1-research-natural/phase1_20260826T130038779522Z_5f55a45bb5e5 \
+  --phase2-run artifacts/experiments/phase2-research-natural/phase2_20260827T081939637435Z_3c366f64fc19 \
+  --dataset-manifest artifacts/datasets/processed/humanevalplus-research-natural-45/dataset_manifest.json \
+  --freeze-id phase3_natural_42_v1 \
+  --output-dir artifacts/experiments/phase3-freezes
+```
+
+只有预检通过后才使用以下发布命令：
+
+```bash
+tracejudge phase3 freeze \
+  --phase1-run artifacts/experiments/phase1-research-natural/phase1_20260826T130038779522Z_5f55a45bb5e5 \
+  --phase2-run artifacts/experiments/phase2-research-natural/phase2_20260827T081939637435Z_3c366f64fc19 \
+  --dataset-manifest artifacts/datasets/processed/humanevalplus-research-natural-45/dataset_manifest.json \
+  --freeze-id phase3_natural_42_v1 \
+  --output-dir artifacts/experiments/phase3-freezes
+```
+
+正式输出为 `artifacts/experiments/phase3-freezes/phase3_natural_42_v1/manifest.json`，SHA256 为 `a4116a7ddb7ac910b79bd52e9530db79dd0f05c9edee8ecd947fc78c35c03692`。同名目录存在时拒绝覆盖。manifest 记录 45 条来源的完整状态核算、42 条成功轨迹顺序、阶段一响应行与阶段二安全结果行引用、候选/说明/题面哈希和五种配对方法 ID；不保存 Provider raw、候选代码正文、说明正文、官方测试输入或 EvalPlus raw。该 manifest 只冻结自然轨迹，不表示五种方法已经运行，也不构成阶段三实验结论。
+
+### 阶段三 Gate B：公开反事实证据与 overlay
+
+公开反事实源固定为 `data/phase3/public_counterfactuals_v1.json`（SHA256 `a6195fb0867c69607bfa7a346b8112c49dfbe4d9d85700e2238d5bb1e22731df`）：3 个父 Fixture，五类各 3 条，共 15 条。父 Fixture 只用于派生和同代码证据，不进入研究分母。正式操作必须逐门槛进行，先只读预检：
+
+```bash
+tracejudge phase3 counterfactual-preflight \
+  --execution-run-id phase3_cf_public_15_v1 \
+  --source-bundle data/phase3/public_counterfactuals_v1.json \
+  --output-dir artifacts/experiments/phase3-public-evidence
+```
+
+该命令不执行代码、不创建产物。确认预检显示 3 个父 Fixture、15 条反事实、15 个执行主体、预期 `6 / 9` 后，才可显式运行 `counterfactual-execute`。执行器不调用 Provider/Docker/Judge，只运行精确 SHA 白名单化的公开自建代码；它使用同机子进程和父进程超时，不是面向恶意代码的安全沙盒。执行结束会保留全部实际 pass/fail/timeout/基础设施错误与预期偏差，不自动重试。
+
+证据无超时、基础设施错误或预期偏差后，先运行 `counterfactual-freeze-preflight` 完整核对自然 manifest、源 bundle、执行 manifest/results 和每条证据绑定，再由 `counterfactual-freeze` 原子发布 overlay。overlay 不改写自然 manifest；正式 42 条自然 + 15 条反事实将形成 57 条固定五方法配对顺序。任何同名目录、哈希变化、case/代码/说明绑定变化都会拒绝冻结。
+
+正式 Gate B 已得到 57 条 overlay：`artifacts/experiments/phase3-freezes/phase3_cohort_42_plus_15_v1/manifest.json`，SHA256 为 `3290221625d687e6d7412a0544247dc81a34857b114a545458b93cc04e35d255`。该产物仍只是研究输入，不是五方法结果。
+
+### 阶段三 Gate C：五方法统一接口
+
+`phase3/runner.py` 将自然 manifest 和 overlay 的精确字节哈希、57 条顺序、轨迹正文哈希及功能证据绑定后，以 trace-major 顺序生成完整 57 × 5 = 285 对。Test-only 仅看脱敏功能证据；其他四种方法分别按冻结白名单加入题面/说明/代码、AST 和公开动态证据。四个 Judge Prompt 独立版本化，共用 `MethodJudgment` 严格 schema；只允许“首次严格 JSON/Schema 失败→一次脱敏修复”，不会对 Provider 错误自动重试。
+
+只读预检命令为：
+
+```bash
+tracejudge phase3 paired-preflight \
+  --cohort-manifest artifacts/experiments/phase3-freezes/phase3_cohort_42_plus_15_v1/manifest.json \
+  --natural-manifest artifacts/experiments/phase3-freezes/phase3_natural_42_v1/manifest.json \
+  --provider mock \
+  --model deterministic-phase3-mock-v1 \
+  --temperature 0 \
+  --timeout-seconds 120
+```
+
+该命令只读取两份白名单 manifest，核算方法规格、Prompt bundle 和输出 schema 哈希；不读取候选/说明正文，不创建产物，不运行五方法，也不连接 Provider、Docker 或网络。正式 Hy3 参数与执行由 Gate E3 的独立预检和显式授权入口处理。
+
+正式只读验收已通过：自然 42 + 反事实 15 = 57 条、五方法、完整笛卡尔积 285 对；方法规格 SHA256 为 `4b8684852125ad3059b5001951479a2f164c7089eb64ff10cbdafafc39c534ff`，Prompt bundle SHA256 为 `c8d6c2c0f6bb1207af987746d912868bd102f90b334f5425528cbda5be9dd366`，输出 schema SHA256 为 `96da92777ee89bb69a65c61f4bdc9fc9e7cb7ac1ba94a52400f79ca1130821f3`。其中方法规格哈希绑定的是 `mock / deterministic-phase3-mock-v1 / temperature=0 / timeout=120s` 的 Gate C 接口身份；它不是正式 Hy3 运行规格或研究结果。
+
+### 阶段三 Gate D：公开反例与错误证书
+
+`phase3/public_evidence.py` 固定“公开 challenge → 最多 32 个确定性探针 → 最多 16 次列表最小化”的公开策略；只允许从 SHA256 精确白名单源恢复公开自建 Fixture。`phase3/replay.py` 不信任证书中的代码，也不接受 HumanEval+ 或外部候选；它重新绑定自然 manifest、overlay、公开源、代码/说明/功能证据哈希后，只执行一个公开反例，并要求重放得到与证书相同的执行证据哈希。
+
+公开工程 claim bundle `data/phase3/public_certificate_claims_v1.json` 的 SHA256 为 `3b1df5e5a1e43c1b91e626c8656495a03d332bd4a5231550eb88c8928b93bb5f`，分别覆盖一个 `confirmed_bug`、一个 `strongly_supported` 和一个 `unverified_suspicion`。它只验证三等级降级语义和 replay 链路，不是五方法预测或人工金标。正式证书 manifest SHA256 为 `4d4d2f8ce5ee86d96aaeffbec2f2d686a395427a340703534b8460a866f144e8`，三证书 payloads SHA256 为 `19661ef014cd79d423a314adc52664fadc3b4c65959f99f8ef79854f0525af53`；confirmed 证书的独立 replay 成功复现一个公开失败，执行证据 SHA256 `cfd897334643853fc10901835a5203aa51ee7edd4442e314893c1e5bc152e670` 与证书一致。未调用 Provider、Docker 或网络；Gate D 已退出。
+
+### 阶段三 Gate E1：冻结协议与盲法标注包
+
+Gate E1 将标注指南与机器可校验协议分开冻结：`docs/experiments/phase3_annotation_guide_v1.md` SHA256 为 `0c789671fc926e8286ca7317eae0496efc9f39616783b2c8cbebd678de20beb1`，`data/phase3/annotation_protocol_v1.json` SHA256 为 `a2d77ae20102364170a6391c544437601c6e5871e86b9a01f64ad9492556ea85`。协议固定正类、失败分母、`unverified_suspicion` 处理、两项主比较、exact McNemar、父题聚类 bootstrap（10,000 次、seed `20260828`）和 Holm 口径。
+
+`annotation-packet-preflight` 只读重建并哈希绑定 57 条白名单材料，不写文件、不执行候选，也不调用 Provider、Docker 或网络。`annotation-packet-export` 在同一身份通过后，把固定随机顺序的 opaque item、协调者 identity map 和未填写标签模板原子写入 Git-ignored 私有目录，权限为 `0700/0600`。packet 不包含五方法预测、其他标注者标签、反事实修改/预期影响/预期状态或官方隐藏输入；identity map 不应交给独立标注者。生成模板本身不等于取得人工标签；本轮后续已完成 Gate E2 冻结标签、E3 真实五方法运行和 E4 配对统计。
+
+正式导出已固定 42 + 15 = 57 条；manifest / packet / identity map / 标签模板 SHA256 分别为 `b9897cb33631f21d6762fabadbafb84bf3ec8dfbafd9e026debf907be4851ee1` / `a8d2c328bc6d041d013f452edc28b4a552eae35f19d44139b99fa6855faf801d` / `c28cde4fc4b20c9b568b0e55d905218e9247b747797f6a9635b81ca157c74ec1` / `9700028c4f57f9e1f0674b37268d1c9f98a7316f27505fb522024912f5816db1`。
+
+Gate E2 的 `annotation-labels-check` 只读 packet manifest、空模板和 working 标签，报告完成、待标注、无效、缺失、额外和顺序偏差，不打开 identity map。只有全部 57 条严格完成时，`annotation-labels-freeze-preflight` 才只读回连冻结 cohort；`annotation-labels-freeze` 再把规范化 opaque 标签和 trace-major 标注记录写入新的 Git-ignored `0700/0600` 目录。空模板、working 副本或进度检查都不是正式人工标签。
+
+正式主标注集 `phase3_labels_primary_round1_v1` 已冻结 42 + 15 = 57 条；manifest / completed labels / annotation records SHA256 分别为 `fbf89aa950318392e49d01a5235461c4ce6ae94acb55842b963bb54048eac0a3` / `17b4e1b43fd2161aff7a0b3d63a7f5f31a89992db9fe75823697d2ac4c32d98d` / `ffbee2c546a6e0f560a96c8c610661258216c9ef627af8ffd3e6ff60ca1e8299`。它是单标注者、单轮次的私有标签集，`agreement_kind=not_computed`，不声称标注者间一致性。
+
+Gate E3 的 `phase3 evaluate-preflight` 只读重建并哈希绑定 57 条方法材料、冻结人工标签、五方法规格、Hy3 公开配置与续跑身份；它不创建目录、不执行候选、不连接 Provider/Docker/网络。`phase3 evaluate` 必须显式传入 `--confirm-real-provider`，对 57 条轨迹产生 285 个 trace-major 配对；Test-only 不调 Provider，其余 228 对每对最多一次修复，最大 456 次 Provider 调用。正式运行 `phase3_hy3_57x5_v1` 已完成：完整配对 285、`valid_judgment=283`、`provider_error=2`、无恢复复用；失败继续保留在统计分母中。
+
+Gate E4 的 `phase3 statistics-preflight` 严格绑定 cohort、私有人工标签 manifest/两个 payload、已完成 E3 run manifest/results/index、逐行哈希和 trace-major 顺序，在内存计算但不显示标签分布或方法结果，也不写文件。`phase3 statistics` 原子写入只含聚合数量的 `report.json` 与 `manifest.json`：主错误检测把无效结果计为错误并单独报告，自然轨迹对两个预注册基线使用双侧精确 McNemar 与 Holm 校正，反事实按父问题聚类进行固定 10,000 次 percentile bootstrap。正式 `phase3_stats_primary_round1_v1` 已发布，输出不含逐轨迹标签、标注理由、方法预测或 Provider raw。
+
+Gate F 的 `phase3 report-preflight` 只读绑定 E4 manifest/report、E3 结构化运行账本与 Gate D 公开 confirmed 证书，在内存生成结果解读但不展示方法成绩。`phase3 report` 会原子写入脱敏 Markdown、`validation.json`、公开证书副本与重放命令；强制 11/11 统计谬误扫描，将 Test-only 的过程字段写为 N/A，对反事实只用父题 cluster bootstrap 做推断，并明确禁止把不显著解释为等效。正式 `phase3_report_primary_round1_v1` 已发布，验收确认 11/11 扫描、`0700/0600` 权限、五个不可覆盖文件和脱敏声明一致。
+
 ## 7. 配置真实 Hy3
 
 复制 `.env.example` 为 `.env` 并填入真实值：
@@ -359,7 +450,7 @@ tracejudge run --dataset data/sample_problems.jsonl --problem-id safe_mean \
   --provider hy3 --sandbox docker
 ```
 
-真实 Hy3 调用仅作为**可选模式**，使用 `HY3_TIMEOUT_SECONDS` 和 `HY3_MAX_RETRIES` 限定单次超时与总尝试次数，不会无限重试。它不是 Mock dry run 或普通单元测试的前置条件；普通测试使用 Mock/替身，不访问真实 Hy3 API。真实 pilot 是否完成应以当次实验报告和实际产物为准。
+真实 Hy3 调用仅作为**可选模式**，使用 `HY3_TIMEOUT_SECONDS` 和 `HY3_MAX_RETRIES` 限定通用/阶段一入口的单次超时与总尝试次数，不会无限重试。Gate E3 为保留精确失败分母，额外将 Provider 交通重试固定为 0，仅严格 JSON 解析失败可进行一次结构化修复。真实 Hy3 不是 Mock dry run 或普通单元测试的前置条件；普通测试使用 Mock/替身，不访问真实 Hy3 API。真实 pilot 是否完成应以当次实验报告和实际产物为准。
 
 ## 8. 环境变量说明
 
@@ -462,10 +553,11 @@ tracejudge-hy3/
 │   ├── config.py               # 环境变量配置 (pydantic-settings)
 │   ├── schemas/                 # 所有 Pydantic v2 数据模型
 │   ├── providers/               # LLMProvider 抽象接口、Mock、Hy3 OpenAI-compatible
-│   ├── prompts/                 # Solver / Evaluator Prompt 构造
+│   ├── prompts/                 # Solver / Evaluator / 阶段三五方法 Prompt
 │   ├── parsing/                  # 结构化输出解析（含围栏/多余文本容错）
 │   ├── dataset/                  # JSONL 加载 + HumanEval+ 阶段一公开投影
 │   ├── evalplus/                 # 阶段二官方 EvalPlus 导出/隔离执行/脱敏
+│   ├── phase3/                   # 阶段三契约、Gate B 冻结与 Gate C 配对接口
 │   ├── static_analysis/          # AST 静态分析
 │   ├── sandbox/                  # Docker / TrustedLocal 沙盒 + 测试运行器
 │   ├── evaluator/                # 规则证据 + LLM 判断 + 组合 + 错误证书
@@ -476,7 +568,8 @@ tracejudge-hy3/
 │   ├── sample_problems.jsonl     # 3 道内置示例题
 │   ├── demo_annotations.jsonl    # Mock Fixture 的人工标注 Fixture
 │   ├── manifests/                # 公开数据固定 revision/哈希来源清单
-│   └── mock_responses/           # 确定性 Mock 解答
+│   ├── mock_responses/           # 确定性 Mock 解答
+│   └── phase3/                    # 公开自建反事实源 bundle（不含官方隐藏评测内容）
 ├── tests/
 ├── docs/
 │   ├── architecture.md
@@ -489,14 +582,14 @@ tracejudge-hy3/
 ## 14. 后续路线（v0.2+ 优先级参考）
 
 1. 将已落地的 HumanEval+ 10 题工程 Pilot 扩展为完整 164 题、多次复现的正式评测，接入 MBPP+，并构造研究级人工标注子集；
-2. 构建真实的反事实配对样本（reasoning 反事实、code 反事实、shortcut 反事实、equivalent 反事实、boundary 反事实）；
-3. 引入模块级消融实验（Test-only / Direct Judge / +四层对齐 / +静态分析 / 完整方法）；
+2. 在已完成的公开反例/证书 Gate D 基础上扩展更多独立公开 Fixture；
+3. 在已冻结的 Gate E1/E2 packet 与主标注上，通过 Gate E3 冻结 Hy3 方法参数并执行 Test-only / Direct Judge / 四层结构化 / +AST / 完整 TraceJudge 的正式配对实验；
 4. 扩展反例生成为更通用的属性测试与更完整的 delta-debugging；
 5. 简单结果可视化（图表）与批量评测报告。
 
 ## 15. 许可证与数据来源
 
 - 代码许可证见 [`LICENSE`](LICENSE)（MIT）。
-- `data/sample_problems.jsonl`、`data/mock_responses/`、`data/demo_annotations.jsonl` 均为本项目自建的工程验证 Fixture（`source: "self_constructed_mvp_fixture"`），不包含 HumanEval / MBPP 等公开题目正文。
+- `data/sample_problems.jsonl`、`data/mock_responses/`、`data/demo_annotations.jsonl` 均为本项目自建的工程验证 Fixture（`source: "self_constructed_mvp_fixture"`）；`data/phase3/public_counterfactuals_v1.json` 是 MIT 许可的公开自建阶段三反事实源。它们均不包含 HumanEval / MBPP 等公开题目正文或官方隐藏评测内容。
 - 仓库只提交 HumanEval+ 来源 manifest 和公开投影适配器；原始快照、生成出的 164 题投影、10 题 Pilot 与实验结果均位于被 Git 忽略的 `artifacts/`。HumanEval+ 来源及许可证记录见 [`data/manifests/evalplus_humanevalplus_d32357cf.json`](data/manifests/evalplus_humanevalplus_d32357cf.json)。
 - 本项目不训练或微调模型；模型能力调用通过用户自行配置的 Hy3（OpenAI-compatible）服务完成，仓库不包含任何真实密钥。

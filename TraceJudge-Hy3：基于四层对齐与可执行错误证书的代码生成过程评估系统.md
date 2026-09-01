@@ -7,8 +7,8 @@
 | 项目定位 | 面向 AI 生成代码的细粒度过程评估与首错定位系统 |
 | 方案版本 | v3.1 |
 | 实施形式 | 单人项目 |
-| 当前进度 | 阶段一、阶段二固定 10 题开发 Pilot 与 research-natural 正式运行已完成；阶段三研究验证待开展 |
-| 更新日期 | 2026-08-27 |
+| 当前进度 | 阶段一、阶段二固定 10 题开发 Pilot 与 research-natural 正式运行已完成；阶段三 Gate A–D 已完成，冻结 42 条自然 + 15 条公开反事实 = 57 条轨迹，Gate C 确认五方法完整配对 285，Gate D confirmed 工程证书已独立重放；Gate E1 packet 与 E2 单人首轮 57 条人工标签已冻结，E3 真实 Hy3 已完成 285 配对（283 有效、2 Provider 失败），E4 统计入口已实现但尚未生成正式统计产物 |
+| 更新日期 | 2026-08-31 |
 | 项目性质 | 犀牛鸟开源活动个人参赛作品，与腾讯官方发布无关 |
 
 ---
@@ -261,17 +261,17 @@ def safe_mean(nums):
 | 工程阶段 | 当前状态 | 已有证据 | 下一步 |
 | --- | --- | --- | --- |
 | 阶段 0 | 固定 10 题路径已完成；45 题自然研究 cohort bundle 已支持 | 已固定 HumanEval+ revision，建立 164 题公开投影能力和只依据公开题号选取的 10 题 bundle；新增排除 10 题 Pilot 的 45 题 schema v2 研究子集生成 | 为完整 164 题运行建立独立 bundle 和实验配置 |
-| 阶段一 | 固定 10 题真实 Pilot 已完成；解析可观测性 v2 与 repair 硬限制已完成 | 10/10 生成成功，10/10 解析成功，10/10 均在第一次调用成功；`HY3_MAX_RETRIES` 与 `HY3_MAX_PARSE_REPAIRS` 已分离，JSON repair 硬上限为 1 | 完成 45 题自然研究子集阶段一运行；不改写旧 Pilot |
-| 阶段二 | 固定 10 题真实 Pilot 已完成；`phase1-success-only` 选择策略已支持 | 10/10 实际执行，Base 10/10，Base+Extra 10/10，timeout、基础设施错误和容器清理失败均为 0 | 先执行正式 45 条自然研究子集（可接受阶段一成功数 ≥30）；完整 164 题作为独立 P1；保留 10 题快速回归 |
-| 阶段三 | 工程 MVP 已具备，研究级验证未完成 | 已有四层评估、有限边界候选、差分反例和错误证书 Fixture | 先完成非 Pilot 的 30—45 条自然子集阶段一/二运行，再冻结反事实、人工标注、配对消融和统计分析 |
+| 阶段一 | 固定 10 题 Pilot 与 45 题 research-natural 正式运行已完成 | 正式 run 来源 45，成功 42、parse error 0、Provider error 3；失败仍保留在来源分母；repair 独立硬上限为 1 | 保持冻结，不为阶段三重新生成或筛掉失败 |
+| 阶段二 | 固定 10 题 Pilot 与 42 候选 research-natural 正式运行已完成 | 正式 run 实际执行 42，Base 41/42，Base+Extra 40/42；timeout、基础设施错误和容器清理错误均为 0 | 阶段三只读取脱敏安全结果；完整 164 题仍为独立 P1 |
+| 阶段三 | Gate A–D 与 E1–E3 已完成；E4 统计入口已实现 | 正式证书 manifest SHA256 `4d4d2f8ce5ee86d96aaeffbec2f2d686a395427a340703534b8460a866f144e8`；E2 主标注 manifest SHA256 `fbf89aa950318392e49d01a5235461c4ce6ae94acb55842b963bb54048eac0a3`；E3 results/index SHA256 为 `332932e949281c84402046dbd25e0110fb7a7e7e224c71b17487226fa1098999` / `b1a6c6a61a4439d3e667ebd52ddba8cba98f8ee196c1cac8dce200f38c857247`，285 配对中 283 有效、2 Provider 失败 | 提交 E4 实现后在 clean worktree 运行统计预检；正式统计和 Gate F 报告尚未执行 |
 
 当前真实审计锚点为：
 
-* 阶段一 run：`phase1_20260824T040336563033Z_e23c1905d438`；
-* 阶段二 run：`phase2_20260824T140814789302Z_5cfa0f9f3126`；
+* 阶段一 research-natural run：`phase1_20260826T130038779522Z_5f55a45bb5e5`；
+* 阶段二 research-natural run：`phase2_20260827T081939637435Z_3c366f64fc19`；
 * 阶段二固定执行身份：EvalPlus `0.4.0.dev2`，source commit `f11cfb92c1d52896a87f988cbebbd74727d56c7e`，installed `evaluate.py` SHA256 `6fcd78d262eae6eff8af4ef6eb00b22909d37beebd90dc37b84b756053e981dd`，HumanEval+ `v0.1.10`，Python `3.11.10`，镜像 digest `sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740`。
 
-当前 10 题结果只作为工程 Pilot。阶段一“解析成功”不表示代码功能正确；阶段二固定 10 题全部通过也不等于完整 164 题成绩或模型总体能力结论。固定 EvalPlus raw 只提供 `pass`/`fail`/`timeout` 粒度，`fail` 无法稳定拆分为错误答案与候选异常，因此独立 execution-error 统计标记为 N/A。
+固定 10 题结果仍只作为工程 Pilot。45 题来源、42 条完整轨迹的 research-natural 结果是阶段三上游锚点，但仍不是完整 164 题成绩、标准 pass@k 或模型总体能力结论。阶段一“解析成功”不表示代码功能正确；固定 EvalPlus raw 只提供 `pass`/`fail`/`timeout` 粒度，`fail` 无法稳定拆分为错误答案与候选异常，因此独立 execution-error 统计标记为 N/A。
 
 ### 4.4 暂不覆盖
 
@@ -546,7 +546,7 @@ Hy3 不一定每次都能正确输出符合 Schema 的 JSON，因此不能无限
                          └─ 仍失败 → terminal parse_error
 ```
 
-当前工作树中正在验证的阶段一 artifact schema v2 采用逐次结果序列区分 Provider 重试与 JSON 修复：
+阶段一 artifact schema v2 已采用逐次结果序列区分 Provider 重试与 JSON 修复：
 
 ```json
 {
@@ -557,7 +557,7 @@ Hy3 不一定每次都能正确输出符合 Schema 的 JSON，因此不能无限
 }
 ```
 
-上图描述的是 v2 的目标契约。`attempt_outcomes` 已进入当前工作树，但“无论普通 Provider 重试预算多大，JSON repair 最多只能发生一次”的独立硬限制及其连续解析失败测试仍在收口；完成这项强制约束和新真实 run 前，文档不把一次修复上限列为已验证能力。
+该 v2 契约、Provider/repair 预算分离以及“无论普通 Provider 重试预算多大，JSON repair 最多一次”的硬限制已经进入正式实现与测试；research-natural 正式 run 继续按真实终态保留失败，不进行格式困难样本重生成筛选。
 
 其中：
 
@@ -578,7 +578,7 @@ Hy3 不一定每次都能正确输出符合 Schema 的 JSON，因此不能无限
 * 模型参数；
 * 调用时间。
 
-终止 `parse_error` 样本保留在端到端分母和失败统计中，但不导出候选代码给阶段二，也不进入需要完整过程字段的阶段三评估。当前固定 10 题旧 Pilot 全部在第一次调用成功；新的 v2 可观测性实现完成测试与新真实 run 后，再作为新的完成证据，不改写旧 Pilot 产物。
+终止 `parse_error` 样本保留在端到端分母和失败统计中，但不导出候选代码给阶段二，也不进入需要完整过程字段的阶段三评估。research-natural 正式 run 的 45 条来源中有 42 条成功、0 条终止解析错误、3 条 Provider 错误；阶段三消费 42 条完整轨迹，同时继续报告 45 条来源核算，不改写旧 Pilot 或正式产物。
 
 ### 7.4 AST 静态分析模块
 
@@ -766,7 +766,7 @@ vs
 
 ### 7.8 可执行错误证书模块
 
-当前 `ErrorCertificate` MVP 使用严格字段白名单。一个带公开反例的证书示例为：
+现有流水线 `ErrorCertificate` MVP 使用严格字段白名单；阶段三研究级 `Phase3ErrorCertificate` 已由 Gate D 公开工程 writer 和 `phase3 replay` 接入。以下仍是字段示意，正式展示必须来自当次实际生成的公开证书：
 
 ```json
 {
@@ -794,9 +794,9 @@ vs
 }
 ```
 
-`confirmed_bug` 也可以由已执行的挑战测试支持，此时证书不一定内嵌独立 `counterexample`。只有带公开、可重放反例的证书才宣称提供“可执行反例证据”。
+阶段三研究级 `confirmed_bug` 必须内嵌公开、已验证的反例并提供 replay 命令；只有旧 MVP 的内部聚合语义允许把已执行挑战测试作为外部引用。正式阶段三不会用隐藏功能失败或不可公开输入冒充可执行反例证据。
 
-`certificate_id`、证书内 `problem_id`、`affected_steps`、`replay_command` 和 `tracejudge replay` CLI 目前属于阶段三待实现扩展，不在当前 Schema 中冒充为已完成能力。
+`certificate_id`、`problem_id`、来源哈希和 `replay_command` 已进入研究级 Schema；Gate D writer 和 `tracejudge phase3 replay` 已实现。正式公开证书 manifest 已发布，其中 confirmed 证书已独立重放并复现精确白名单失败，Gate D 已完成。这些仍是三条公开自建工程 Fixture 证据，不是五方法研究结果。
 
 ---
 
@@ -1412,7 +1412,7 @@ Base 通过的候选数
 
 阶段二不调用 Hy3、Direct Judge 或四层 Judge。当前固定 10 题运行仍作为开发回归；P0 需先将相同的严格执行协议泛化到正式自然研究子集，为其中 30—45 条解析成功候选生成独立脱敏功能证据。完整 164 题则作为另一项扩展实验运行，不覆盖已有产物。
 
-当前阶段二入口只执行经验证的阶段一自然候选。若阶段三纳入 HumanEval+ 代码修改型反事实，必须先实现并验证“冻结候选集合执行”扩展，使每个变体按自身代码哈希获得独立 EvalPlus 证据；在该扩展完成前，代码修改型反事实仅使用公开自建 Fixture 的受限执行证据。
+当前阶段二入口只执行经验证的阶段一自然候选。若阶段三纳入 HumanEval+ 代码修改型反事实，必须先实现并验证“冻结候选集合执行”扩展，使每个变体按自身代码哈希获得独立 EvalPlus 证据。本轮 Gate B 已明确不实现或混用该扩展，而使用 SHA256 精确白名单化的公开自建 Fixture：固定 3 个父 Fixture、五类各 3 条；3 条 reasoning 变体复用父代码证据，12 条改码变体逐条取得与自身代码哈希绑定的受限执行证据。正式 evidence run 已得到 `6 pass / 9 fail`、0 超时/基础设施错误/预期偏差，42 + 15 overlay 已冻结完成。
 
 ### 阶段三：过程评估与研究验证
 
@@ -1603,7 +1603,7 @@ Demo 最后从本次运行实际生成的完整 artifact 中直接展示以下�
 tracejudge demo --mock --case faulty
 ```
 
-该命令会生成实际 JSON artifact，Demo 展示该文件，而不是手写示例。`tracejudge replay <certificate>` 是阶段三的待实现交付项；只在命令实现、测试并确认只消费公开反例后，才在正式 Demo 中展示独立重放。
+该命令会生成实际 JSON artifact，Demo 展示该文件，而不是手写示例。阶段三正式使用 `tracejudge phase3 replay --certificate ...`；它只从精确白名单公开源恢复代码并执行单个公开反例。Gate D confirmed 工程证书已完成这一独立重放；正式 Demo 应展示该实际证书及重放证据，并与后续五方法研究结果明确分开。
 
 ---
 
@@ -1619,9 +1619,13 @@ tracejudge demo --mock --case faulty
 * **进行中：** 阶段一结构化解析可观测性 v2，需完成测试和新真实 run；
 * **已完成：** 固定官方 EvalPlus 容器执行、脱敏结果、严格身份和 resume；
 * **MVP 已完成：** AST 静态分析、四层评估、有限边界候选、差分反例和错误证书；
-* **计划：** 通用确定性探针目录、属性搜索、通用最小化和 `tracejudge replay`；
+* **Gate D 已完成：** 固定预算确定性探针、有限列表最小化、三等级公开工程证书和 `tracejudge phase3 replay`；正式 confirmed 证书已独立重放，通用属性搜索与更强最小化仍是后续扩展；
+* **Gate E1 已正式导出：** 冻结标注指南与协议、白名单材料重建、固定随机顺序、盲法 packet/协调者 identity map 分离与私有原子导出；未填写模板不是人工标签；
+* **Gate E2 已冻结：** 不打开 identity map 的 working 进度检查、完成后身份回连预检、严格完成标签 Schema 和不可覆盖私有冻结已产生单人首轮 57 条正式主标注；
+* **Gate E3 已正式运行：** 只读预检绑定冻结标签、材料、Provider、代码和环境身份；显式授权的真实 Hy3 已完成 285 配对，283 条有效、2 条 Provider 失败；
+* **Gate E4 工程入口已实现：** 严格绑定标签与 E3 manifest/results/index，提供全分母指标、精确 McNemar + Holm、父题聚类 bootstrap 和无逐轨迹内容的聚合 writer；正式统计产物尚未生成；
 * **已完成：** README、环境配置样例、安全/架构/数据格式文档与阶段二运行说明；
-* **计划：** 研究级指标、统计分析与可视化脚本。
+* **计划：** 在 clean worktree 上运行正式 E4 统计，再实现 Gate F 脱敏报告与可视化。
 
 ### 17.2 评测材料（阶段三计划）
 
@@ -1685,12 +1689,12 @@ tracejudge demo --mock --case faulty
 | 时间 | 状态 | 里程碑 | 主要产出 |
 | --- | --- | --- | --- |
 | 8/24 | 已完成 | 阶段 0 + 固定 10 题阶段一/二 | HumanEval+ 公开投影、真实 Hy3 Pilot、官方 EvalPlus Pilot、可审计产物 |
-| 8/25—8/27 | 进行中 | 解析可观测性 v2 与方案冻结 | `attempt_outcomes`、Provider/repair 分离统计、兼容测试、方案 v3.1 |
-| 8/28—8/30 | 计划 | 阶段三数据与标注规范 | 非 Pilot 自然 cohort 与备用顺序、错误类型规范、统计分析计划、公开/私有索引 |
-| 8/30—9/3 | 计划 | 正式自然子集阶段一/二运行 | 以冻结 v2 配置生成，最低取得 30 条解析成功自然轨迹及其独立 EvalPlus 脱敏证据 |
-| 8/31—9/2 | 计划 | 反例与错误证书收口 | 确定性探针扩展、证书 Schema 对齐、`tracejudge replay`、公开 Fixture 回归测试 |
-| 9/3—9/5 | 计划 | 冻结研究子集并人工标注 | 最低 30 条自然 + 10 条反事实；时间允许扩展至 45 + 15 |
-| 9/5—9/7 | 计划 | 一致性与五种方法配对实验 | 15—20 条双人独立标注，或如实报告单人跨时间自一致性；配对预测表 |
+| 8/25—8/27 | 已完成 | 解析可观测性 v2 与 research-natural 上游运行 | 45 条来源中 42 条生成成功；42 条独立 EvalPlus 脱敏证据 |
+| 8/28 | 已完成 | 阶段三 Gate A：契约与隐私边界 | 冻结/反事实/五方法/证书/标注/resume schema、能力矩阵与 canary 测试 |
+| 8/28—8/30 | 已完成 | Gate C：五方法统一接口 | Gate B 已冻结 42 + 15 = 57 条；Gate C 统一投影、Prompt、严格解析、失败/成本记账和 Mock 中断/resume 已实现，只读验收确认 57 × 5 = 285 对且零方法/Provider/Docker/网络执行 |
+| 8/31—9/2 | 已完成 | Gate D：反例与错误证书收口 | 三等级公开工程证书已发布；confirmed 证书已独立重放一个精确白名单公开失败 |
+| 9/3—9/5 | 已完成 | 冻结盲法标注材料并人工标注 | 42 + 15 研究集、Gate E1 正式私有 packet 与 E2 单人首轮 57 条主标注已冻结 |
+| 9/5—9/7 | 进行中 | 一致性与五种方法配对实验 | E3 只读预检/显式 Hy3 执行入口已实现；待 clean worktree 预检与单独授权真实运行。一致性仍需 15—20 条双人独立标注，或如实报告单人跨时间自一致性 |
 | 9/7—9/9 | 计划 | 统计与典型案例 | 原始数量、Wilson CI、适用范围内的 exact McNemar、cluster bootstrap、脱敏真实证书 |
 | 9/9—9/11 | 计划 | 最终交付 | README、分析报告、仓库整理、2 分钟 Demo |
 

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "kind": "tracejudge_phase3_annotation_protocol",
+  "protocol_id": "phase3_annotation_protocol_57_v1",
+  "frozen_cohort_manifest_sha256": "3290221625d687e6d7412a0544247dc81a34857b114a545458b93cc04e35d255",
+  "annotation_guide_relative_path": "docs/experiments/phase3_annotation_guide_v1.md",
+  "annotation_guide_sha256": "0c789671fc926e8286ca7317eae0496efc9f39616783b2c8cbebd678de20beb1",
+  "annotation_order_seed": 20260828,
+  "visible_materials": [
+    "public_problem",
+    "structured_solution_trace",
+    "candidate_code",
+    "functional_evidence",
+    "public_dynamic_evidence"
+  ],
+  "forbidden_materials": [
+    "method_predictions",
+    "provider_raw",
+    "other_rater_labels",
+    "counterfactual_mutation",
+    "counterfactual_expected_impact",
+    "canonical_solution",
+    "official_test_inputs",
+    "official_failure_inputs",
+    "evalplus_raw",
+    "credentials"
+  ],
+  "required_label_fields": [
+    "process_correct",
+    "has_error",
+    "reasoning_correct",
+    "plan_code_aligned",
+    "first_faulty_layer",
+    "first_faulty_step",
+    "error_type",
+    "rationale"
+  ],
+  "positive_class": "has_error_true",
+  "unverified_suspicion_policy": "positive_for_any_error_detection_but_not_confirmed_evidence",
+  "invalid_method_outcome_policy": "retain_in_full_denominator_count_as_incorrect_and_report_separately",
+  "primary_comparisons": [
+    "full_tracejudge_vs_test_only",
+    "full_tracejudge_vs_direct_llm_judge"
+  ],
+  "natural_binary_test": "two_sided_exact_mcnemar_report_n01_n10",
+  "counterfactual_interval": "parent_problem_cluster_percentile_bootstrap",
+  "bootstrap_iterations": 10000,
+  "bootstrap_seed": 20260828,
+  "confidence_level": 0.95,
+  "multiple_comparison_policy": "holm_for_confirmatory_primary_comparisons",
+  "agreement_subset_minimum": 15,
+  "agreement_subset_maximum": 20,
+  "intra_rater_minimum_interval_days": 7,
+  "exploratory_only": true
+}

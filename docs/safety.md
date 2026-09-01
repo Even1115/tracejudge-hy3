@@ -35,6 +35,7 @@
 - Gate E3 `evaluate-preflight` 只按字节哈希绑定已冻结私有标签，标签内容不进入任一方法 Prompt；预检不创建目录、不连接 Provider/网络。`evaluate` 必须显式确认真实 Provider，拒绝未配置或模型不一致的 Hy3；非敏感 Provider 配置、标签三个哈希和完整实现哈希全部进入 resume identity。交通层禁止自动重试，仅解析失败允许一次脱敏结构化修复；
 - Gate E4 `statistics-preflight` / `statistics` 不打开 Provider raw、候选正文或隐藏评测内容，只读取冻结标签记录与 E3 的结构化结果。输入必须匹配用户显式给出的 run manifest/results/index SHA256、完整 trace-major 顺序和标签三个哈希；公共 report 只含聚合计数并通过敏感键/canary 检查，不含 trace ID、标注理由或逐条方法预测。正式统计默认拒绝 dirty worktree；
 - Gate F `report-preflight` / `report` 不打开 Provider raw、候选正文、标注理由或隐藏评测内容；只对 E4 聚合统计、E3 结构化用量/状态账本与 Gate D 公开 confirmed 证书进行精确哈希绑定。预检不写文件且不显示方法成绩；正式 writer 在敏感键/canary 检查后以 `0700/0600` 原子发布且默认拒绝 dirty worktree。`replay_command.txt` 只保存公开重放指令，Gate F 不自动执行候选、Provider、Docker 或网络；
+- 阶段四 Gate B 的私有 inventory 只保存 allowlist 文件的仓库相对路径、大小、精确 mode 和 SHA256，目录/文件权限为 `0700/0600` 且保持 Git-ignored；公开 digest 只保存确定性集合摘要、整体 manifest 哈希和公开锚点，不含私有路径或正文。Gate C 只把已通过 Gate F 脱敏检查的 Markdown 逐字节复制到 `docs/releases/phase4`，并单独发布审计说明；不会复制私有标签、逐轨迹预测、Provider raw、EvalPlus raw、官方测试或失败输入。阶段四公开 receipt 仅执行精确白名单的单个公开 Fixture，不读取凭据、不调用 Provider/Docker/网络；
 - Gate C 内部 writer 把 Provider raw 仅写入 Git-ignored、`0700/0600` 的 invocation 目录；公开 `results.jsonl` 不保存 raw 正文，并对敏感键和调用方 canary 执行 fail-closed 检查。严格解析器不从 Markdown 围栏或前后文中抽取 JSON，只允许一次脱敏 schema 修复，不对 Provider 错误自动重试；
 - `MockProvider` 对未知题目会复用数据集的 `reference_code` 作为 fallback，但这不是仓库内置可信 Fixture，默认同样会拒绝本地执行；
 - 真实模型输出、外部数据集代码、Mock fallback 或其他无可信来源的代码，应使用 Docker。只有用户显式传入 `--allow-unsafe-local-exec` 时才会跳过该来源检查，并由用户承担风险；

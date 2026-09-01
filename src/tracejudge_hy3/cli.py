@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import typer
 from rich.console import Console
@@ -73,11 +73,15 @@ from tracejudge_hy3.phase3 import (
     replay_public_certificate,
 )
 from tracejudge_hy3.phase4 import (
+    Phase4ReleaseError,
     Phase4ReproducibilityError,
     freeze_artifact_inventory,
     preflight_artifact_inventory,
+    prepare_public_charts,
     prepare_public_replay_receipt,
     verify_artifact_inventory,
+    verify_public_charts,
+    write_public_charts,
     write_public_replay_receipt,
 )
 from tracejudge_hy3.pipeline.runner import PipelineResult, run_pipeline, select_backend
@@ -108,7 +112,7 @@ phase3_app = typer.Typer(
 )
 phase4_app = typer.Typer(
     add_completion=False,
-    help="阶段四复现清单、恢复验证与公开 replay receipt 工具",
+    help="阶段四复现清单、公开 replay receipt 与聚合图表工具",
 )
 app.add_typer(dataset_app, name="dataset")
 app.add_typer(phase3_app, name="phase3")
@@ -135,6 +139,18 @@ DEFAULT_PHASE4_NATURAL_MANIFEST = (
     "artifacts/experiments/phase3-freezes/phase3_natural_42_v1/manifest.json"
 )
 DEFAULT_PHASE4_SOURCE_BUNDLE = f"data/{PUBLIC_COUNTERFACTUAL_SOURCE_RELATIVE_PATH}"
+DEFAULT_PHASE4_STATISTICS_MANIFEST = (
+    "artifacts/experiments/phase3-statistics/phase3_stats_primary_round1_v1/manifest.json"
+)
+DEFAULT_PHASE4_STATISTICS_REPORT = (
+    "artifacts/experiments/phase3-statistics/phase3_stats_primary_round1_v1/report.json"
+)
+DEFAULT_PHASE4_STATISTICS_MANIFEST_SHA256 = (
+    "7efbdc9c36340593be09e192ea0e7b15297d5e69c4192fa4b49583558b368bf8"
+)
+DEFAULT_PHASE4_STATISTICS_REPORT_SHA256 = (
+    "972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10"
+)
 
 
 def _reject_phase1_projection_execution(problems: list[ProblemSpec]) -> None:
@@ -2505,6 +2521,168 @@ def phase4_replay_receipt(
     console.print(f"[dim]receipt: {result.receipt_path}[/dim]")
 
 
+def _phase4_chart_arguments(
+    *,
+    chart_bundle_id: str,
+    statistics_manifest: str,
+    statistics_report: str,
+    statistics_manifest_sha256: str,
+    statistics_report_sha256: str,
+    repo_root: str,
+    allow_dirty: bool,
+) -> dict[str, object]:
+    return {
+        "chart_bundle_id": chart_bundle_id,
+        "statistics_manifest_path": statistics_manifest,
+        "statistics_report_path": statistics_report,
+        "expected_statistics_manifest_sha256": statistics_manifest_sha256,
+        "expected_statistics_report_sha256": statistics_report_sha256,
+        "repo_root": repo_root,
+        "allow_dirty": allow_dirty,
+    }
+
+
+@phase4_app.command("charts-preflight")
+def phase4_charts_preflight(
+    chart_bundle_id: str = typer.Option(
+        "phase4_public_charts_v1",
+        "--chart-bundle-id",
+    ),
+    statistics_manifest: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_MANIFEST,
+        "--statistics-manifest",
+    ),
+    statistics_report: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_REPORT,
+        "--statistics-report",
+    ),
+    statistics_manifest_sha256: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_MANIFEST_SHA256,
+        "--statistics-manifest-sha256",
+    ),
+    statistics_report_sha256: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_REPORT_SHA256,
+        "--statistics-report-sha256",
+    ),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate E：只读校验聚合统计并在内存生成三个确定性 SVG。"""
+
+    try:
+        result = prepare_public_charts(
+            **_phase4_chart_arguments(
+                chart_bundle_id=chart_bundle_id,
+                statistics_manifest=statistics_manifest,
+                statistics_report=statistics_report,
+                statistics_manifest_sha256=statistics_manifest_sha256,
+                statistics_report_sha256=statistics_report_sha256,
+                repo_root=repo_root,
+                allow_dirty=allow_dirty,
+            )
+        )
+    except (Phase4ReleaseError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四公开聚合图表只读预检：{result.manifest.chart_bundle_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "轨迹 / 方法 / 配对",
+        f"{result.manifest.cohort.trace_count} / {result.manifest.cohort.method_count} / {result.manifest.cohort.pair_count}",
+    )
+    table.add_row("公开 SVG", str(len(result.manifest.figures)))
+    table.add_row("图表 manifest SHA256", result.manifest_sha256)
+    table.add_row("写入文件", "否")
+    table.add_row("Provider / Docker / 网络", "否 / 否 / 否")
+    console.print(table)
+    console.print(
+        "[yellow]图表仅含聚合数据；反事实单方法结果保持描述性，证据边界仍为 "
+        "ANALYZED / CAUTION / CANNOT_VERIFY。[/yellow]"
+    )
+
+
+@phase4_app.command("charts-publish")
+def phase4_charts_publish(
+    chart_bundle_id: str = typer.Option(
+        "phase4_public_charts_v1",
+        "--chart-bundle-id",
+    ),
+    statistics_manifest: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_MANIFEST,
+        "--statistics-manifest",
+    ),
+    statistics_report: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_REPORT,
+        "--statistics-report",
+    ),
+    statistics_manifest_sha256: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_MANIFEST_SHA256,
+        "--statistics-manifest-sha256",
+    ),
+    statistics_report_sha256: str = typer.Option(
+        DEFAULT_PHASE4_STATISTICS_REPORT_SHA256,
+        "--statistics-report-sha256",
+    ),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    output_dir: str = typer.Option(
+        "docs/releases/phase4/charts",
+        "--output-dir",
+    ),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """Gate E：原子发布三个 SVG 和一个聚合公开 manifest。"""
+
+    try:
+        result = write_public_charts(
+            output_dir=output_dir,
+            **_phase4_chart_arguments(
+                chart_bundle_id=chart_bundle_id,
+                statistics_manifest=statistics_manifest,
+                statistics_report=statistics_report,
+                statistics_manifest_sha256=statistics_manifest_sha256,
+                statistics_report_sha256=statistics_report_sha256,
+                repo_root=repo_root,
+                allow_dirty=allow_dirty,
+            ),
+        )
+    except (Phase4ReleaseError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四公开聚合图表：{result.chart_bundle_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("公开 SVG", str(len(result.figure_paths)))
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("Provider / Docker / 网络", "否 / 否 / 否")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+
+
+@phase4_app.command("charts-verify")
+def phase4_charts_verify(
+    manifest: str = typer.Option(..., "--manifest"),
+    manifest_sha256: str | None = typer.Option(None, "--manifest-sha256"),
+) -> None:
+    """Gate E：从公开 manifest 重绘并逐字节验证三个 SVG。"""
+
+    try:
+        result = verify_public_charts(
+            manifest_path=manifest,
+            expected_manifest_sha256=manifest_sha256,
+        )
+    except (Phase4ReleaseError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四公开聚合图表验证：{result.chart_bundle_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("确定性 SVG", str(result.figure_count))
+    table.add_row("逐字节验证", "通过" if result.verified else "失败")
+    table.add_row("Provider / Docker / 网络", "否 / 否 / 否")
+    console.print(table)
+
+
 def _render_result(result: PipelineResult) -> None:
     problem = result.problem
     solution = result.solution
@@ -2614,12 +2792,50 @@ def _render_result(result: PipelineResult) -> None:
         )
 
 
+def _safe_demo_output_path(output: str | None, *, case: str) -> Path:
+    if output is None:
+        if Path("artifacts").is_symlink():
+            raise typer.BadParameter("Demo 输出目录不能是符号链接")
+        return timestamped_artifact_path(Path("artifacts"), f"demo_{case}")
+    if "\\" in output:
+        raise typer.BadParameter("--output 必须是 artifacts/ 下的规范仓库相对路径")
+    raw_parts = output.split("/")
+    relative = PurePosixPath(output)
+    if (
+        relative.is_absolute()
+        or not raw_parts
+        or any(part in {"", ".", ".."} for part in raw_parts)
+        or relative.parts[0] != "artifacts"
+        or relative.suffix != ".json"
+    ):
+        raise typer.BadParameter("--output 必须是 artifacts/ 下的规范仓库相对 JSON 路径")
+    path = Path(*relative.parts)
+    for parent in (path.parent, *path.parents):
+        if parent == Path("."):
+            break
+        if parent.exists() and parent.is_symlink():
+            raise typer.BadParameter("Demo 输出路径不能经过符号链接")
+    return path
+
+
 @app.command()
 def demo(
     mock: bool = typer.Option(
         True, "--mock/--no-mock", help="v0.1 仅支持 Mock Demo；--no-mock 会报错退出"
     ),
     case: str = typer.Option("faulty", "--case", help="safe_mean 演示场景：'correct' 或 'faulty'"),
+    output: str | None = typer.Option(
+        None,
+        "--output",
+        help="可选的 artifacts/ 下规范仓库相对 JSON 路径；默认使用 UTC 时间戳",
+    ),
+    per_test_timeout_seconds: float = typer.Option(
+        5.0,
+        "--per-test-timeout-seconds",
+        min=0.1,
+        max=10.0,
+        help="公开 Mock Fixture 单用例父进程超时；不会读取 .env",
+    ),
 ) -> None:
     """运行内置 safe_mean 场景的完整链路演示（默认 faulty：可见测试通过但隐藏/挑战测试暴露空输入缺陷）。"""
 
@@ -2632,7 +2848,9 @@ def demo(
     if case not in ("correct", "faulty"):
         raise typer.BadParameter("--case 必须是 'correct' 或 'faulty'")
 
-    settings = get_settings()
+    out_path = _safe_demo_output_path(output, case=case)
+    if out_path.exists() or out_path.is_symlink():
+        raise typer.BadParameter("Demo 输出已存在，拒绝覆盖")
     try:
         problem = load_problem_by_id(DEFAULT_DATASET, "safe_mean")
     except TraceJudgeError as exc:
@@ -2640,15 +2858,13 @@ def demo(
         raise typer.Exit(code=1) from exc
 
     provider = MockProvider(case=case)
-    backend = TrustedLocalSandbox(per_test_timeout_seconds=settings.tracejudge_test_timeout_seconds)
+    backend = TrustedLocalSandbox(per_test_timeout_seconds=per_test_timeout_seconds)
 
     result = asyncio.run(run_pipeline(problem, provider, backend))
     _render_result(result)
 
-    settings.artifact_path.mkdir(parents=True, exist_ok=True)
-    out_path = timestamped_artifact_path(settings.artifact_path, f"demo_{case}")
     save_result_json(result, out_path)
-    console.print(f"\n[dim]完整结果 JSON 已保存到 {out_path}[/dim]")
+    console.print(f"\n[dim]完整结果 JSON 已保存到 {out_path.as_posix()}[/dim]")
 
 
 @app.command()

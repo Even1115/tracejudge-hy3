@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img">
+<title>Full-denominator error detection by source</title>
+<desc>Five methods are shown across all, natural, and counterfactual full-denominator error detection accuracy.</desc>
+<style>text { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }</style>
+<rect x="0.0" y="0.0" width="1200.0" height="720.0" fill="#ffffff" rx="0" />
+<text x="50.0" y="62.0" font-size="29" font-weight="700" text-anchor="start" fill="#172033">Full-denominator error detection by source</text>
+<text x="50.0" y="96.0" font-size="16" font-weight="400" text-anchor="start" fill="#526078">All invalid method outcomes count as incorrect. Counterfactual values are descriptive only.</text>
+<text x="445.0" y="145.0" font-size="18" font-weight="650" text-anchor="middle" fill="#172033">All traces (n=57)</text>
+<line x1="330.0" y1="170.0" x2="330.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="330.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">0</text>
+<line x1="387.5" y1="170.0" x2="387.5" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="387.5" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">25</text>
+<line x1="445.0" y1="170.0" x2="445.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="445.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">50</text>
+<line x1="502.5" y1="170.0" x2="502.5" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="502.5" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">75</text>
+<line x1="560.0" y1="170.0" x2="560.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="560.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">100</text>
+<text x="740.0" y="145.0" font-size="18" font-weight="650" text-anchor="middle" fill="#172033">Natural (n=42)</text>
+<line x1="625.0" y1="170.0" x2="625.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="625.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">0</text>
+<line x1="682.5" y1="170.0" x2="682.5" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="682.5" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">25</text>
+<line x1="740.0" y1="170.0" x2="740.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="740.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">50</text>
+<line x1="797.5" y1="170.0" x2="797.5" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="797.5" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">75</text>
+<line x1="855.0" y1="170.0" x2="855.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="855.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">100</text>
+<text x="1035.0" y="145.0" font-size="18" font-weight="650" text-anchor="middle" fill="#172033">Counterfactual (n=15)</text>
+<line x1="920.0" y1="170.0" x2="920.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="920.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">0</text>
+<line x1="977.5" y1="170.0" x2="977.5" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="977.5" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">25</text>
+<line x1="1035.0" y1="170.0" x2="1035.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="1035.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">50</text>
+<line x1="1092.5" y1="170.0" x2="1092.5" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="1092.5" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">75</text>
+<line x1="1150.0" y1="170.0" x2="1150.0" y2="590.0" stroke="#E2E6ED" stroke-width="1.0" />
+<text x="1150.0" y="620.0" font-size="14" font-weight="400" text-anchor="middle" fill="#667085">100</text>
+<text x="45.0" y="220.0" font-size="16" font-weight="600" text-anchor="start" fill="#172033">Test-only</text>
+<line x1="527.0" y1="215.0" x2="555.8" y2="215.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="527.0" y1="209.0" x2="527.0" y2="221.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="555.8" y1="209.0" x2="555.8" y2="221.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="547.9" cy="215.0" r="6" fill="#172033" />
+<text x="445.0" y="241.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">54/57 (94.7%)</text>
+<line x1="835.7" y1="215.0" x2="855.0" y2="215.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="835.7" y1="209.0" x2="835.7" y2="221.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="855.0" y1="209.0" x2="855.0" y2="221.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="855.0" cy="215.0" r="6" fill="#172033" />
+<text x="740.0" y="241.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">42/42 (100.0%)</text>
+<circle cx="1104.0" cy="215.0" r="6" fill="#172033" />
+<text x="1035.0" y="241.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">12/15 (80.0%)</text>
+<text x="45.0" y="302.0" font-size="16" font-weight="600" text-anchor="start" fill="#172033">Direct LLM Judge</text>
+<line x1="532.6" y1="297.0" x2="557.8" y2="297.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="532.6" y1="291.0" x2="532.6" y2="303.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="557.8" y1="291.0" x2="557.8" y2="303.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="551.9" cy="297.0" r="6" fill="#172033" />
+<text x="445.0" y="323.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">55/57 (96.5%)</text>
+<line x1="826.7" y1="297.0" x2="854.0" y2="297.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="826.7" y1="291.0" x2="826.7" y2="303.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="854.0" y1="291.0" x2="854.0" y2="303.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="849.5" cy="297.0" r="6" fill="#172033" />
+<text x="740.0" y="323.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">41/42 (97.6%)</text>
+<circle cx="1134.7" cy="297.0" r="6" fill="#172033" />
+<text x="1035.0" y="323.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">14/15 (93.3%)</text>
+<text x="45.0" y="384.0" font-size="16" font-weight="600" text-anchor="start" fill="#172033">Four-layer Structured</text>
+<line x1="538.6" y1="379.0" x2="559.3" y2="379.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="538.6" y1="373.0" x2="538.6" y2="385.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="559.3" y1="373.0" x2="559.3" y2="385.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="556.0" cy="379.0" r="6" fill="#172033" />
+<text x="445.0" y="405.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">56/57 (98.2%)</text>
+<line x1="835.7" y1="379.0" x2="855.0" y2="379.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="835.7" y1="373.0" x2="835.7" y2="385.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="855.0" y1="373.0" x2="855.0" y2="385.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="855.0" cy="379.0" r="6" fill="#172033" />
+<text x="740.0" y="405.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">42/42 (100.0%)</text>
+<circle cx="1134.7" cy="379.0" r="6" fill="#172033" />
+<text x="1035.0" y="405.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">14/15 (93.3%)</text>
+<text x="45.0" y="466.0" font-size="16" font-weight="600" text-anchor="start" fill="#172033">Four-layer + AST</text>
+<line x1="527.0" y1="461.0" x2="555.8" y2="461.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="527.0" y1="455.0" x2="527.0" y2="467.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="555.8" y1="455.0" x2="555.8" y2="467.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="547.9" cy="461.0" r="6" fill="#172033" />
+<text x="445.0" y="487.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">54/57 (94.7%)</text>
+<line x1="818.7" y1="461.0" x2="852.0" y2="461.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="818.7" y1="455.0" x2="818.7" y2="467.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="852.0" y1="455.0" x2="852.0" y2="467.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="844.0" cy="461.0" r="6" fill="#172033" />
+<text x="740.0" y="487.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">40/42 (95.2%)</text>
+<circle cx="1134.7" cy="461.0" r="6" fill="#172033" />
+<text x="1035.0" y="487.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">14/15 (93.3%)</text>
+<text x="45.0" y="548.0" font-size="16" font-weight="600" text-anchor="start" fill="#172033">Full TraceJudge</text>
+<line x1="532.6" y1="543.0" x2="557.8" y2="543.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="532.6" y1="537.0" x2="532.6" y2="549.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="557.8" y1="537.0" x2="557.8" y2="549.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="551.9" cy="543.0" r="6" fill="#172033" />
+<text x="445.0" y="569.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">55/57 (96.5%)</text>
+<line x1="826.7" y1="543.0" x2="854.0" y2="543.0" stroke="#2457C5" stroke-width="4.0" />
+<line x1="826.7" y1="537.0" x2="826.7" y2="549.0" stroke="#2457C5" stroke-width="2.0" />
+<line x1="854.0" y1="537.0" x2="854.0" y2="549.0" stroke="#2457C5" stroke-width="2.0" />
+<circle cx="849.5" cy="543.0" r="6" fill="#172033" />
+<text x="740.0" y="569.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">41/42 (97.6%)</text>
+<circle cx="1134.7" cy="543.0" r="6" fill="#172033" />
+<text x="1035.0" y="569.0" font-size="13" font-weight="400" text-anchor="middle" fill="#526078">14/15 (93.3%)</text>
+<text x="330.0" y="664.0" font-size="15" font-weight="400" text-anchor="start" fill="#526078">Wilson 95% intervals: all and natural only</text>
+<text x="50.0" y="698.0" font-size="17" font-weight="650" text-anchor="start" fill="#8A3B32">Exploratory · CAUTION · source strata must not be collapsed into a universal ranking</text>
+</svg>

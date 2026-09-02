@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+import tracejudge_hy3.cli as cli_module
 from tracejudge_hy3.cli import app
 from tracejudge_hy3.config import get_settings
 from tracejudge_hy3.dataset.loader import load_problem_by_id, load_problems
@@ -58,18 +59,33 @@ async def test_full_mock_pipeline_for_all_sample_problems():
 
 
 def test_cli_demo_faulty_reports_confirmed_bug(tmp_path, monkeypatch):
-    monkeypatch.chdir(Path(__file__).resolve().parents[1])
+    monkeypatch.chdir(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["demo", "--mock", "--case", "faulty"])
+    result = runner.invoke(
+        app,
+        [
+            "demo",
+            "--mock",
+            "--case",
+            "faulty",
+            "--output",
+            "artifacts/demo-faulty.json",
+        ],
+    )
     assert result.exit_code == 0, result.output
     assert "confirmed_bug" in result.output
     assert "A01_PLAN_CODE_MISMATCH" in result.output
+    assert (tmp_path / "artifacts/demo-faulty.json").is_file()
+    assert str(tmp_path) not in result.output
 
 
-def test_cli_demo_correct_does_not_report_confirmed_bug(monkeypatch):
-    monkeypatch.chdir(Path(__file__).resolve().parents[1])
+def test_cli_demo_correct_does_not_report_confirmed_bug(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["demo", "--mock", "--case", "correct"])
+    result = runner.invoke(
+        app,
+        ["demo", "--mock", "--case", "correct", "--output", "artifacts/demo-correct.json"],
+    )
     assert result.exit_code == 0, result.output
     assert "confirmed_bug" not in result.output
 
@@ -77,9 +93,66 @@ def test_cli_demo_correct_does_not_report_confirmed_bug(monkeypatch):
 def test_cli_demo_finds_bundled_data_outside_repository(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["demo", "--mock", "--case", "correct"])
+    result = runner.invoke(
+        app,
+        ["demo", "--mock", "--case", "correct", "--output", "artifacts/demo.json"],
+    )
     assert result.exit_code == 0, result.output
     assert "safe_mean" in result.output
+
+
+def test_cli_demo_does_not_load_settings_or_dotenv(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("HY3_API_KEY=DEMO_PRIVATE_CANARY\n", encoding="utf-8")
+
+    def fail_if_settings_are_loaded():
+        raise AssertionError("public Mock Demo must not load Settings or .env")
+
+    monkeypatch.setattr(cli_module, "get_settings", fail_if_settings_are_loaded)
+    result = CliRunner().invoke(
+        app,
+        ["demo", "--mock", "--case", "faulty", "--output", "artifacts/public-demo.json"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "DEMO_PRIVATE_CANARY" not in result.output
+    assert (tmp_path / "artifacts/public-demo.json").is_file()
+
+
+@pytest.mark.parametrize(
+    "output",
+    (
+        "/tmp/demo.json",
+        "../artifacts/demo.json",
+        "artifacts/../demo.json",
+        "results/demo.json",
+        "artifacts/demo.txt",
+    ),
+)
+def test_cli_demo_rejects_non_public_output_paths(output, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(
+        app,
+        ["demo", "--mock", "--case", "faulty", "--output", output],
+    )
+
+    assert result.exit_code != 0
+    assert not (tmp_path / "artifacts/demo.json").exists()
+
+
+def test_cli_demo_refuses_to_overwrite_an_existing_artifact(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    output = tmp_path / "artifacts/public-demo.json"
+    output.parent.mkdir()
+    output.write_text("existing\n", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        app,
+        ["demo", "--mock", "--case", "faulty", "--output", "artifacts/public-demo.json"],
+    )
+
+    assert result.exit_code != 0
+    assert output.read_text(encoding="utf-8") == "existing\n"
 
 
 def test_cli_doctor_runs(monkeypatch):

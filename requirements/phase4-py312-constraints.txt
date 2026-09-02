@@ -1,0 +1,34 @@
+# TraceJudge-Hy3 phase-four tested environment snapshot.
+# Python: 3.12.14; platform: macOS; captured: 2026-09-01.
+# This constraints file contains package names and versions only—no local paths or credentials.
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.14.2
+coverage==7.15.4
+h11==0.16.0
+httpcore2==2.12.0
+httpx2==2.12.0
+idna==3.19
+iniconfig==2.3.0
+jiter==0.16.0
+markdown-it-py==4.2.0
+mdurl==0.1.2
+openai==3.3.1
+packaging==26.3
+pluggy==1.6.0
+pydantic==2.13.4
+pydantic-core==2.46.4
+pydantic-settings==2.15.0
+pygments==2.21.0
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+python-dotenv==1.2.3
+rich==15.0.0
+ruff==0.16.4
+shellingham==1.5.4
+sniffio==1.3.1
+truststore==0.10.4
+typer==0.27.1
+typing-extensions==4.16.0
+typing-inspection==0.4.4

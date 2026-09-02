@@ -26,7 +26,7 @@ Closure ID：`phase4_closure_report_v1`
 | Gate B：复现清单与公开 replay receipt | 完成 | 103 个私有关键产物、13 个公开锚点、0 个权限警告；公开 digest 与 replay receipt 已受 Git 跟踪。 |
 | Gate C：脱敏报告与文档发布 | 完成 | Gate F Markdown 逐字节公开，发布说明记录隐私审计、展示缺口和结论边界。 |
 | Gate D：一致性与稳健性增强 | 非 P0，延期 | 第二标注者/跨时间复标、扩展反事实、消融和 Provider 失败敏感性分析均未执行。 |
-| Gate E：Demo、图表与 Release 封版 | 仓库内交付完成 | 3 张确定性聚合 SVG、2 分钟公开 Fixture Demo、Release 检查单和本封版报告已就绪；push/tag/Release 待授权。 |
+| Gate E：Demo、图表与 Release 封版 | 仓库内交付完成 | 3 张确定性聚合 SVG、2 分钟公开 Fixture Demo、Release 检查单和本封版报告已就绪；push、PR、merge、tag、Release 和附件上传待授权。 |
 
 ## 3. 可公开交付物
 
@@ -50,7 +50,7 @@ Gate E 在本地执行公开 `safe_mean` Fixture：完整 Mock Demo 约 0.93 秒
 
 正式图表通过 manifest 哈希绑定、隐私校验和逐字节重绘验证。图表只是阶段三聚合结果的静态展示，不新增样本、标签、模型调用或统计推断。
 
-本轮封版验证结果：Gate E focused tests 为 43 passed；完整普通测试为 496 passed、3 skipped，3 项 skipped 均为未启用的 Docker 集成检查；Ruff 检查、Ruff 格式检查、`git diff --check` 和图表逐字节验证全部通过。测试和图表验证没有调用真实 Hy3、Docker 或网络。
+本轮封版验证结果：Gate E focused tests 与完整普通测试均通过，完整测试中的 3 项 skipped 均为未启用的 Docker 集成检查；Ruff 检查、Ruff 格式检查和图表逐字节验证通过。原工作树级 `git diff --check` 不作为最终提交链证据；最终检查改为对 `origin/main...HEAD` 提交范围执行，并明确排除必须保持 Gate F 逐字节身份的公开报告。该报告改用固定 SHA256 和与 Git-ignored 冻结源的 `cmp` 单独验证。测试和图表验证没有调用真实 Hy3、Docker 或网络。
 
 ## 5. 研究结论与限制
 
@@ -74,6 +74,6 @@ v0.2+ 保持在本轮之外：完整 HumanEval+ 164 题、MBPP+、多模型 Judg
 
 ## 7. 最终授权边界
 
-本报告完成的是仓库内 P0 Gate E 交付准备，不代表已发生外部发布。当前未由自动化执行 commit、push、merge、tag、Release 创建、附件上传或分支删除。
+本报告完成的是仓库内 P0 Gate E 交付，不代表已发生外部发布。仓库内审查和提交已经完成；当前未执行 push、PR、merge、tag、Release 创建或附件上传。
 
-项目负责人授权发布前，应按 [`phase4_release_checklist_v1.md`](phase4_release_checklist_v1.md) 重新运行测试、Ruff、格式检查、`git diff --check`、图表逐字节验证和公开产物哈希检查。最终封版 commit ID，以及本报告和检查单自身 SHA256，应在 commit 产生后写入 Release 说明，而不是在自引用文档中预先伪造。
+项目负责人授权发布前，应按 [`phase4_release_checklist_v1.md`](phase4_release_checklist_v1.md) 重新运行测试、Ruff、格式检查、排除冻结报告后的提交范围 whitespace 检查、冻结报告 SHA256/`cmp`、图表逐字节验证和其他公开产物哈希检查。最终封版 commit ID，以及本报告和检查单自身 SHA256，应在最终提交产生后写入 Release 说明，而不是在自引用文档中预先伪造。

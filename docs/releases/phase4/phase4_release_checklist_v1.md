@@ -38,7 +38,8 @@ Checklist ID：`phase4_release_checklist_v1`
 env -u TRACEJUDGE_RUN_DOCKER_INTEGRATION .venv/bin/pytest -q
 .venv/bin/ruff check .
 .venv/bin/ruff format --check .
-git diff --check
+git diff --check origin/main...HEAD -- . \
+  ':(exclude)docs/releases/phase4/phase3_research_report_public_v1.md'
 .venv/bin/tracejudge phase4 charts-verify \
   --manifest docs/releases/phase4/charts/phase4_public_charts_v1/manifest.json \
   --manifest-sha256 20d94ad514400ff7ebe72b8d288eb6a208b571069878091b4b6b481659f30d71
@@ -47,17 +48,21 @@ git diff --check
 发布前还应重新执行：
 
 ```bash
-shasum -a 256 \
+shasum -a 256 docs/releases/phase4/phase3_research_report_public_v1.md
+cmp -s \
   docs/releases/phase4/phase3_research_report_public_v1.md \
+  artifacts/experiments/phase3-reports/phase3_report_primary_round1_v1/phase3_research_report.md
+shasum -a 256 \
   docs/releases/phase4/phase4_public_artifact_digest_v1.json \
   docs/releases/phase4/phase4_public_replay_receipt_v1.json \
   docs/releases/phase4/charts/phase4_public_charts_v1/manifest.json \
   docs/releases/phase4/charts/phase4_public_charts_v1/*.svg
 git status --short --branch
-git diff --cached --check
 ```
 
-失败判断：任一测试或静态检查失败、哈希变化、图表重绘不一致、出现未审查文件、工作树包含无关改动，或任何隐私 canary 命中。此时不得 tag 或发布 Release。
+公开报告的预期 SHA256 为 `29eaef9f44a964308ab26b9821c472b0d13837eee587a3e687faa861edb4d725`。它为保持 Gate F 逐字节身份而保留源文件的 EOF，因此从提交范围 whitespace 检查中明确排除，并改用 SHA256 和 `cmp` 单独验证；没有 Git-ignored 保管产物的全新 clone 只能执行公开文件 SHA256 检查，不能伪造 `cmp` 通过。
+
+失败判断：任一测试或静态检查失败、公开报告 SHA256 或 `cmp` 不一致、其他提交范围存在 whitespace 错误、图表重绘不一致、出现未审查文件、工作树包含无关改动，或任何隐私 canary 命中。此时不得 tag 或发布 Release。
 
 ## 非阻塞后续范围
 
@@ -67,10 +72,9 @@ git diff --cached --check
 
 ## 需要项目负责人授权的动作
 
-- [ ] `PENDING AUTHORIZATION`：审查并提交本检查单、Demo、封版报告、索引、状态和测试改动。
+- [x] `PASS`：本检查单、Demo、封版报告、索引、状态和测试改动已经完成审查并提交到目标分支。
 - [ ] `PENDING AUTHORIZATION`：push 目标分支并创建或更新 Pull Request。
-- [ ] `PENDING AUTHORIZATION`：合并、创建 tag、生成 Release、上传任何附件或删除分支。
-- [ ] `PENDING AUTHORIZATION`：在最终封版 commit 后，将 commit ID 及本检查单/封版报告自身 SHA256 记录到 Release 说明；文档不得自引用尚未产生的最终哈希。
+- [ ] `PENDING AUTHORIZATION`：合并 Pull Request。
+- [ ] `PENDING AUTHORIZATION`：创建 tag、生成 Release 或上传附件；在 Release 说明中记录最终 commit ID 及本检查单/封版报告自身 SHA256。
 
-P0 Gate E 的仓库内交付内容可以完成，但以上外部状态变更在获得明确授权前始终保持未勾选。
-
+P0 Gate E 的仓库内交付、审查和提交已经完成；以上外部发布状态变更在获得明确授权前始终保持未勾选。

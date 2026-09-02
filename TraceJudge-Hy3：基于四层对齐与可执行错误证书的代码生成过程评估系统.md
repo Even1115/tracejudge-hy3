@@ -265,7 +265,7 @@ def safe_mean(nums):
 | 阶段一 | 固定 10 题 Pilot 与 45 题 research-natural 正式运行已完成 | 正式 run 来源 45，成功 42、parse error 0、Provider error 3；失败仍保留在来源分母；repair 独立硬上限为 1 | 保持冻结，不为阶段三重新生成或筛掉失败 |
 | 阶段二 | 固定 10 题 Pilot 与 42 候选 research-natural 正式运行已完成 | 正式 run 实际执行 42，Base 41/42，Base+Extra 40/42；timeout、基础设施错误和容器清理错误均为 0 | 阶段三只读取脱敏安全结果；完整 164 题仍为独立 P1 |
 | 阶段三 | Gate A–F 已完成 | E3 results/index SHA256 为 `332932e949281c84402046dbd25e0110fb7a7e7e224c71b17487226fa1098999` / `b1a6c6a61a4439d3e667ebd52ddba8cba98f8ee196c1cac8dce200f38c857247`；E4 manifest/report SHA256 为 `7efbdc9c36340593be09e192ea0e7b15297d5e69c4192fa4b49583558b368bf8` / `972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10`；Gate F Markdown SHA256 为 `29eaef9f44a964308ab26b9821c472b0d13837eee587a3e687faa861edb4d725` | 保持冻结；不重跑、不覆盖，不把探索性结果写成因果、等效或完整 benchmark 结论 |
-| 阶段四 | Gate B、Gate C 已完成 | 103 个关键产物、13 个公开锚点、0 个权限警告；公开 digest/replay receipt 已发布；Gate F Markdown 已逐字节发布为 tracked 文档 | P0 尚需聚合图表、2 分钟 Fixture Demo、Release 检查单与封版报告；P1 研究增强不阻塞 |
+| 阶段四 | P0 Gate A、B、C、E 仓库内交付已完成；Gate D/P1 延期 | 103 个关键产物、13 个公开锚点、0 个权限警告；公开 digest/replay receipt、Gate F 逐字节公开副本、三张确定性聚合图表、2 分钟 Fixture Demo、Release 检查单和封版报告均已交付 | 保持 `ANALYZED / CAUTION / CANNOT_VERIFY`；push、PR、merge、tag、Release 和附件上传仍待明确授权 |
 
 当前真实审计锚点为：
 
@@ -1658,7 +1658,7 @@ Gate F 报告已覆盖研究身份、执行失败核算、主终点、配对主�
 解题 → 运行 → 过程评估 → 反例复现 → 错误证书
 ```
 
-当前已有公开 `safe_mean` Mock Fixture 的完整 JSON artifact Demo；Gate D replay 与阶段四公开 receipt 已实现并验证。正式视频仍待阶段四 Gate E 制作，只展示公开 Fixture、错误证书、独立 replay 和聚合结果。
+公开 `safe_mean` Mock Fixture 的完整 JSON artifact Demo、Gate D replay 与阶段四公开 receipt 均已实现并验证；阶段四已交付不超过 2 分钟的正式演示时间线和命令，展示公开 Fixture、错误证书、独立 replay 和聚合结果。视频/GIF 文件不是本轮仓库内 P0 的交付或未完成项。
 
 ---
 
@@ -1674,7 +1674,7 @@ Gate F 报告已覆盖研究身份、执行失败核算、主终点、配对主�
 | 阶段三实际封版 | 已完成 | Gate E1—F：标注、配对实验、统计与报告 | 42 + 15 研究集、单人首轮 57 条主标注、五方法 285 配对、283 条有效判断、2 条 Provider 失败；正式统计与 Gate F 脱敏报告已冻结 |
 | 阶段四本轮 | 已完成 | Gate A—B：审计与复现加固 | 合并状态与关键哈希复核、私有产物清单与备份方案、公开 Fixture replay receipt |
 | 阶段四本轮 | 已完成 | Gate C：脱敏报告与文档发布 | Gate F 报告逐字节受 Git 跟踪副本、发布说明、状态文档更新与隐私回归测试 |
-| 后续 | 待完成 | 阶段四 Gate E：发布封版 | 仅含聚合结果的图表、2 分钟公开 Fixture Demo、Release 检查单和封版报告；提交、推送、tag 与 Release 另行授权 |
+| 阶段四本轮 | 已完成 | Gate E：发布封版仓库交付 | 仅含聚合结果的图表、2 分钟公开 Fixture Demo、Release 检查单和封版报告已提交；push、PR、merge、tag、Release 和附件上传另行授权 |
 
 阶段四 Gate D/P1 的一致性、反事实扩展、消融和 Provider 失败敏感性分析均为非阻塞研究增强。完整 164 题 HumanEval+、MBPP+、多模型 Judge、Web UI、自动修复、多文件和多语言执行属于 v0.2+，不得替代阶段三已冻结的方法验证。
 
@@ -1689,10 +1689,10 @@ Gate F 报告已覆盖研究身份、执行失败核算、主终点、配对主�
 * 已完成 Gate A：合并状态、阶段三冻结产物、关键哈希、私有/公开边界与过期文档审计；
 * 已完成 Gate B：不泄露正文的私有产物清单、备份/恢复方案、公开 Fixture 独立 replay 与脱敏 receipt；
 * 已完成 Gate C：Gate F 脱敏报告的逐字节受 Git 跟踪副本、发布说明、文档状态更新与隐私回归测试；
-* 待完成 Gate E：生成仅含聚合结果的图表；
-* 待完成 Gate E：制作不超过 2 分钟、仅使用公开 Fixture 的 Demo；
-* 待完成 Gate E：建立最终 Release 检查单与封版报告；
-* 提交、推送、tag 和 Release 发布须另行获得明确授权。
+* 已完成 Gate E：生成并逐字节验证仅含聚合结果的三张图表；
+* 已完成 Gate E：交付不超过 2 分钟、仅使用公开 Fixture 的 Demo 时间线和命令；
+* 已完成 Gate E：建立最终 Release 检查单与封版报告；
+* 仓库内审查和提交已完成；push、PR、merge、tag、Release 和附件上传须另行获得明确授权。
 
 ### 阶段四 P1：研究增强（不阻塞 P0）
 
@@ -1835,7 +1835,7 @@ Gate F 报告已覆盖研究身份、执行失败核算、主终点、配对主�
 * 一份明确区分证据与局限性的分析报告；
 * 一个 2 分钟以内、使用公开 Fixture 并展示真实 artifact 的 Demo。
 
-前五项已经完成；最后一项 Demo 仍是阶段四 Gate E 的 P0 交付。因此，阶段三实验闭环已经完成，但项目 Release 尚未封版，论文级证据也仍受单标注者、3 个反事实父题聚类、单模型单次运行和两条 Provider 失败限制。
+六项仓库内研究交付均已完成，阶段四 Gate E 已提供正式 Demo 时间线、命令和验证记录。阶段三实验闭环与阶段四 P0 仓库封版已经完成，但外部 Release 尚未发布；论文级证据仍受单标注者、3 个反事实父题聚类、单模型单次运行和两条 Provider 失败限制。
 
 ---
 

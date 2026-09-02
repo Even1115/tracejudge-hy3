@@ -68,4 +68,3 @@ env -u TRACEJUDGE_RUN_DOCKER_INTEGRATION .venv/bin/tracejudge phase3 replay \
 ## 已验证的演示预算
 
 Gate E 本地干跑中，完整 Mock Demo 用时约 0.93 秒，公开证书 replay 用时约 0.76 秒；二者均未调用 Provider、Docker 或网络。该时间仅用于确认 2 分钟脚本有充足余量，不构成跨机器性能承诺。
-

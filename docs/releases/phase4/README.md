@@ -13,4 +13,4 @@
 
 公开 receipt 证明指定公开证书在记录环境中重现了同一失败并得到相同执行证据哈希；它不重跑 Hy3，也不证明五种方法的普遍有效性。公开研究报告继续保持 `ANALYZED / CAUTION / CANNOT_VERIFY`，不得将发布动作解释为证据等级提升。
 
-阶段四 P0 的仓库内交付内容已完成；commit、push、merge、tag、Release 和任何附件上传仍需项目负责人明确授权。
+阶段四 P0 的仓库内交付、审查和提交已完成；push、PR、merge、tag、Release 和任何附件上传仍需项目负责人明确授权。

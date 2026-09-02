@@ -70,12 +70,12 @@ TraceJudge-Hy3 不只判断代码是否通过测试，还尝试验证它是否"�
 - 规则证据 + LLM 判断的四层评估：空输入声明—代码不一致、集合声明—代码不一致、单次遍历声明—嵌套循环不一致、复杂度声明不一致、执行失败归因（[`src/tracejudge_hy3/evaluator/`](src/tracejudge_hy3/evaluator/)）。
 - 反例生成：优先复用与当前违反需求条款相关的 challenge/hidden 测试失败结果，其次基于相关测试的参数形状生成有限边界候选并与参考实现差分执行，并对列表参数做简单 delta-debugging 最小化（[`src/tracejudge_hy3/counterexample/`](src/tracejudge_hy3/counterexample/)）。
 - 可执行错误证书聚合：新疑似问题直接产生 `confirmed_bug` / `strongly_supported` / `unverified_suspicion` 三种裁决。普通首次运行正确时不产生证书；`cleared` 仅用于显式传入既有证书后，复核的完整执行证据表明原疑似问题不再成立的状态转移（[`src/tracejudge_hy3/evaluator/evidence.py`](src/tracejudge_hy3/evaluator/evidence.py)）。
-- CLI（Typer + Rich）：`doctor` / `demo` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `evalplus` / 阶段三 Gate B–F 命令 / 阶段四 `artifact-preflight`、`artifact-freeze`、`artifact-verify`、`replay-receipt-preflight`、`replay-receipt` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
+- CLI（Typer + Rich）：`doctor` / `demo` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `evalplus` / 阶段三 Gate B–F 命令 / 阶段四 `artifact-preflight`、`artifact-freeze`、`artifact-verify`、`replay-receipt-preflight`、`replay-receipt`、`charts-preflight`、`charts-publish`、`charts-verify` / `run` / `batch`（[`src/tracejudge_hy3/cli.py`](src/tracejudge_hy3/cli.py)）。
 - HumanEval+ 阶段一公开投影适配器：校验本地固定 revision 快照及其受控来源 manifest，把 164 道公开题面转换为不含答案/测试的 `ProblemSpec`，并仅依据公开 `problem_id` 生成固定种子 10 题 Pilot（`20260824`）或排除 Pilot 后的 45 题自然研究子集（`20260825`，schema v2）（[`src/tracejudge_hy3/dataset/humanevalplus.py`](src/tracejudge_hy3/dataset/humanevalplus.py)）。
 - HumanEval+ 阶段二官方执行适配器：严格验证阶段一产物后只导出 `solution_trace.code`，支持 `all` 与 `phase1-success-only` 两种选择策略；在固定 digest 的官方镜像中逐题运行 Base 和 Extra 测试，并生成脱敏的单样本工程结果（[`src/tracejudge_hy3/evalplus/`](src/tracejudge_hy3/evalplus/)）。
 - 阶段三 Gate A–C 已完成：正式自然 manifest 冻结 42 条轨迹，SHA256 `a4116a7ddb7ac910b79bd52e9530db79dd0f05c9edee8ecd947fc78c35c03692`；公开反事实证据 run 独立执行 15 个主体，实际 `6 pass / 9 fail`、0 超时、0 基础设施错误、0 预期偏差，results SHA256 `19a138ecc2ce784b940e88e085a85ddddf92a564be7235bbd5a3e97bb39d2776`；最终 overlay 冻结 42 + 15 = 57 条五方法配对顺序，SHA256 `3290221625d687e6d7412a0544247dc81a34857b114a545458b93cc04e35d255`。Gate C 只读验收核算 57 × 5 = 285 个配对，方法规格、Prompt bundle、输出 schema SHA256 分别为 `4b8684852125ad3059b5001951479a2f164c7089eb64ff10cbdafafc39c534ff`、`c8d6c2c0f6bb1207af987746d912868bd102f90b334f5425528cbda5be9dd366`、`96da92777ee89bb69a65c61f4bdc9fc9e7cb7ac1ba94a52400f79ca1130821f3`，且未执行方法、Provider、Docker 或网络（[`src/tracejudge_hy3/phase3/`](src/tracejudge_hy3/phase3/)）。
 - 阶段三 Gate D 已完成三等级公开工程证书发布与 confirmed 证书独立重放；Gate E1 正式私有盲法 packet 已导出，Gate E2 单人首轮 57 条标签已冻结。Gate E3 正式运行 `phase3_hy3_57x5_v1` 已产出完整 285 配对，其中 `valid_judgment=283`、`provider_error=2`；results / index SHA256 分别为 `332932e949281c84402046dbd25e0110fb7a7e7e224c71b17487226fa1098999` / `b1a6c6a61a4439d3e667ebd52ddba8cba98f8ee196c1cac8dce200f38c857247`。Gate E4 正式聚合统计已冻结，manifest / report SHA256 分别为 `7efbdc9c36340593be09e192ea0e7b15297d5e69c4192fa4b49583558b368bf8` / `972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10`。Gate F 正式脱敏报告 `phase3_report_primary_round1_v1` 已发布，manifest / Markdown / validation SHA256 分别为 `0b8285ec04344e29670d752a37c4d5ecb41ea07d5dfc18a5715b56de3e800b06` / `29eaef9f44a964308ab26b9821c472b0d13837eee587a3e687faa861edb4d725` / `702bf96be5d0911088dfea5cb95562d6b8e25d147d972c78b0b6870cecbae113`，验证状态为 `ANALYZED`、总体置信为 `CAUTION`。
-- 阶段四 Gate B 已完成 103 个关键产物的权限/哈希清单、13 个公开锚点、恢复验证和公开 replay receipt；Gate C 已将 Gate F Markdown 以相同 SHA256 发布为受 Git 跟踪的 [正式脱敏报告](docs/releases/phase4/phase3_research_report_public_v1.md)，并附带 [发布审计说明](docs/releases/phase4/phase3_research_report_publication_notes_v1.md)。该发布不重跑 Hy3，复现判定仍为 `CANNOT_VERIFY`。
+- 阶段四 P0 Gate A、B、C、E 的仓库内交付已完成：103 个关键产物的权限/哈希清单、13 个公开锚点、恢复验证和公开 replay receipt；Gate F Markdown 已以相同 SHA256 发布为受 Git 跟踪的 [正式脱敏报告](docs/releases/phase4/phase3_research_report_public_v1.md)，并附带 [发布审计说明](docs/releases/phase4/phase3_research_report_publication_notes_v1.md)；三张确定性聚合图表、[2 分钟公开 Fixture Demo](docs/releases/phase4/phase4_fixture_demo_v1.md)、[Release 检查单](docs/releases/phase4/phase4_release_checklist_v1.md)和[封版报告](docs/releases/phase4/phase4_closure_report_v1.md)均已就绪。Gate D/P1 研究增强延期且不阻塞 P0；该发布不重跑 Hy3，复现判定仍为 `CANNOT_VERIFY`。push、PR、merge、tag、Release 和附件上传仍待明确授权。
 - 3 道内置示例题（`safe_mean` / `deduplicate_preserve_order` / `clamp`），来源标记为 `self_constructed_mvp_fixture`（见 §10 和 §15）。
 - 指标计算：10 个纯函数指标，缺少人工标注时返回 `not_computable` 而不是伪造数值（[`src/tracejudge_hy3/reporting/metrics.py`](src/tracejudge_hy3/reporting/metrics.py)）。
 - 单元测试与集成测试（`pytest`），Lint（`ruff`）。
@@ -584,9 +584,9 @@ tracejudge-hy3/
 
 1. 将已落地的 HumanEval+ 10 题工程 Pilot 扩展为完整 164 题、多次复现的正式评测，接入 MBPP+，并构造研究级人工标注子集；
 2. 在已完成的公开反例/证书 Gate D 基础上扩展更多独立公开 Fixture；
-3. 在已冻结的 Gate E1/E2 packet 与主标注上，通过 Gate E3 冻结 Hy3 方法参数并执行 Test-only / Direct Judge / 四层结构化 / +AST / 完整 TraceJudge 的正式配对实验；
+3. 按新的预注册身份执行第二标注者或跨时间复标，补充一致性统计、反事实父题 cluster、消融和 Provider 失败敏感性分析；
 4. 扩展反例生成为更通用的属性测试与更完整的 delta-debugging；
-5. 简单结果可视化（图表）与批量评测报告。
+5. 在阶段四静态聚合 SVG 基础上扩展跨运行可视化看板和批量评测报告。
 
 ## 15. 许可证与数据来源
 

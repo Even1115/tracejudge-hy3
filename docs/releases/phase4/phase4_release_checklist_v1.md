@@ -74,7 +74,7 @@ git status --short --branch
 
 - [x] `PASS`：本检查单、Demo、封版报告、索引、状态和测试改动已经完成审查并提交到目标分支。
 - [x] `PASS`：目标分支已 push，[Pull Request #4](https://github.com/Even1115/tracejudge-hy3/pull/4) 已创建。
-- [ ] `PENDING AUTHORIZATION`：合并 Pull Request。
+- [x] `PASS`：[Pull Request #4](https://github.com/Even1115/tracejudge-hy3/pull/4) 已通过 merge commit `9627d93b668891c1fba0b255e403168afa731bf1` 合并到 `main`。
 - [ ] `PENDING AUTHORIZATION`：创建 tag、生成 Release 或上传附件；在 Release 说明中记录最终 commit ID 及本检查单/封版报告自身 SHA256。
 
-P0 Gate E 的仓库内交付、审查、提交、目标分支 push 和 Pull Request #4 创建已经完成；merge、tag、Release 和附件上传在获得明确授权前始终保持未勾选。
+P0 Gate E 的仓库内交付、审查、提交、目标分支 push、Pull Request #4 创建和合并已经完成；tag、Release 和附件上传在获得明确授权前始终保持未勾选。

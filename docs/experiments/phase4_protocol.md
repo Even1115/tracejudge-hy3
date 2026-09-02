@@ -4,7 +4,7 @@
 
 阶段四只为既有阶段一至阶段三结果建立复现、备份、公开发布和封版证据，不覆盖或重解释冻结运行。任何新增研究运行必须使用新的 ID、目录、manifest 和报告版本。
 
-P0 Gate A、B、C、E 的仓库内交付已经完成；Gate D/P1 研究增强延期且不阻塞 P0。目标分支已 push，Pull Request #4 已创建；merge、tag、Release 和附件上传仍须项目负责人明确授权。
+P0 Gate A、B、C、E 的仓库内交付已经完成；Gate D/P1 研究增强延期且不阻塞 P0。Pull Request #4 已通过 merge commit `9627d93b668891c1fba0b255e403168afa731bf1` 合并到 `main`；tag、Release 和附件上传仍须项目负责人明确授权。
 
 ## 1. Gate B 边界
 
@@ -142,4 +142,4 @@ tracejudge demo --mock --case faulty --per-test-timeout-seconds 5
 - 三张聚合 SVG、2 分钟 Fixture Demo、Release 检查单和封版报告已交付；
 - 不修改阶段三冻结运行、统计或 Gate F 文件。
 
-以上仓库内退出条件均已满足。Gate D/P1 和 v0.2+ 不阻塞本次 P0；目标分支已 push，Pull Request #4 已创建；merge、tag、Release 和附件上传仍待明确授权。
+以上仓库内退出条件均已满足。Gate D/P1 和 v0.2+ 不阻塞本次 P0；Pull Request #4 已通过 merge commit `9627d93b668891c1fba0b255e403168afa731bf1` 合并到 `main`；tag、Release 和附件上传仍待明确授权。

@@ -73,8 +73,8 @@ git status --short --branch
 ## 需要项目负责人授权的动作
 
 - [x] `PASS`：本检查单、Demo、封版报告、索引、状态和测试改动已经完成审查并提交到目标分支。
-- [ ] `PENDING AUTHORIZATION`：push 目标分支并创建或更新 Pull Request。
+- [x] `PASS`：目标分支已 push，[Pull Request #4](https://github.com/Even1115/tracejudge-hy3/pull/4) 已创建。
 - [ ] `PENDING AUTHORIZATION`：合并 Pull Request。
 - [ ] `PENDING AUTHORIZATION`：创建 tag、生成 Release 或上传附件；在 Release 说明中记录最终 commit ID 及本检查单/封版报告自身 SHA256。
 
-P0 Gate E 的仓库内交付、审查和提交已经完成；以上外部发布状态变更在获得明确授权前始终保持未勾选。
+P0 Gate E 的仓库内交付、审查、提交、目标分支 push 和 Pull Request #4 创建已经完成；merge、tag、Release 和附件上传在获得明确授权前始终保持未勾选。

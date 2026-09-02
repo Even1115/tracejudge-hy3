@@ -487,13 +487,19 @@ def preflight_artifact_inventory(
 
 
 def _safe_output_root(value: str | Path) -> Path:
-    root = Path(value).expanduser()
-    if root.is_symlink() or (root.exists() and not root.is_dir()):
+    root = Path(os.path.abspath(Path(value).expanduser()))
+    for candidate in (root, *root.parents):
+        if candidate.is_symlink():
+            raise Phase4ReproducibilityError(
+                "output root cannot traverse a symbolic link",
+                safe_stage="P4B_OUTPUT",
+            )
+    if root.exists() and not root.is_dir():
         raise Phase4ReproducibilityError(
             "output root is unsafe",
             safe_stage="P4B_OUTPUT",
         )
-    return root.resolve()
+    return root
 
 
 def _write_new_file(path: Path, payload: bytes, *, mode: int) -> None:
@@ -571,8 +577,13 @@ def verify_artifact_inventory(
     """Verify hashes, sizes, and exact modes after backup restoration."""
 
     root = Path(repo_root).expanduser().resolve()
-    manifest_file = Path(manifest_path).expanduser().resolve()
-    if manifest_file.is_symlink() or not manifest_file.is_file():
+    manifest_file = Path(os.path.abspath(Path(manifest_path).expanduser()))
+    if any(candidate.is_symlink() for candidate in (manifest_file, *manifest_file.parents)):
+        raise Phase4ReproducibilityError(
+            "inventory manifest cannot traverse a symbolic link",
+            safe_stage="P4B_VERIFY",
+        )
+    if not manifest_file.is_file():
         raise Phase4ReproducibilityError(
             "inventory manifest is missing or unsafe",
             safe_stage="P4B_VERIFY",
@@ -675,7 +686,11 @@ def prepare_public_replay_receipt(
             "public replay did not produce a verified single-case failure",
             safe_stage="P4B_REPLAY",
         )
-    implementation_path = Path(inspect.getsourcefile(replay_public_certificate) or "")
+    try:
+        implementation_source = inspect.getsourcefile(replay)
+    except TypeError:
+        implementation_source = None
+    implementation_path = Path(implementation_source or "")
     if not implementation_path.is_file():
         raise Phase4ReproducibilityError(
             "replay implementation identity is unavailable",

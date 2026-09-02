@@ -97,7 +97,9 @@ def test_phase4_release_index_links_report_and_keeps_evidence_level_unchanged():
     assert "phase4_closure_report_v1.md" in release_index
     assert "`ANALYZED / CAUTION / CANNOT_VERIFY`" in release_index
     assert "仓库内交付、审查和提交已完成" in release_index
-    assert "push、PR、merge、tag、Release" in release_index
+    assert "目标分支已 push" in release_index
+    assert "Pull Request #4" in release_index
+    assert "merge、tag、Release" in release_index
 
 
 def test_formal_chart_bundle_is_hash_bound_and_aggregate_only():
@@ -165,8 +167,11 @@ def test_gate_e_documents_preserve_scope_and_release_authority_boundary():
     assert "没有重跑 Hy3 主实验" in combined
     assert "没有重试两条 Provider 失败" in combined
     assert "ANALYZED / CAUTION / CANNOT_VERIFY" in combined
-    assert "不代表已发生外部发布" in closure
+    assert "不代表已完成外部发布" in closure
     assert "仓库内审查和提交已经完成" in closure
+    assert "Pull Request #4" in combined
+    assert "push 目标分支并创建或更新 Pull Request" not in checklist
+    assert "merge、tag、Release 和附件上传" in combined
     assert "审查并提交本检查单" not in checklist
     assert "git diff --check origin/main...HEAD -- ." in checklist
     assert "docs/releases/phase4/phase3_research_report_public_v1.md'" in checklist
@@ -183,7 +188,8 @@ def test_implementation_status_marks_gate_e_content_complete_without_claiming_re
     assert "阶段四 P0 Gate E" in status
     assert "phase4_public_charts_v1" in status
     assert "P0 仓库内交付、审查和提交已完成" in status
-    assert "push、PR、merge、tag、Release" in status
+    assert "目标分支已 push，Pull Request #4 已创建" in status
+    assert "merge、tag、Release 和附件上传仍待" in status
     assert "交互式 Web UI 与跨运行可视化看板" in status
 
 
@@ -203,4 +209,6 @@ def test_canonical_project_documents_mark_gate_e_complete_without_claiming_relea
     assert "正式视频仍待阶段四 Gate E" not in combined
     assert "最后一项 Demo 仍是阶段四 Gate E" not in combined
     assert "Gate B 实现草案" not in protocol
-    assert "push、PR、merge、tag、Release" in combined
+    assert "目标分支已 push" in combined
+    assert "Pull Request #4 已创建" in combined
+    assert "merge、tag、Release 和附件上传" in combined

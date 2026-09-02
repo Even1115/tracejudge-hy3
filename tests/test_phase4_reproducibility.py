@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import stat
 from datetime import UTC, datetime, timedelta
@@ -225,6 +226,35 @@ def test_inventory_freeze_and_restore_verification_are_atomic_and_mode_bound(tmp
         )
 
 
+@pytest.mark.parametrize("linked_output", ("private", "public"))
+def test_inventory_writer_rejects_symlinked_output_ancestor(
+    tmp_path: Path,
+    linked_output: str,
+):
+    specs = _inventory_fixture(tmp_path)
+    real_output = tmp_path / f"real-{linked_output}-output"
+    real_output.mkdir()
+    linked_parent = tmp_path / f"linked-{linked_output}-output"
+    linked_parent.symlink_to(real_output, target_is_directory=True)
+    private_output = (
+        linked_parent / "private" if linked_output == "private" else tmp_path / "private"
+    )
+    public_output = linked_parent / "public" if linked_output == "public" else tmp_path / "public"
+
+    with pytest.raises(Phase4ReproducibilityError) as captured:
+        freeze_artifact_inventory(
+            repo_root=tmp_path,
+            inventory_id="phase4_inventory_fixture_v1",
+            artifact_specs=specs,
+            created_at=NOW,
+            git_identity=GIT,
+            private_output_dir=private_output,
+            public_output_dir=public_output,
+        )
+
+    assert captured.value.safe_stage == "P4B_OUTPUT"
+
+
 def test_restore_verification_rejects_hash_size_or_mode_drift(tmp_path: Path):
     specs = _inventory_fixture(tmp_path)
     result = freeze_artifact_inventory(
@@ -269,6 +299,29 @@ def test_restore_verification_rejects_tampered_artifact_set_digest(tmp_path: Pat
     assert captured.value.safe_stage == "P4B_VERIFY"
 
 
+def test_restore_verification_rejects_symlink_manifest(tmp_path: Path):
+    specs = _inventory_fixture(tmp_path)
+    result = freeze_artifact_inventory(
+        repo_root=tmp_path,
+        inventory_id="phase4_inventory_fixture_v1",
+        artifact_specs=specs,
+        created_at=NOW,
+        git_identity=GIT,
+        private_output_dir=tmp_path / "private-output",
+        public_output_dir=tmp_path / "public-output",
+    )
+    linked_manifest = tmp_path / "linked-manifest.json"
+    linked_manifest.symlink_to(result.private_manifest_path)
+
+    with pytest.raises(Phase4ReproducibilityError) as captured:
+        verify_artifact_inventory(
+            repo_root=tmp_path,
+            manifest_path=linked_manifest,
+        )
+
+    assert captured.value.safe_stage == "P4B_VERIFY"
+
+
 def test_public_replay_receipt_binds_inputs_without_copying_content(tmp_path: Path):
     paths = _receipt_files(tmp_path)
     receipt = prepare_public_replay_receipt(
@@ -287,6 +340,8 @@ def test_public_replay_receipt_binds_inputs_without_copying_content(tmp_path: Pa
     assert receipt.safety.docker_call_count == 0
     assert receipt.safety.network_call_count == 0
     assert receipt.certificate_sha256 == _sha((tmp_path / paths["certificate_path"]).read_bytes())
+    replay_implementation = Path(inspect.getsourcefile(_fake_replay) or "")
+    assert receipt.runtime.replay_implementation_sha256 == _sha(replay_implementation.read_bytes())
     payload = json.dumps(receipt.model_dump(mode="json"), sort_keys=True)
     assert 'fixture":0' not in payload
 

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "kind": "tracejudge_phase4_p1_second_annotator_protocol",
+  "protocol_id": "phase4_p1_second_annotator_protocol_v1",
+  "arrangement_relative_path": "docs/experiments/phase4_p1_second_annotator_arrangement_v1.md",
+  "arrangement_sha256": "15a0de0efc0b6695b8021f5912ea6670bfc234f686a89cfcf5d267b53e3d7c6b",
+  "phase3_annotation_guide_relative_path": "docs/experiments/phase3_annotation_guide_v1.md",
+  "phase3_annotation_guide_sha256": "0c789671fc926e8286ca7317eae0496efc9f39616783b2c8cbebd678de20beb1",
+  "ethics_status": "READY",
+  "ethics_determination": {
+    "decision": "approved",
+    "confirmed_on": "2026-09-02",
+    "verifier_role": "supervising_advisor",
+    "record_storage": "private_restricted_location",
+    "participant_consent_requirements_confirmed": true,
+    "data_management_requirements_confirmed": true
+  },
+  "delivery_record_status": "pending_completion",
+  "data_collection_allowed": false,
+  "formal_subset": {
+    "subset_id": "phase4_p1_formal_subset_v1",
+    "subset_status": "frozen",
+    "selection_seed": 20260902,
+    "selection_algorithm": "sha256_seeded_rank_v1:natural_top15;counterfactual_parent_first_then_global_fill_max2;source_order_output",
+    "target_item_count": 20,
+    "natural_item_count": 15,
+    "counterfactual_item_count": 5,
+    "counterfactual_parent_minimum": 3,
+    "counterfactual_per_parent_maximum": 2,
+    "selection_forbidden_inputs": [
+      "primary_rater_labels",
+      "method_predictions",
+      "provider_status",
+      "post_hoc_results"
+    ],
+    "freeze_before_practice_response_review": true
+  },
+  "practice": {
+    "source_id": "phase4_p1_public_practice_source_v1",
+    "practice_id": "phase4_p1_public_practice_v1",
+    "item_count": 5,
+    "clean_reference_count": 2,
+    "error_reference_count": 3,
+    "cohort_overlap_required": 0,
+    "coordinator_reference_storage": "git_ignored_private_artifact",
+    "public_manifest_excludes_reference_content_and_private_path": true,
+    "maximum_calibration_rounds_total": 2,
+    "admission": {
+      "schema_valid_count_required": 5,
+      "privacy_or_blinding_violation_count_required": 0,
+      "has_error_exact_agreement_required": 4,
+      "process_correct_exact_agreement_required": 4,
+      "error_item_first_faulty_layer_exact_agreement_required": 2,
+      "error_item_first_faulty_layer_denominator": 3,
+      "public_evidence_only_rationale_required": true,
+      "coordinator_written_authorization_required": true
+    }
+  },
+  "relative_deadlines": {
+    "practice_calendar_days_after_verified_receipt": 3,
+    "coordinator_feedback_business_days": 2,
+    "formal_calendar_days_after_written_admission_and_verified_receipt": 10,
+    "coordinator_wait_extension_threshold_hours": 24,
+    "coordinator_wait_time_extends_deadline_one_for_one": true
+  },
+  "transport": {
+    "encrypted_archive_minimum": "AES-256",
+    "authenticated_one_to_one_file_channel_required": true,
+    "password_via_separate_realtime_voice_or_in_person_channel": true,
+    "exact_channels_recorded_before_delivery": true,
+    "project_owner_per_delivery_upload_authorization_required": true,
+    "local_non_sync_storage_only": true,
+    "full_disk_encryption_or_equivalent_required": true,
+    "sha256_verification_before_opening_required": true
+  },
+  "blinding": {
+    "blinded_to_primary_labels": true,
+    "blinded_to_method_predictions": true,
+    "blinded_to_other_raters": true,
+    "active_project_search_forbidden": true,
+    "item_discussion_with_others_forbidden": true,
+    "external_ai_or_execution_forbidden": true,
+    "disagreement_discussion_before_raw_freeze_forbidden": true
+  },
+  "incident_rule": "stop_preserve_report_wait_for_written_instruction",
+  "withdrawal_allowed_before_freeze": true,
+  "partial_labels_used_after_pre_freeze_withdrawal": false,
+  "participant_copy_deletion_hours_after_receipt_or_withdrawal": 24,
+  "analysis": {
+    "raw_agreement_required": true,
+    "confusion_counts_required": true,
+    "cohen_kappa_policy": "report_only_when_both_classes_present_and_expected_agreement_defined",
+    "adjudication_overwrites_original_labels": false,
+    "exploratory_only": true
+  },
+  "formal_packet_created": false,
+  "formal_data_collected": false
+}

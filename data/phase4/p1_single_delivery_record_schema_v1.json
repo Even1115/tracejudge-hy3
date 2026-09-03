@@ -1,0 +1,404 @@
+{
+  "$defs": {
+    "P1DeliveryChannels": {
+      "additionalProperties": false,
+      "properties": {
+        "emergency_channel": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Emergency Channel"
+        },
+        "faq_channel": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Faq Channel"
+        },
+        "file_delivery_channel": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "File Delivery Channel"
+        },
+        "password_channel": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Password Channel"
+        },
+        "return_channel": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Return Channel"
+        }
+      },
+      "title": "P1DeliveryChannels",
+      "type": "object"
+    }
+  },
+  "$id": "https://tracejudge-hy3.invalid/schema/p1_single_delivery_record_v1.json",
+  "additionalProperties": false,
+  "properties": {
+    "channels": {
+      "$ref": "#/$defs/P1DeliveryChannels"
+    },
+    "compensation_terms": {
+      "anyOf": [
+        {
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Compensation Terms"
+    },
+    "coordinator_contact": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coordinator Contact"
+    },
+    "credit_and_authorship_terms": {
+      "anyOf": [
+        {
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Credit And Authorship Terms"
+    },
+    "data_collection_allowed": {
+      "default": false,
+      "title": "Data Collection Allowed",
+      "type": "boolean"
+    },
+    "delivery_id": {
+      "const": "phase4_p1_single_delivery_v1",
+      "default": "phase4_p1_single_delivery_v1",
+      "title": "Delivery Id",
+      "type": "string"
+    },
+    "ethics_confirmed_on": {
+      "const": "2026-09-02",
+      "default": "2026-09-02",
+      "title": "Ethics Confirmed On",
+      "type": "string"
+    },
+    "ethics_decision": {
+      "const": "approved",
+      "default": "approved",
+      "title": "Ethics Decision",
+      "type": "string"
+    },
+    "ethics_record_storage": {
+      "const": "private_restricted_location",
+      "default": "private_restricted_location",
+      "title": "Ethics Record Storage",
+      "type": "string"
+    },
+    "ethics_status": {
+      "const": "READY",
+      "default": "READY",
+      "title": "Ethics Status",
+      "type": "string"
+    },
+    "ethics_verifier_role": {
+      "const": "supervising_advisor",
+      "default": "supervising_advisor",
+      "title": "Ethics Verifier Role",
+      "type": "string"
+    },
+    "final_deletion_confirmed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Final Deletion Confirmed At"
+    },
+    "formal_data_collected": {
+      "const": false,
+      "default": false,
+      "title": "Formal Data Collected",
+      "type": "boolean"
+    },
+    "formal_due_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Formal Due At"
+    },
+    "formal_packet_created": {
+      "const": false,
+      "default": false,
+      "title": "Formal Packet Created",
+      "type": "boolean"
+    },
+    "incident_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Incident Count",
+      "type": "integer"
+    },
+    "kind": {
+      "const": "tracejudge_phase4_p1_single_delivery_record",
+      "default": "tracejudge_phase4_p1_single_delivery_record",
+      "title": "Kind",
+      "type": "string"
+    },
+    "may_contain_private_contact_details": {
+      "const": true,
+      "default": true,
+      "title": "May Contain Private Contact Details",
+      "type": "boolean"
+    },
+    "outbound_formal_archive_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outbound Formal Archive Sha256"
+    },
+    "outbound_practice_archive_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outbound Practice Archive Sha256"
+    },
+    "participant_consent_confirmed": {
+      "default": false,
+      "title": "Participant Consent Confirmed",
+      "type": "boolean"
+    },
+    "participant_consent_confirmed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Participant Consent Confirmed At"
+    },
+    "participant_receipt_verified_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Participant Receipt Verified At"
+    },
+    "practice_due_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Practice Due At"
+    },
+    "private_restricted_storage": {
+      "const": true,
+      "default": true,
+      "title": "Private Restricted Storage",
+      "type": "boolean"
+    },
+    "project_owner_delivery_authorization_confirmed": {
+      "default": false,
+      "title": "Project Owner Delivery Authorization Confirmed",
+      "type": "boolean"
+    },
+    "protocol_id": {
+      "const": "phase4_p1_second_annotator_protocol_v1",
+      "default": "phase4_p1_second_annotator_protocol_v1",
+      "title": "Protocol Id",
+      "type": "string"
+    },
+    "protocol_sha256": {
+      "const": "3f7268eb757f452d3902de3d60274ce2d45fb022ba047e64bfd5e680b044bf6c",
+      "default": "3f7268eb757f452d3902de3d60274ce2d45fb022ba047e64bfd5e680b044bf6c",
+      "title": "Protocol Sha256",
+      "type": "string"
+    },
+    "public_release_forbidden": {
+      "const": true,
+      "default": true,
+      "title": "Public Release Forbidden",
+      "type": "boolean"
+    },
+    "rater_id": {
+      "const": "p1_rater_02",
+      "default": "p1_rater_02",
+      "title": "Rater Id",
+      "type": "string"
+    },
+    "record_status": {
+      "default": "pending_completion",
+      "enum": [
+        "pending_completion",
+        "ready_for_practice_delivery"
+      ],
+      "title": "Record Status",
+      "type": "string"
+    },
+    "retention_and_destruction_terms": {
+      "anyOf": [
+        {
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retention And Destruction Terms"
+    },
+    "returned_archive_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Returned Archive Sha256"
+    },
+    "schema_relative_path": {
+      "const": "data/phase4/p1_single_delivery_record_schema_v1.json",
+      "default": "data/phase4/p1_single_delivery_record_schema_v1.json",
+      "title": "Schema Relative Path",
+      "type": "string"
+    },
+    "schema_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Schema Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "withdrawal_cutoff_terms": {
+      "anyOf": [
+        {
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Withdrawal Cutoff Terms"
+    }
+  },
+  "required": [
+    "schema_sha256"
+  ],
+  "title": "P1SingleDeliveryRecord",
+  "type": "object"
+}

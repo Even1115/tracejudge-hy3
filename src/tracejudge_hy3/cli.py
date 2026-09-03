@@ -73,14 +73,42 @@ from tracejudge_hy3.phase3 import (
     replay_public_certificate,
 )
 from tracejudge_hy3.phase4 import (
+    P1_ARRANGEMENT_RELATIVE_PATH,
+    P1_COORDINATOR_REFERENCE_DEFAULT_PATH,
+    P1_DELIVERY_RECORD_DEFAULT_PATH,
+    P1_DELIVERY_SCHEMA_RELATIVE_PATH,
+    P1_FORMAL_PACKET_DEFAULT_OUTPUT,
+    P1_FORMAL_PACKET_ID,
+    P1_FORMAL_PRIVATE_MANIFEST_DEFAULT_PATH,
+    P1_FORMAL_PUBLIC_COMMITMENT_DEFAULT_PATH,
+    P1_PRACTICE_ADMISSION_DEFAULT_PATH,
+    P1_PRACTICE_ID,
+    P1_PRACTICE_SOURCE_RELATIVE_PATH,
+    P1_PROTOCOL_RELATIVE_PATH,
+    Phase4P1AnnotationError,
     Phase4ReleaseError,
     Phase4ReproducibilityError,
+    Phase4StabilityError,
+    create_p1_delivery_record_template,
+    execute_hy3_judge_stability,
     freeze_artifact_inventory,
+    freeze_p1_formal_subset,
     preflight_artifact_inventory,
+    preflight_hy3_judge_stability,
+    preflight_p1_delivery_record,
+    preflight_p1_formal_packet,
+    preflight_p1_formal_subset,
+    preflight_p1_practice_bundle,
     prepare_public_charts,
     prepare_public_replay_receipt,
     verify_artifact_inventory,
+    verify_p1_formal_packet,
+    verify_p1_formal_subset,
+    verify_p1_practice_bundle,
     verify_public_charts,
+    write_p1_formal_packet,
+    write_p1_practice_admission,
+    write_p1_practice_bundle,
     write_public_charts,
     write_public_replay_receipt,
 )
@@ -112,7 +140,7 @@ phase3_app = typer.Typer(
 )
 phase4_app = typer.Typer(
     add_completion=False,
-    help="阶段四复现清单、公开 replay receipt 与聚合图表工具",
+    help="阶段四复现、公开发布与 P1 研究增强工具",
 )
 app.add_typer(dataset_app, name="dataset")
 app.add_typer(phase3_app, name="phase3")
@@ -151,6 +179,30 @@ DEFAULT_PHASE4_STATISTICS_MANIFEST_SHA256 = (
 DEFAULT_PHASE4_STATISTICS_REPORT_SHA256 = (
     "972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10"
 )
+DEFAULT_PHASE4_P1_ARRANGEMENT = P1_ARRANGEMENT_RELATIVE_PATH
+DEFAULT_PHASE4_P1_PROTOCOL = P1_PROTOCOL_RELATIVE_PATH
+DEFAULT_PHASE4_P1_PRACTICE_SOURCE = P1_PRACTICE_SOURCE_RELATIVE_PATH
+DEFAULT_PHASE4_P1_COORDINATOR_REFERENCE = P1_COORDINATOR_REFERENCE_DEFAULT_PATH
+DEFAULT_PHASE4_P1_PRACTICE_OUTPUT = "docs/experiments/phase4_p1_practice"
+DEFAULT_PHASE4_P1_DELIVERY_SCHEMA = P1_DELIVERY_SCHEMA_RELATIVE_PATH
+DEFAULT_PHASE4_P1_DELIVERY_RECORD = P1_DELIVERY_RECORD_DEFAULT_PATH
+DEFAULT_PHASE4_P1_FORMAL_PRIVATE_MANIFEST = P1_FORMAL_PRIVATE_MANIFEST_DEFAULT_PATH
+DEFAULT_PHASE4_P1_FORMAL_PUBLIC_COMMITMENT = P1_FORMAL_PUBLIC_COMMITMENT_DEFAULT_PATH
+DEFAULT_PHASE4_P1_PRACTICE_ADMISSION = P1_PRACTICE_ADMISSION_DEFAULT_PATH
+DEFAULT_PHASE4_P1_FORMAL_PACKET_OUTPUT = P1_FORMAL_PACKET_DEFAULT_OUTPUT
+DEFAULT_PHASE4_P1_PHASE1_RUN = (
+    "artifacts/experiments/phase1-research-natural/phase1_20260826T130038779522Z_5f55a45bb5e5"
+)
+DEFAULT_PHASE4_P1_PHASE2_RUN = (
+    "artifacts/experiments/phase2-research-natural/phase2_20260827T081939637435Z_3c366f64fc19"
+)
+DEFAULT_PHASE4_P1_DATASET_MANIFEST = (
+    "artifacts/datasets/processed/humanevalplus-research-natural-45/dataset_manifest.json"
+)
+DEFAULT_PHASE4_P1_EXECUTION_RUN = (
+    "artifacts/experiments/phase3-public-evidence/phase3_cf_public_15_v1"
+)
+DEFAULT_PHASE4_STABILITY_OUTPUT = "artifacts/experiments/phase4-judge-stability"
 
 
 def _reject_phase1_projection_execution(problems: list[ProblemSpec]) -> None:
@@ -2305,8 +2357,133 @@ def phase3_report(
 
 
 def _render_phase4_failure(exc: BaseException) -> None:
-    console.print("[red]阶段四复现加固校验失败；未输出敏感正文。[/red]")
+    console.print("[red]阶段四校验失败；未输出敏感正文。[/red]")
     console.print(f"[yellow]安全阶段码：{getattr(exc, 'safe_stage', 'P4B_UNCLASSIFIED')}[/yellow]")
+
+
+@phase4_app.command("stability-preflight")
+def phase4_stability_preflight(
+    run_id: str = typer.Option(..., "--run-id", help="独立稳定性实验 run ID"),
+    source_bundle: str = typer.Option(DEFAULT_PHASE4_SOURCE_BUNDLE, "--source-bundle"),
+    execution_run: str = typer.Option(
+        DEFAULT_PHASE4_P1_EXECUTION_RUN,
+        "--execution-run",
+        help="阶段三已冻结的公开 Fixture 功能证据 run",
+    ),
+    output_dir: str = typer.Option(DEFAULT_PHASE4_STABILITY_OUTPUT, "--output-dir"),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    temperature: float = typer.Option(0.0, "--temperature", min=0.0),
+    timeout_seconds: float = typer.Option(
+        120.0,
+        "--timeout-seconds",
+        min=1.0,
+        help="每次底层 Judge 请求的超时",
+    ),
+    resume: bool = typer.Option(False, "--resume", help="预检同 ID 的未完成稳定性 run"),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """只读固化 4 个公开案例 × 5 次 Full TraceJudge 计划，不调用 Provider。"""
+
+    try:
+        result = preflight_hy3_judge_stability(
+            run_id=run_id,
+            source_bundle_path=source_bundle,
+            execution_run_dir=execution_run,
+            output_dir=output_dir,
+            repo_root=repo_root,
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+            resume=resume,
+            allow_dirty=allow_dirty,
+        )
+    except (Phase4StabilityError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 Judge 稳定性只读预检：{result.run_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "公开案例 / 每例重复 / 评审单元",
+        f"{result.case_count} / {result.repetition_count} / {result.scheduled_evaluation_count}",
+    )
+    table.add_row(
+        "名义 / 最大底层 Provider 请求",
+        f"{result.nominal_provider_call_count} / {result.maximum_provider_call_count}",
+    )
+    table.add_row("Provider / 模型", f"{result.provider} / {result.model}")
+    table.add_row("Protocol SHA256", result.protocol_sha256)
+    table.add_row("公开证据 results SHA256", result.execution_results_sha256)
+    table.add_row("方法输入集合 SHA256", result.material_payloads_sha256)
+    table.add_row("Full Prompt SHA256", result.prompt_sha256)
+    table.add_row("Git commit / dirty", f"{result.git_commit} / {result.git_dirty}")
+    table.add_row("创建目录 / 调用 Provider", "否 / 否")
+    console.print(table)
+    console.print("[yellow]该计划是独立探索性附加实验，不得并入冻结的 57×5 主实验。[/yellow]")
+
+
+@phase4_app.command("stability-run")
+def phase4_stability_run(
+    run_id: str = typer.Option(..., "--run-id", help="独立稳定性实验 run ID"),
+    source_bundle: str = typer.Option(DEFAULT_PHASE4_SOURCE_BUNDLE, "--source-bundle"),
+    execution_run: str = typer.Option(
+        DEFAULT_PHASE4_P1_EXECUTION_RUN,
+        "--execution-run",
+        help="阶段三已冻结的公开 Fixture 功能证据 run",
+    ),
+    output_dir: str = typer.Option(DEFAULT_PHASE4_STABILITY_OUTPUT, "--output-dir"),
+    repo_root: str = typer.Option(".", "--repo-root"),
+    temperature: float = typer.Option(0.0, "--temperature", min=0.0),
+    timeout_seconds: float = typer.Option(
+        120.0,
+        "--timeout-seconds",
+        min=1.0,
+        help="每次底层 Judge 请求的超时",
+    ),
+    resume: bool = typer.Option(False, "--resume", help="续跑同 ID 的未完成稳定性 run"),
+    confirm_real_provider: bool = typer.Option(
+        False,
+        "--confirm-real-provider",
+        help="确认本命令会调用真实 Hy3，并可能产生费用",
+    ),
+    allow_dirty: bool = typer.Option(False, "--allow-dirty", hidden=True),
+) -> None:
+    """执行或续跑 20 个独立评审单元，并生成 JSON/Markdown 稳定性报告。"""
+
+    try:
+        result = asyncio.run(
+            execute_hy3_judge_stability(
+                confirm_real_provider=confirm_real_provider,
+                run_id=run_id,
+                source_bundle_path=source_bundle,
+                execution_run_dir=execution_run,
+                output_dir=output_dir,
+                repo_root=repo_root,
+                temperature=temperature,
+                timeout_seconds=timeout_seconds,
+                resume=resume,
+                allow_dirty=allow_dirty,
+            )
+        )
+    except (Phase4StabilityError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 Judge 稳定性实验：{result.run_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("有效判断 / 计划", f"{result.valid_judgment_count} / 20")
+    table.add_row(
+        "Provider / 解析失败", f"{result.provider_failure_count} / {result.parse_failure_count}"
+    )
+    table.add_row("实际底层 Provider 请求", str(result.observed_provider_call_count))
+    table.add_row("results SHA256", result.results_sha256)
+    table.add_row("report JSON SHA256", result.report_json_sha256)
+    table.add_row("report Markdown SHA256", result.report_markdown_sha256)
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]report: {result.report_markdown_path}[/dim]")
+    console.print(
+        "[yellow]结果仅描述四个目的性选择公开案例的运行内稳定性；不得覆盖或合并主实验。[/yellow]"
+    )
 
 
 @phase4_app.command("artifact-preflight")
@@ -2680,6 +2857,644 @@ def phase4_charts_verify(
     table.add_row("确定性 SVG", str(result.figure_count))
     table.add_row("逐字节验证", "通过" if result.verified else "失败")
     table.add_row("Provider / Docker / 网络", "否 / 否 / 否")
+    console.print(table)
+
+
+def _phase4_p1_practice_arguments(
+    *,
+    arrangement: str,
+    protocol: str,
+    phase3_guide: str,
+    source: str,
+    coordinator_reference: str,
+    cohort_manifest: str,
+    natural_manifest: str,
+    timeout_seconds: float,
+) -> dict[str, object]:
+    return {
+        "arrangement_path": arrangement,
+        "protocol_path": protocol,
+        "phase3_guide_path": phase3_guide,
+        "source_path": source,
+        "coordinator_reference_path": coordinator_reference,
+        "cohort_manifest_path": cohort_manifest,
+        "natural_manifest_path": natural_manifest,
+        "timeout_seconds": timeout_seconds,
+    }
+
+
+@phase4_app.command("p1-practice-preflight")
+def phase4_p1_practice_preflight(
+    arrangement: str = typer.Option(DEFAULT_PHASE4_P1_ARRANGEMENT, "--arrangement"),
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    phase3_guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--phase3-guide"),
+    source: str = typer.Option(DEFAULT_PHASE4_P1_PRACTICE_SOURCE, "--source"),
+    coordinator_reference: str = typer.Option(
+        DEFAULT_PHASE4_P1_COORDINATOR_REFERENCE,
+        "--coordinator-reference",
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    timeout_seconds: float = typer.Option(2.0, "--timeout-seconds"),
+) -> None:
+    """Gate D/P1：只读构建 5 条 cohort 外公开 Fixture 练习包。"""
+
+    try:
+        result = preflight_p1_practice_bundle(
+            **_phase4_p1_practice_arguments(
+                arrangement=arrangement,
+                protocol=protocol,
+                phase3_guide=phase3_guide,
+                source=source,
+                coordinator_reference=coordinator_reference,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 公开练习包只读预检：{result.manifest.practice_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "公开 Fixture / 执行用例",
+        f"{result.manifest.item_count} / {result.manifest.executed_public_case_count}",
+    )
+    table.add_row("与阶段三 cohort 重合", str(result.manifest.cohort_overlap_count))
+    table.add_row("练习 manifest SHA256", result.manifest_sha256)
+    table.add_row("写入文件", "否")
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    table.add_row(
+        "伦理状态 / 正式数据收集",
+        f"{result.manifest.ethics_status} / 禁止（待单次交付记录）",
+    )
+    console.print(table)
+
+
+@phase4_app.command("p1-practice-publish")
+def phase4_p1_practice_publish(
+    arrangement: str = typer.Option(DEFAULT_PHASE4_P1_ARRANGEMENT, "--arrangement"),
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    phase3_guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--phase3-guide"),
+    source: str = typer.Option(DEFAULT_PHASE4_P1_PRACTICE_SOURCE, "--source"),
+    coordinator_reference: str = typer.Option(
+        DEFAULT_PHASE4_P1_COORDINATOR_REFERENCE,
+        "--coordinator-reference",
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    output_dir: str = typer.Option(DEFAULT_PHASE4_P1_PRACTICE_OUTPUT, "--output-dir"),
+    timeout_seconds: float = typer.Option(2.0, "--timeout-seconds"),
+) -> None:
+    """Gate D/P1：原子写入不可覆盖的公开 Fixture 练习包。"""
+
+    try:
+        result = write_p1_practice_bundle(
+            output_dir=output_dir,
+            **_phase4_p1_practice_arguments(
+                arrangement=arrangement,
+                protocol=protocol,
+                phase3_guide=phase3_guide,
+                source=source,
+                coordinator_reference=coordinator_reference,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+                timeout_seconds=timeout_seconds,
+            ),
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 公开练习包：{result.manifest.practice_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "公开 Fixture / 执行用例",
+        f"{result.manifest.item_count} / {result.manifest.executed_public_case_count}",
+    )
+    table.add_row("与阶段三 cohort 重合", str(result.manifest.cohort_overlap_count))
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]参与者文件: {result.participant_packet_path.parent}[/dim]")
+    console.print(
+        "[yellow]公开目录仅写入 participant/ 与 manifest；协调者参考继续保存在 "
+        "Git-ignored 受限目录。伦理已批准，但单次交付记录仍待完成；本命令不授权发包。"
+        "[/yellow]"
+    )
+
+
+@phase4_app.command("p1-practice-verify")
+def phase4_p1_practice_verify(
+    manifest: str = typer.Option(
+        f"{DEFAULT_PHASE4_P1_PRACTICE_OUTPUT}/{P1_PRACTICE_ID}/manifest.json",
+        "--manifest",
+    ),
+    manifest_sha256: str | None = typer.Option(None, "--manifest-sha256"),
+    arrangement: str = typer.Option(DEFAULT_PHASE4_P1_ARRANGEMENT, "--arrangement"),
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    phase3_guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--phase3-guide"),
+    source: str = typer.Option(DEFAULT_PHASE4_P1_PRACTICE_SOURCE, "--source"),
+    coordinator_reference: str = typer.Option(
+        DEFAULT_PHASE4_P1_COORDINATOR_REFERENCE,
+        "--coordinator-reference",
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    timeout_seconds: float = typer.Option(2.0, "--timeout-seconds"),
+) -> None:
+    """Gate D/P1：重建并逐字节核验公开 Fixture 练习包。"""
+
+    try:
+        result = verify_p1_practice_bundle(
+            manifest_path=manifest,
+            expected_manifest_sha256=manifest_sha256,
+            **_phase4_p1_practice_arguments(
+                arrangement=arrangement,
+                protocol=protocol,
+                phase3_guide=phase3_guide,
+                source=source,
+                coordinator_reference=coordinator_reference,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+                timeout_seconds=timeout_seconds,
+            ),
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 公开练习包验证：{result.practice_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "公开 Fixture / 执行用例", f"{result.item_count} / {result.executed_public_case_count}"
+    )
+    table.add_row("逐字节重建", "通过" if result.verified else "失败")
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-delivery-init")
+def phase4_p1_delivery_init(
+    schema: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_SCHEMA, "--schema"),
+    record: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_RECORD, "--record"),
+) -> None:
+    """Gate D/P1：创建不可覆盖的 Git-ignored 私有单次交付记录模板。"""
+
+    try:
+        result = create_p1_delivery_record_template(schema_path=schema, record_path=record)
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 单次交付记录模板：{result.delivery_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("记录状态", result.record_status)
+    table.add_row("缺失必填确认", str(result.missing_required_count))
+    table.add_row("数据收集", "允许" if result.data_collection_allowed else "禁止")
+    table.add_row("Schema SHA256", result.schema_sha256)
+    table.add_row("记录 SHA256", result.record_sha256)
+    table.add_row("写入范围", "仅 Git-ignored 私有模板；不发包")
+    console.print(table)
+
+
+@phase4_app.command("p1-delivery-preflight")
+def phase4_p1_delivery_preflight(
+    schema: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_SCHEMA, "--schema"),
+    record: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_RECORD, "--record"),
+) -> None:
+    """Gate D/P1：只读检查单次交付记录和操作门。"""
+
+    try:
+        result = preflight_p1_delivery_record(schema_path=schema, record_path=record)
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 单次交付记录预检：{result.delivery_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("记录状态", result.record_status)
+    table.add_row("缺失必填确认", str(result.missing_required_count))
+    table.add_row("数据收集", "允许" if result.data_collection_allowed else "禁止")
+    table.add_row("Schema SHA256", result.schema_sha256)
+    table.add_row("记录 SHA256", result.record_sha256)
+    table.add_row("读取内容回显", "无")
+    console.print(table)
+
+
+def _phase4_p1_formal_subset_arguments(
+    *, protocol: str, cohort_manifest: str, natural_manifest: str
+) -> dict[str, str]:
+    return {
+        "protocol_path": protocol,
+        "cohort_manifest_path": cohort_manifest,
+        "natural_manifest_path": natural_manifest,
+    }
+
+
+@phase4_app.command("p1-formal-subset-preflight")
+def phase4_p1_formal_subset_preflight(
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+) -> None:
+    """Gate D/P1：只读重建正式 20 条子集，不读取标签或方法结果。"""
+
+    try:
+        result = preflight_p1_formal_subset(
+            **_phase4_p1_formal_subset_arguments(
+                protocol=protocol,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+            )
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式子集只读预检：{result.commitment.subset_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "自然 / 反事实 / 合计",
+        f"{result.commitment.selected_natural_count} / "
+        f"{result.commitment.selected_counterfactual_count} / "
+        f"{result.commitment.selected_total_count}",
+    )
+    table.add_row(
+        "反事实父题覆盖 / 单父题上限",
+        f"{result.commitment.counterfactual_parent_count} / "
+        f"{result.commitment.counterfactual_per_parent_maximum}",
+    )
+    table.add_row("私有 manifest SHA256", result.private_manifest_sha256)
+    table.add_row("公开 commitment SHA256", result.public_commitment_sha256)
+    table.add_row("写入文件", "否")
+    table.add_row("标签 / 方法预测 / Provider 状态", "未读取 / 未读取 / 未读取")
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-formal-subset-freeze")
+def phase4_p1_formal_subset_freeze(
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    private_manifest: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PRIVATE_MANIFEST, "--private-manifest"
+    ),
+    public_commitment: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PUBLIC_COMMITMENT, "--public-commitment"
+    ),
+) -> None:
+    """Gate D/P1：不可覆盖地冻结私有 20 条身份与公开哈希承诺。"""
+
+    try:
+        result = freeze_p1_formal_subset(
+            private_manifest_path=private_manifest,
+            public_commitment_path=public_commitment,
+            **_phase4_p1_formal_subset_arguments(
+                protocol=protocol,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+            ),
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式子集冻结：{result.commitment.subset_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("自然 / 反事实 / 合计", "15 / 5 / 20")
+    table.add_row("私有 manifest SHA256", result.private_manifest_sha256)
+    table.add_row("公开 commitment SHA256", result.public_commitment_sha256)
+    table.add_row("正式标注包 / 数据收集", "未创建 / 未开始")
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+    console.print(f"[dim]公开承诺: {result.public_commitment_path}[/dim]")
+
+
+@phase4_app.command("p1-formal-subset-verify")
+def phase4_p1_formal_subset_verify(
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    private_manifest: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PRIVATE_MANIFEST, "--private-manifest"
+    ),
+    public_commitment: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PUBLIC_COMMITMENT, "--public-commitment"
+    ),
+    commitment_sha256: str | None = typer.Option(None, "--commitment-sha256"),
+) -> None:
+    """Gate D/P1：逐字节重建并验证私有正式子集和公开承诺。"""
+
+    try:
+        result = verify_p1_formal_subset(
+            private_manifest_path=private_manifest,
+            public_commitment_path=public_commitment,
+            expected_public_commitment_sha256=commitment_sha256,
+            **_phase4_p1_formal_subset_arguments(
+                protocol=protocol,
+                cohort_manifest=cohort_manifest,
+                natural_manifest=natural_manifest,
+            ),
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式子集验证：{result.subset_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("逐字节重建", "通过" if result.verified else "失败")
+    table.add_row("正式子集条数", str(result.selected_total_count))
+    table.add_row("私有 manifest SHA256", result.private_manifest_sha256)
+    table.add_row("公开 commitment SHA256", result.public_commitment_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-practice-admission-freeze")
+def phase4_p1_practice_admission_freeze(
+    completed_labels: str = typer.Option(..., "--completed-labels"),
+    returned_archive_sha256: str = typer.Option(..., "--returned-archive-sha256"),
+    public_evidence_rationales_confirmed: bool = typer.Option(
+        False,
+        "--public-evidence-rationales-confirmed",
+        help="协调者已确认 5 条 rationale 只使用参与者可见的公开证据",
+    ),
+    coordinator_written_authorization_confirmed: bool = typer.Option(
+        False,
+        "--coordinator-written-authorization-confirmed",
+        help="已向标注者发出“准入正式 20 条”的书面通知",
+    ),
+    privacy_or_blinding_violation_count: int = typer.Option(
+        0, "--privacy-or-blinding-violation-count", min=0
+    ),
+    output: str = typer.Option(DEFAULT_PHASE4_P1_PRACTICE_ADMISSION, "--output"),
+    arrangement: str = typer.Option(DEFAULT_PHASE4_P1_ARRANGEMENT, "--arrangement"),
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    phase3_guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--phase3-guide"),
+    source: str = typer.Option(DEFAULT_PHASE4_P1_PRACTICE_SOURCE, "--source"),
+    coordinator_reference: str = typer.Option(
+        DEFAULT_PHASE4_P1_COORDINATOR_REFERENCE, "--coordinator-reference"
+    ),
+) -> None:
+    """Gate D/P1：根据 5 条练习结果固化私有准入决定。"""
+
+    try:
+        result = write_p1_practice_admission(
+            completed_labels_path=completed_labels,
+            returned_archive_sha256=returned_archive_sha256,
+            public_evidence_only_rationales_confirmed=(public_evidence_rationales_confirmed),
+            coordinator_written_authorization_confirmed=(
+                coordinator_written_authorization_confirmed
+            ),
+            privacy_or_blinding_violation_count=privacy_or_blinding_violation_count,
+            output_path=output,
+            arrangement_path=arrangement,
+            protocol_path=protocol,
+            phase3_guide_path=phase3_guide,
+            source_path=source,
+            coordinator_reference_path=coordinator_reference,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 练习准入：{result.record.admission_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("Schema 有效", f"{result.record.schema_valid_count} / 5")
+    table.add_row(
+        "has_error / process_correct",
+        f"{result.record.has_error_exact_agreement_count} / 5; "
+        f"{result.record.process_correct_exact_agreement_count} / 5",
+    )
+    table.add_row(
+        "首错层（错误条目）",
+        f"{result.record.error_item_first_faulty_layer_exact_agreement_count} / 3",
+    )
+    table.add_row("隐私/盲法违规", str(result.record.privacy_or_blinding_violation_count))
+    table.add_row("准入决定", "通过，准入正式 20 条")
+    table.add_row("准入记录 SHA256", result.record_sha256)
+    table.add_row("练习结果用途", "仅校准，排除于研究终点")
+    console.print(table)
+    console.print(f"[dim]私有准入记录: {result.record_path}[/dim]")
+
+
+def _phase4_p1_formal_packet_arguments(
+    *,
+    protocol: str,
+    phase3_guide: str,
+    delivery_schema: str,
+    delivery_record: str,
+    practice_admission: str,
+    private_manifest: str,
+    public_commitment: str,
+    cohort_manifest: str,
+    natural_manifest: str,
+    phase1_run: str,
+    phase2_run: str,
+    dataset_manifest: str,
+    source_bundle: str,
+    execution_run: str,
+    output_dir: str,
+) -> dict[str, str]:
+    return {
+        "protocol_path": protocol,
+        "phase3_guide_path": phase3_guide,
+        "delivery_schema_path": delivery_schema,
+        "delivery_record_path": delivery_record,
+        "practice_admission_path": practice_admission,
+        "formal_subset_manifest_path": private_manifest,
+        "formal_subset_commitment_path": public_commitment,
+        "cohort_manifest_path": cohort_manifest,
+        "natural_manifest_path": natural_manifest,
+        "phase1_run_dir": phase1_run,
+        "phase2_run_dir": phase2_run,
+        "dataset_manifest_path": dataset_manifest,
+        "source_bundle_path": source_bundle,
+        "execution_run_dir": execution_run,
+        "output_dir": output_dir,
+    }
+
+
+def _phase4_p1_formal_packet_options(
+    *,
+    protocol: str,
+    phase3_guide: str,
+    delivery_schema: str,
+    delivery_record: str,
+    practice_admission: str,
+    private_manifest: str,
+    public_commitment: str,
+    cohort_manifest: str,
+    natural_manifest: str,
+    phase1_run: str,
+    phase2_run: str,
+    dataset_manifest: str,
+    source_bundle: str,
+    execution_run: str,
+    output_dir: str,
+) -> dict[str, str]:
+    """Keep CLI wrappers explicit while sharing the exact argument mapping."""
+
+    return _phase4_p1_formal_packet_arguments(
+        protocol=protocol,
+        phase3_guide=phase3_guide,
+        delivery_schema=delivery_schema,
+        delivery_record=delivery_record,
+        practice_admission=practice_admission,
+        private_manifest=private_manifest,
+        public_commitment=public_commitment,
+        cohort_manifest=cohort_manifest,
+        natural_manifest=natural_manifest,
+        phase1_run=phase1_run,
+        phase2_run=phase2_run,
+        dataset_manifest=dataset_manifest,
+        source_bundle=source_bundle,
+        execution_run=execution_run,
+        output_dir=output_dir,
+    )
+
+
+@phase4_app.command("p1-formal-packet-preflight")
+def phase4_p1_formal_packet_preflight(
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    phase3_guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--phase3-guide"),
+    delivery_schema: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_SCHEMA, "--delivery-schema"),
+    delivery_record: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_RECORD, "--delivery-record"),
+    practice_admission: str = typer.Option(
+        DEFAULT_PHASE4_P1_PRACTICE_ADMISSION, "--practice-admission"
+    ),
+    private_manifest: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PRIVATE_MANIFEST, "--private-manifest"
+    ),
+    public_commitment: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PUBLIC_COMMITMENT, "--public-commitment"
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    phase1_run: str = typer.Option(DEFAULT_PHASE4_P1_PHASE1_RUN, "--phase1-run"),
+    phase2_run: str = typer.Option(DEFAULT_PHASE4_P1_PHASE2_RUN, "--phase2-run"),
+    dataset_manifest: str = typer.Option(DEFAULT_PHASE4_P1_DATASET_MANIFEST, "--dataset-manifest"),
+    source_bundle: str = typer.Option(DEFAULT_PHASE4_SOURCE_BUNDLE, "--source-bundle"),
+    execution_run: str = typer.Option(DEFAULT_PHASE4_P1_EXECUTION_RUN, "--execution-run"),
+    output_dir: str = typer.Option(DEFAULT_PHASE4_P1_FORMAL_PACKET_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：硬门禁后只读构建正式 20 条盲化包。"""
+
+    try:
+        result = preflight_p1_formal_packet(**_phase4_p1_formal_packet_options(**locals()))
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式包只读预检：{result.manifest.packet_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("自然 / 反事实 / 合计", "15 / 5 / 20")
+    table.add_row("参与者 packet SHA256", result.participant_packet_sha256)
+    table.add_row("空白标签模板 SHA256", result.participant_labels_template_sha256)
+    table.add_row("协调者身份映射 SHA256", result.coordinator_identity_map_sha256)
+    table.add_row("写入文件", "否")
+    table.add_row("主标签 / 方法预测 / Provider / 网络", "未读取 / 未读取 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-formal-packet-export")
+def phase4_p1_formal_packet_export(
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    phase3_guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--phase3-guide"),
+    delivery_schema: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_SCHEMA, "--delivery-schema"),
+    delivery_record: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_RECORD, "--delivery-record"),
+    practice_admission: str = typer.Option(
+        DEFAULT_PHASE4_P1_PRACTICE_ADMISSION, "--practice-admission"
+    ),
+    private_manifest: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PRIVATE_MANIFEST, "--private-manifest"
+    ),
+    public_commitment: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PUBLIC_COMMITMENT, "--public-commitment"
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    phase1_run: str = typer.Option(DEFAULT_PHASE4_P1_PHASE1_RUN, "--phase1-run"),
+    phase2_run: str = typer.Option(DEFAULT_PHASE4_P1_PHASE2_RUN, "--phase2-run"),
+    dataset_manifest: str = typer.Option(DEFAULT_PHASE4_P1_DATASET_MANIFEST, "--dataset-manifest"),
+    source_bundle: str = typer.Option(DEFAULT_PHASE4_SOURCE_BUNDLE, "--source-bundle"),
+    execution_run: str = typer.Option(DEFAULT_PHASE4_P1_EXECUTION_RUN, "--execution-run"),
+    output_dir: str = typer.Option(DEFAULT_PHASE4_P1_FORMAL_PACKET_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：门禁通过后原子导出私有正式盲化包。"""
+
+    try:
+        result = write_p1_formal_packet(**_phase4_p1_formal_packet_options(**locals()))
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式包：{result.manifest.packet_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("自然 / 反事实 / 合计", "15 / 5 / 20")
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("参与者目录", str(result.participant_packet_path.parent))
+    table.add_row("身份映射", "另存 coordinator/，不得发送")
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-formal-packet-verify")
+def phase4_p1_formal_packet_verify(
+    manifest: str = typer.Option(
+        f"{DEFAULT_PHASE4_P1_FORMAL_PACKET_OUTPUT}/{P1_FORMAL_PACKET_ID}/manifest.json",
+        "--manifest",
+    ),
+    manifest_sha256: str | None = typer.Option(None, "--manifest-sha256"),
+    protocol: str = typer.Option(DEFAULT_PHASE4_P1_PROTOCOL, "--protocol"),
+    phase3_guide: str = typer.Option(DEFAULT_PHASE3_ANNOTATION_GUIDE, "--phase3-guide"),
+    delivery_schema: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_SCHEMA, "--delivery-schema"),
+    delivery_record: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_RECORD, "--delivery-record"),
+    practice_admission: str = typer.Option(
+        DEFAULT_PHASE4_P1_PRACTICE_ADMISSION, "--practice-admission"
+    ),
+    private_manifest: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PRIVATE_MANIFEST, "--private-manifest"
+    ),
+    public_commitment: str = typer.Option(
+        DEFAULT_PHASE4_P1_FORMAL_PUBLIC_COMMITMENT, "--public-commitment"
+    ),
+    cohort_manifest: str = typer.Option(DEFAULT_PHASE4_COHORT_MANIFEST, "--cohort-manifest"),
+    natural_manifest: str = typer.Option(DEFAULT_PHASE4_NATURAL_MANIFEST, "--natural-manifest"),
+    phase1_run: str = typer.Option(DEFAULT_PHASE4_P1_PHASE1_RUN, "--phase1-run"),
+    phase2_run: str = typer.Option(DEFAULT_PHASE4_P1_PHASE2_RUN, "--phase2-run"),
+    dataset_manifest: str = typer.Option(DEFAULT_PHASE4_P1_DATASET_MANIFEST, "--dataset-manifest"),
+    source_bundle: str = typer.Option(DEFAULT_PHASE4_SOURCE_BUNDLE, "--source-bundle"),
+    execution_run: str = typer.Option(DEFAULT_PHASE4_P1_EXECUTION_RUN, "--execution-run"),
+    output_dir: str = typer.Option(DEFAULT_PHASE4_P1_FORMAL_PACKET_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：重建并逐字节核验正式 20 条盲化包。"""
+
+    options = locals().copy()
+    options.pop("manifest")
+    options.pop("manifest_sha256")
+    try:
+        result = verify_p1_formal_packet(
+            manifest_path=manifest,
+            expected_manifest_sha256=manifest_sha256,
+            **_phase4_p1_formal_packet_options(**options),
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式包验证：{result.packet_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("逐字节重建", "通过" if result.verified else "失败")
+    table.add_row("条数", str(result.item_count))
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
     console.print(table)
 
 

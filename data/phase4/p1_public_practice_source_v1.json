@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "kind": "tracejudge_phase4_p1_public_practice_source",
+  "source_id": "phase4_p1_public_practice_source_v1",
+  "license": "MIT",
+  "authorship": "TraceJudge-Hy3 self-constructed public fixtures",
+  "frozen_phase3_cohort_manifest_sha256": "3290221625d687e6d7412a0544247dc81a34857b114a545458b93cc04e35d255",
+  "frozen_phase3_natural_manifest_sha256": "a4116a7ddb7ac910b79bd52e9530db79dd0f05c9edee8ecd947fc78c35c03692",
+  "selection_role": "cohort_external_calibration_only",
+  "items": [
+    {
+      "practice_item_id": "practice_item_001",
+      "problem": {
+        "problem_id": "p1_rotate_left_once",
+        "title": "循环左移一位 rotate_left_once",
+        "requirement": "实现 rotate_left_once(values)：返回一个新列表，将非空输入的首元素移到末尾，其余元素顺序不变；空列表返回空列表。不得修改原列表。",
+        "function_signature": "def rotate_left_once(values: list) -> list:",
+        "requirements": [
+          {
+            "requirement_id": "R1",
+            "content": "非空列表将首元素移到末尾并保持其余顺序",
+            "verification_hint": "rotate_left_once([1, 2, 3]) == [2, 3, 1]"
+          },
+          {
+            "requirement_id": "R2",
+            "content": "空列表返回空列表",
+            "verification_hint": "rotate_left_once([]) == []"
+          },
+          {
+            "requirement_id": "R3",
+            "content": "返回新列表，不修改原列表",
+            "verification_hint": "调用后原 values 保持不变"
+          }
+        ],
+        "visible_test_cases": [
+          {
+            "case_id": "v1",
+            "args": [[1, 2, 3]],
+            "kwargs": {},
+            "expected": [2, 3, 1],
+            "category": "visible",
+            "related_requirements": ["R1", "R3"]
+          },
+          {
+            "case_id": "v2",
+            "args": [[]],
+            "kwargs": {},
+            "expected": [],
+            "category": "visible",
+            "related_requirements": ["R2", "R3"]
+          }
+        ],
+        "hidden_test_cases": [],
+        "challenge_test_cases": [
+          {
+            "case_id": "c1",
+            "args": [[7]],
+            "kwargs": {},
+            "expected": [7],
+            "category": "challenge",
+            "related_requirements": ["R1", "R3"]
+          }
+        ],
+        "reference_code": "def rotate_left_once(values: list) -> list:\n    return values[1:] + values[:1]\n",
+        "difficulty": "easy",
+        "source": "self_constructed_phase4_p1_public_fixture",
+        "tags": ["sequence", "boundary", "calibration"]
+      },
+      "solution_trace": {
+        "problem_id": "p1_rotate_left_once",
+        "requirement_understanding": "需要构造新列表，对非空列表将第一个元素移至末尾；空列表保持为空。",
+        "design_summary": "用两个切片拼接：values[1:] 提供剩余元素，values[:1] 提供最多一个首元素。",
+        "edge_cases_considered": ["空列表", "单元素列表"],
+        "implementation_steps": [
+          {
+            "step_id": "S1",
+            "content": "取 values[1:] 作为结果前缀",
+            "related_requirements": ["R1", "R2"],
+            "expected_code_behavior": "对空列表产生空切片"
+          },
+          {
+            "step_id": "S2",
+            "content": "拼接 values[:1] 并返回新列表",
+            "related_requirements": ["R1", "R3"],
+            "expected_code_behavior": "首元素出现在新列表末尾，不原地修改输入"
+          }
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def rotate_left_once(values: list) -> list:\n    return values[1:] + values[:1]\n"
+      }
+    },
+    {
+      "practice_item_id": "practice_item_002",
+      "problem": {
+        "problem_id": "p1_take_last_or_none",
+        "title": "安全取末元素 take_last_or_none",
+        "requirement": "实现 take_last_or_none(values)：非空列表返回最后一个元素；空列表返回 None，不得抛出异常。",
+        "function_signature": "def take_last_or_none(values: list):",
+        "requirements": [
+          {
+            "requirement_id": "R1",
+            "content": "非空列表返回最后一个元素",
+            "verification_hint": "take_last_or_none([1, 2]) == 2"
+          },
+          {
+            "requirement_id": "R2",
+            "content": "空列表返回 None 而不抛出异常",
+            "verification_hint": "take_last_or_none([]) is None"
+          }
+        ],
+        "visible_test_cases": [
+          {
+            "case_id": "v1",
+            "args": [[1, 2]],
+            "kwargs": {},
+            "expected": 2,
+            "category": "visible",
+            "related_requirements": ["R1"]
+          },
+          {
+            "case_id": "v2",
+            "args": [[]],
+            "kwargs": {},
+            "expected": null,
+            "category": "visible",
+            "related_requirements": ["R2"]
+          }
+        ],
+        "hidden_test_cases": [],
+        "challenge_test_cases": [
+          {
+            "case_id": "c1",
+            "args": [["only"]],
+            "kwargs": {},
+            "expected": "only",
+            "category": "challenge",
+            "related_requirements": ["R1"]
+          }
+        ],
+        "reference_code": "def take_last_or_none(values: list):\n    if not values:\n        return None\n    return values[-1]\n",
+        "difficulty": "easy",
+        "source": "self_constructed_phase4_p1_public_fixture",
+        "tags": ["boundary", "exception", "calibration"]
+      },
+      "solution_trace": {
+        "problem_id": "p1_take_last_or_none",
+        "requirement_understanding": "非空时返回末元素；空时必须显式返回 None 以避免越界。",
+        "design_summary": "先判断 values 是否为空，为空就提前返回 None，否则返回 values[-1]。",
+        "edge_cases_considered": ["空列表", "单元素列表"],
+        "implementation_steps": [
+          {
+            "step_id": "S1",
+            "content": "检查 values 是否为空，为空时返回 None",
+            "related_requirements": ["R2"],
+            "expected_code_behavior": "代码存在空列表提前返回分支"
+          },
+          {
+            "step_id": "S2",
+            "content": "非空时返回 values[-1]",
+            "related_requirements": ["R1"],
+            "expected_code_behavior": "使用负索引获取末元素"
+          }
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def take_last_or_none(values: list):\n    return values[-1]\n"
+      }
+    },
+    {
+      "practice_item_id": "practice_item_003",
+      "problem": {
+        "problem_id": "p1_count_even_values",
+        "title": "统计偶数 count_even_values",
+        "requirement": "实现 count_even_values(values)：返回整数列表中偶数元素的个数。0 和负偶数也应计入。",
+        "function_signature": "def count_even_values(values: list[int]) -> int:",
+        "requirements": [
+          {
+            "requirement_id": "R1",
+            "content": "返回可被 2 整除的元素个数",
+            "verification_hint": "count_even_values([1, 2, 4]) == 2"
+          },
+          {
+            "requirement_id": "R2",
+            "content": "0 和负偶数必须计入",
+            "verification_hint": "count_even_values([-2, 0, 3]) == 2"
+          }
+        ],
+        "visible_test_cases": [
+          {
+            "case_id": "v1",
+            "args": [[1, 2, 4]],
+            "kwargs": {},
+            "expected": 2,
+            "category": "visible",
+            "related_requirements": ["R1"]
+          },
+          {
+            "case_id": "v2",
+            "args": [[-2, -1, 0, 3, 4]],
+            "kwargs": {},
+            "expected": 3,
+            "category": "visible",
+            "related_requirements": ["R1", "R2"]
+          }
+        ],
+        "hidden_test_cases": [],
+        "challenge_test_cases": [
+          {
+            "case_id": "c1",
+            "args": [[]],
+            "kwargs": {},
+            "expected": 0,
+            "category": "challenge",
+            "related_requirements": ["R1"]
+          }
+        ],
+        "reference_code": "def count_even_values(values: list[int]) -> int:\n    return sum(1 for value in values if value % 2 == 0)\n",
+        "difficulty": "easy",
+        "source": "self_constructed_phase4_p1_public_fixture",
+        "tags": ["reasoning", "parity", "calibration"]
+      },
+      "solution_trace": {
+        "problem_id": "p1_count_even_values",
+        "requirement_understanding": "需要统计列表中所有偶数，包括 0 和负偶数。",
+        "design_summary": "遍历列表并统计所有大于 0 的元素，将该数量作为偶数个数返回。",
+        "edge_cases_considered": ["空列表", "包含 0", "包含负数"],
+        "implementation_steps": [
+          {
+            "step_id": "S1",
+            "content": "对每个大于 0 的元素计数 1",
+            "related_requirements": ["R1", "R2"],
+            "expected_code_behavior": "使用 value > 0 作为筛选条件"
+          },
+          {
+            "step_id": "S2",
+            "content": "求和并返回计数",
+            "related_requirements": ["R1"],
+            "expected_code_behavior": "返回满足筛选条件的元素个数"
+          }
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(1)",
+        "code": "def count_even_values(values: list[int]) -> int:\n    return sum(1 for value in values if value > 0)\n"
+      }
+    },
+    {
+      "practice_item_id": "practice_item_004",
+      "problem": {
+        "problem_id": "p1_compact_whitespace",
+        "title": "压缩空白 compact_whitespace",
+        "requirement": "实现 compact_whitespace(text)：删除首尾空白，并将中间任意连续空白字符压缩为一个普通空格。空字符串或只含空白时返回空字符串。",
+        "function_signature": "def compact_whitespace(text: str) -> str:",
+        "requirements": [
+          {
+            "requirement_id": "R1",
+            "content": "删除首尾空白并将连续空白压缩为单空格",
+            "verification_hint": "compact_whitespace('  a\t b  ') == 'a b'"
+          },
+          {
+            "requirement_id": "R2",
+            "content": "空字符串或纯空白字符串返回空字符串",
+            "verification_hint": "compact_whitespace('  ') == ''"
+          }
+        ],
+        "visible_test_cases": [
+          {
+            "case_id": "v1",
+            "args": ["  alpha\t beta  "],
+            "kwargs": {},
+            "expected": "alpha beta",
+            "category": "visible",
+            "related_requirements": ["R1"]
+          },
+          {
+            "case_id": "v2",
+            "args": ["   "],
+            "kwargs": {},
+            "expected": "",
+            "category": "visible",
+            "related_requirements": ["R2"]
+          }
+        ],
+        "hidden_test_cases": [],
+        "challenge_test_cases": [
+          {
+            "case_id": "c1",
+            "args": ["one\ntwo"],
+            "kwargs": {},
+            "expected": "one two",
+            "category": "challenge",
+            "related_requirements": ["R1"]
+          }
+        ],
+        "reference_code": "def compact_whitespace(text: str) -> str:\n    return \" \".join(text.split())\n",
+        "difficulty": "easy",
+        "source": "self_constructed_phase4_p1_public_fixture",
+        "tags": ["string", "equivalent_implementation", "calibration"]
+      },
+      "solution_trace": {
+        "problem_id": "p1_compact_whitespace",
+        "requirement_understanding": "需要统一处理空格、制表和换行等空白，去掉首尾并以单空格连接文本片段。",
+        "design_summary": "使用不带分隔符的 split() 按任意空白拆分非空片段，再用单空格 join()。",
+        "edge_cases_considered": ["空字符串", "纯空白", "制表和换行"],
+        "implementation_steps": [
+          {
+            "step_id": "S1",
+            "content": "用 text.split() 得到所有非空白片段",
+            "related_requirements": ["R1", "R2"],
+            "expected_code_behavior": "自动忽略首尾和连续空白"
+          },
+          {
+            "step_id": "S2",
+            "content": "使用单空格连接片段并返回",
+            "related_requirements": ["R1", "R2"],
+            "expected_code_behavior": "无片段时 join 返回空字符串"
+          }
+        ],
+        "declared_time_complexity": "O(n)",
+        "declared_space_complexity": "O(n)",
+        "code": "def compact_whitespace(text: str) -> str:\n    return \" \".join(text.split())\n"
+      }
+    },
+    {
+      "practice_item_id": "practice_item_005",
+      "problem": {
+        "problem_id": "p1_safe_ratio",
+        "title": "安全比值 safe_ratio",
+        "requirement": "实现 safe_ratio(numerator, denominator)：当 denominator 为 0 时返回 None；否则返回 numerator / denominator 的浮点结果。",
+        "function_signature": "def safe_ratio(numerator: float, denominator: float) -> float | None:",
+        "requirements": [
+          {
+            "requirement_id": "R1",
+            "content": "denominator 为 0 时返回 None",
+            "verification_hint": "safe_ratio(5, 0) is None"
+          },
+          {
+            "requirement_id": "R2",
+            "content": "denominator 非 0 时返回浮点除法结果",
+            "verification_hint": "safe_ratio(3, 2) == 1.5"
+          }
+        ],
+        "visible_test_cases": [
+          {
+            "case_id": "v1",
+            "args": [3, 2],
+            "kwargs": {},
+            "expected": 1.5,
+            "category": "visible",
+            "related_requirements": ["R2"]
+          },
+          {
+            "case_id": "v2",
+            "args": [5, 0],
+            "kwargs": {},
+            "expected": null,
+            "category": "visible",
+            "related_requirements": ["R1"]
+          }
+        ],
+        "hidden_test_cases": [],
+        "challenge_test_cases": [
+          {
+            "case_id": "c1",
+            "args": [-4, 2],
+            "kwargs": {},
+            "expected": -2.0,
+            "category": "challenge",
+            "related_requirements": ["R2"]
+          }
+        ],
+        "reference_code": "def safe_ratio(numerator: float, denominator: float) -> float | None:\n    if denominator == 0:\n        return None\n    return numerator / denominator\n",
+        "difficulty": "easy",
+        "source": "self_constructed_phase4_p1_public_fixture",
+        "tags": ["requirement", "division", "calibration"]
+      },
+      "solution_trace": {
+        "problem_id": "p1_safe_ratio",
+        "requirement_understanding": "当分母为 0 时应返回 0.0 表示比值不可计算；否则返回浮点除法结果。",
+        "design_summary": "先检查 denominator == 0 并返回 0.0，非零时返回 numerator / denominator。",
+        "edge_cases_considered": ["分母为 0", "负数", "非整数结果"],
+        "implementation_steps": [
+          {
+            "step_id": "S1",
+            "content": "分母为 0 时返回 0.0",
+            "related_requirements": ["R1"],
+            "expected_code_behavior": "存在 denominator == 0 的提前返回分支"
+          },
+          {
+            "step_id": "S2",
+            "content": "分母非零时返回 numerator / denominator",
+            "related_requirements": ["R2"],
+            "expected_code_behavior": "执行浮点除法"
+          }
+        ],
+        "declared_time_complexity": "O(1)",
+        "declared_space_complexity": "O(1)",
+        "code": "def safe_ratio(numerator: float, denominator: float) -> float | None:\n    if denominator == 0:\n        return 0.0\n    return numerator / denominator\n"
+      }
+    }
+  ]
+}

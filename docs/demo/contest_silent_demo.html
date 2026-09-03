@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TraceJudge-Hy3 · Silent Contest Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071018;
+      --surface: #0b1723;
+      --surface-2: #0f1e2b;
+      --line: #213244;
+      --text: #f5f8fb;
+      --muted: #91a3b7;
+      --cyan: #41d9ff;
+      --blue: #699cff;
+      --green: #56d8a0;
+      --red: #ff6f79;
+      --amber: #f2bb62;
+      --ease: cubic-bezier(.2,.8,.2,1);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body {
+      background:
+        radial-gradient(circle at 70% 15%, rgba(64, 174, 255, .12), transparent 31%),
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        var(--bg);
+      background-size: auto, 44px 44px, 44px 44px, auto;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+      letter-spacing: .01em;
+    }
+
+    .app { position: relative; width: 100vw; height: 100vh; min-width: 980px; min-height: 620px; }
+
+    header {
+      position: absolute;
+      z-index: 20;
+      inset: 0 0 auto 0;
+      height: 86px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4.5vw;
+      border-bottom: 1px solid rgba(145, 163, 183, .15);
+      background: linear-gradient(180deg, rgba(7,16,24,.96), rgba(7,16,24,.72));
+      backdrop-filter: blur(16px);
+    }
+
+    .brand { display: flex; align-items: center; gap: 16px; }
+    .mark {
+      width: 39px; height: 39px; border: 1px solid rgba(65,217,255,.48);
+      display: grid; place-items: center; transform: rotate(45deg);
+      box-shadow: inset 0 0 22px rgba(65,217,255,.09), 0 0 26px rgba(65,217,255,.08);
+    }
+    .mark::after { content: ""; width: 13px; height: 13px; background: var(--cyan); }
+    .brand-copy strong { display: block; font: 710 18px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
+    .brand-copy span { display: block; margin-top: 7px; color: var(--muted); font-size: 12px; letter-spacing: .12em; }
+    .mode { color: var(--muted); font: 600 12px/1 ui-monospace, monospace; letter-spacing: .12em; }
+    .mode b { color: var(--green); font-weight: 650; }
+
+    main { position: absolute; inset: 86px 0 52px; }
+    .scene {
+      position: absolute; inset: 0;
+      display: grid;
+      align-content: center;
+      padding: 3.5vh 6vw 4vh;
+      opacity: 0;
+      transform: translateY(22px) scale(.992);
+      pointer-events: none;
+      transition: opacity .85s var(--ease), transform .85s var(--ease);
+    }
+    .scene.active { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+
+    h1, h2, p { margin: 0; }
+    h1 { max-width: 1000px; font-size: clamp(48px, 6.1vw, 94px); line-height: .99; letter-spacing: -.055em; font-weight: 770; }
+    h2 { font-size: clamp(34px, 4vw, 64px); line-height: 1.02; letter-spacing: -.04em; font-weight: 760; }
+    .lede { margin-top: 25px; max-width: 860px; color: #b7c5d3; font-size: clamp(19px, 1.65vw, 29px); line-height: 1.55; }
+    .accent { color: var(--cyan); }
+    .danger { color: var(--red); }
+    .success { color: var(--green); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+    .metric-rail { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 58px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .metric { padding: 22px 24px 21px 0; }
+    .metric + .metric { border-left: 1px solid var(--line); padding-left: 26px; }
+    .metric strong { display: block; font-size: clamp(30px, 3vw, 54px); line-height: 1; letter-spacing: -.045em; }
+    .metric span { display: block; margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .disclaimer { margin-top: 18px; color: #718397; font-size: 12px; }
+
+    .section-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; margin-bottom: 34px; }
+    .section-title p { max-width: 540px; color: var(--muted); font-size: 16px; line-height: 1.55; text-align: right; }
+
+    .split { display: grid; grid-template-columns: .92fr 1.08fr; gap: 28px; align-items: stretch; }
+    .panel { background: linear-gradient(145deg, rgba(15,30,43,.92), rgba(9,20,30,.88)); border: 1px solid var(--line); min-height: 360px; padding: 28px 30px; box-shadow: 0 22px 60px rgba(0,0,0,.2); }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font: 600 12px/1 ui-monospace, monospace; letter-spacing: .11em; text-transform: uppercase; }
+    .panel-head b { color: var(--cyan); font-weight: 650; }
+    .requirement { margin-top: 34px; font-size: clamp(21px, 2vw, 31px); line-height: 1.55; font-weight: 590; }
+    .claim { margin-top: 30px; padding-left: 18px; border-left: 3px solid var(--cyan); color: #c9d5e1; font-size: 17px; line-height: 1.55; }
+
+    pre { margin: 30px 0 0; font: 600 clamp(18px, 1.55vw, 25px)/1.85 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .line-no { color: #53677c; display: inline-block; width: 30px; user-select: none; }
+    .missing { margin-top: 32px; border-top: 1px solid var(--line); padding-top: 20px; color: var(--red); font-size: 18px; }
+    .missing span { color: var(--muted); }
+
+    .tests { display: grid; grid-template-columns: 1.05fr .95fr; gap: 34px; align-items: center; }
+    .test-table { border-top: 1px solid var(--line); }
+    .test-row { display: grid; grid-template-columns: 1fr .8fr 1fr; align-items: center; min-height: 72px; border-bottom: 1px solid var(--line); font-size: 17px; }
+    .test-row.head { min-height: 46px; color: var(--muted); font: 600 11px/1 ui-monospace, monospace; letter-spacing: .12em; }
+    .result { font: 700 13px/1 ui-monospace, monospace; }
+    .failure-focus { padding-left: 42px; border-left: 1px solid var(--line); }
+    .failure-focus .big { margin-top: 18px; font-size: clamp(42px, 5vw, 78px); line-height: .95; font-weight: 790; letter-spacing: -.06em; color: var(--red); }
+    .failure-focus .big small { display: block; margin-top: 20px; color: var(--text); font: 600 clamp(17px, 1.5vw, 24px)/1.35 ui-monospace, monospace; letter-spacing: 0; }
+    .failure-focus p { margin-top: 28px; color: var(--muted); font-size: 16px; line-height: 1.65; }
+
+    .verdict-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 44px; align-items: center; }
+    .verdict-box { border-left: 5px solid var(--red); padding: 12px 0 12px 34px; }
+    .verdict-label { color: var(--muted); font: 650 12px/1 ui-monospace, monospace; letter-spacing: .14em; }
+    .verdict-main { margin-top: 18px; font-size: clamp(42px, 5.2vw, 82px); line-height: 1; font-weight: 780; letter-spacing: -.055em; }
+    .verdict-main span { display: block; margin-top: 17px; color: var(--red); font: 690 clamp(20px, 2vw, 31px)/1.25 ui-monospace, monospace; letter-spacing: -.02em; }
+    .facts { margin-top: 36px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .fact { background: var(--surface); padding: 20px; }
+    .fact span { color: var(--muted); font: 600 11px/1 ui-monospace, monospace; letter-spacing: .1em; }
+    .fact strong { display: block; margin-top: 12px; font-size: 22px; }
+    .counterexample { position: relative; min-height: 360px; display: grid; align-content: center; padding: 42px; border: 1px solid rgba(255,111,121,.42); background: radial-gradient(circle at 50% 50%, rgba(255,111,121,.09), transparent 65%), rgba(11,23,35,.8); }
+    .counterexample::before { content: ""; position: absolute; inset: 13px; border: 1px solid rgba(255,255,255,.045); }
+    .counterexample span { color: var(--muted); font: 650 12px/1 ui-monospace, monospace; letter-spacing: .13em; }
+    .counterexample strong { margin-top: 24px; color: var(--red); font: 760 clamp(58px, 7vw, 106px)/1 ui-monospace, monospace; letter-spacing: -.08em; }
+    .counterexample p { margin-top: 24px; color: #c3d0dd; font: 600 17px/1.7 ui-monospace, monospace; }
+
+    .replay { display: grid; grid-template-columns: .9fr 1.1fr; gap: 52px; align-items: center; }
+    .receipt { border: 1px solid var(--line); background: rgba(11,23,35,.78); padding: 30px 32px; font: 590 15px/1.85 ui-monospace, monospace; }
+    .receipt-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(33,50,68,.72); padding: 13px 0; gap: 30px; }
+    .receipt-row:last-child { border-bottom: 0; }
+    .receipt-row span { color: var(--muted); }
+    .receipt-row strong { text-align: right; }
+    .hash { color: #9eb3c8; font-size: 12px; max-width: 390px; overflow: hidden; text-overflow: ellipsis; }
+    .replay-copy h2 { max-width: 660px; }
+    .checks { margin-top: 35px; display: grid; gap: 18px; }
+    .check { display: flex; gap: 15px; align-items: center; color: #c9d6e2; font-size: 19px; }
+    .check i { width: 24px; height: 24px; border: 1px solid rgba(86,216,160,.55); display: grid; place-items: center; color: var(--green); font-style: normal; font-size: 13px; }
+
+    .final { grid-template-columns: 1.08fr .92fr; gap: 60px; align-items: center; }
+    .final h2 { font-size: clamp(48px, 5.4vw, 88px); }
+    .final .lede { max-width: 720px; }
+    .summary { border-top: 1px solid var(--line); }
+    .summary-row { display: grid; grid-template-columns: 56px 1fr; gap: 20px; align-items: start; padding: 20px 0; border-bottom: 1px solid var(--line); }
+    .summary-row b { color: var(--cyan); font: 700 17px/1 ui-monospace, monospace; }
+    .summary-row span { color: #c5d1dd; font-size: 17px; line-height: 1.4; }
+    .url { margin-top: 34px; color: var(--muted); font: 600 14px/1 ui-monospace, monospace; }
+
+    footer { position: absolute; z-index: 30; inset: auto 0 0; height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 4.5vw; border-top: 1px solid rgba(145,163,183,.13); background: rgba(7,16,24,.84); }
+    .step { position: relative; height: 2px; flex: 1; background: #243446; overflow: hidden; }
+    .step::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 0; background: var(--cyan); }
+    .step.done::after { width: 100%; }
+    .step.current::after { animation: fill var(--scene-duration) linear forwards; }
+    .step-label { width: 88px; text-align: right; color: var(--muted); font: 600 11px/1 ui-monospace, monospace; letter-spacing: .08em; }
+    @keyframes fill { to { width: 100%; } }
+
+    .reveal { opacity: 0; transform: translateY(16px); }
+    .active .reveal { animation: reveal .7s var(--ease) forwards; animation-delay: var(--delay, .15s); }
+    @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
+
+    .controls { position: fixed; right: 20px; bottom: 66px; z-index: 99; display: flex; gap: 8px; opacity: .16; transition: opacity .2s; }
+    .controls:hover { opacity: 1; }
+    button { border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 8px 11px; font: 600 11px/1 ui-monospace, monospace; cursor: pointer; }
+    body.recording .controls { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .scene, .reveal { transition: none; animation: none !important; opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="brand-copy"><strong>TRACEJUDGE-HY3</strong><span>过程评估与错误定位</span></div>
+      </div>
+      <div class="mode"><b>●</b>&nbsp; PUBLIC FIXTURE · OFFLINE · REPRODUCIBLE</div>
+    </header>
+
+    <main>
+      <section class="scene active" data-duration="11500">
+        <h1 class="reveal">不只判断代码能不能跑，<br><span class="accent">还要找到推理从哪里开始错。</span></h1>
+        <p class="lede reveal" style="--delay:.35s">TraceJudge-Hy3 对齐需求、推理、代码与执行证据，输出首错步骤、违反需求、代码位置、反例和可重放错误证书。</p>
+        <div class="metric-rail reveal" style="--delay:.58s">
+          <div class="metric"><strong>57</strong><span>冻结研究轨迹<br>42 自然 + 15 反事实</span></div>
+          <div class="metric"><strong>285</strong><span>严格配对判断<br>5 种评估方法</span></div>
+          <div class="metric"><strong>98.2%</strong><span>最佳观察检测准确率<br>56 / 57</span></div>
+          <div class="metric"><strong>2.33%</strong><span>Full TraceJudge 误报率<br>1 / 43</span></div>
+        </div>
+        <p class="disclaimer reveal" style="--delay:.75s">单主标注者、探索性结果；第二标注者一致性尚未计算，不构成普遍优越性结论。</p>
+      </section>
+
+      <section class="scene" data-duration="13500">
+        <div class="section-title reveal">
+          <h2>一个“看起来正确”的解答</h2>
+          <p>公开自建 safe_mean Fixture · 不调用真实 Hy3、Docker 或网络</p>
+        </div>
+        <div class="split">
+          <div class="panel reveal" style="--delay:.25s">
+            <div class="panel-head"><span>REQUIREMENT · R1</span><b>CLAIMED</b></div>
+            <p class="requirement">输入为空列表时，必须直接返回 <span class="mono accent">0.0</span>，不能触发除以零错误。</p>
+            <p class="claim"><span class="mono">S1</span>：先检查输入列表是否为空；若为空，直接返回 0.0。</p>
+          </div>
+          <div class="panel reveal" style="--delay:.42s">
+            <div class="panel-head"><span>CANDIDATE · PYTHON</span><b>ACTUAL CODE</b></div>
+            <pre><span class="line-no">1</span>def safe_mean(nums):
+<span class="line-no">2</span>    return sum(nums) / len(nums)</pre>
+            <div class="missing">✕ 缺少空输入分支 <span>· AST if_count = 0</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-duration="12500">
+        <div class="section-title reveal">
+          <h2>可见测试全过，<span class="danger">边界条件失败</span></h2>
+          <p>只看最终结果会错过需求—代码之间的结构性矛盾。</p>
+        </div>
+        <div class="tests">
+          <div class="test-table reveal" style="--delay:.25s">
+            <div class="test-row head"><span>CASE</span><span>TYPE</span><span>RESULT</span></div>
+            <div class="test-row"><span class="mono">v1 · [1,2,3]</span><span>visible</span><span class="result success">PASS · 2.0</span></div>
+            <div class="test-row"><span class="mono">v2 · [10]</span><span>visible</span><span class="result success">PASS · 10.0</span></div>
+            <div class="test-row"><span class="mono">h1 · []</span><span>hidden*</span><span class="result danger">FAIL · ZeroDivisionError</span></div>
+            <div class="test-row"><span class="mono">c1 · []</span><span>challenge*</span><span class="result danger">FAIL · ZeroDivisionError</span></div>
+          </div>
+          <div class="failure-focus reveal" style="--delay:.48s">
+            <div class="verdict-label">EXECUTABLE EVIDENCE</div>
+            <div class="big">FAIL<small>ZeroDivisionError<br>division by zero</small></div>
+            <p>* hidden / challenge 是公开自建 Fixture 内部类别，不是第三方隐藏测试正文。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-duration="14500">
+        <div class="verdict-grid">
+          <div>
+            <div class="verdict-box reveal">
+              <div class="verdict-label">PROCESS EVALUATION VERDICT</div>
+              <div class="verdict-main">过程不成立<span>A01_PLAN_CODE_MISMATCH</span></div>
+            </div>
+            <div class="facts reveal" style="--delay:.35s">
+              <div class="fact"><span>FIRST ERROR</span><strong>S1</strong></div>
+              <div class="fact"><span>REQUIREMENT</span><strong>R1</strong></div>
+              <div class="fact"><span>CODE SPAN</span><strong>L1–L2</strong></div>
+            </div>
+          </div>
+          <div class="counterexample reveal" style="--delay:.52s">
+            <span>MINIMAL COUNTEREXAMPLE</span>
+            <strong>[[]]</strong>
+            <p>expected&nbsp; 0.0<br>actual&nbsp;&nbsp;&nbsp; ZeroDivisionError<br>verdict&nbsp;&nbsp; confirmed_bug</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-duration="12500">
+        <div class="replay">
+          <div class="receipt reveal">
+            <div class="panel-head"><span>PUBLIC REPLAY RECEIPT</span><b>VERIFIED</b></div>
+            <div class="receipt-row"><span>reproduced_failure</span><strong class="success">true</strong></div>
+            <div class="receipt-row"><span>evidence_hash_verified</span><strong class="success">true</strong></div>
+            <div class="receipt-row"><span>provider / docker / network</span><strong>no / no / no</strong></div>
+            <div class="receipt-row"><span>evidence SHA256</span><strong class="hash">cfd897334643853f…152e670</strong></div>
+          </div>
+          <div class="replay-copy">
+            <h2 class="reveal">结论不止可读，<br><span class="accent">还可以独立重放。</span></h2>
+            <div class="checks reveal" style="--delay:.38s">
+              <div class="check"><i>✓</i><span>错误证书绑定证据与公开身份</span></div>
+              <div class="check"><i>✓</i><span>反例可以重新执行并复现失败</span></div>
+              <div class="check"><i>✓</i><span>哈希一致，过程不依赖在线 Provider</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene final" data-duration="13000">
+        <div>
+          <h2 class="reveal">从“答案对不对”，<br>走向<span class="accent">“证据是否支持”</span>。</h2>
+          <p class="lede reveal" style="--delay:.3s">TraceJudge-Hy3 把过程错误定位变成可执行、可审计、可复现的工程证据。</p>
+          <p class="url reveal" style="--delay:.5s">github.com/Even1115/tracejudge-hy3</p>
+        </div>
+        <div class="summary reveal" style="--delay:.45s">
+          <div class="summary-row"><b>01</b><span>四层对齐：需求 · 推理 · 代码 · 执行</span></div>
+          <div class="summary-row"><b>02</b><span>首错步骤、违反需求与代码位置</span></div>
+          <div class="summary-row"><b>03</b><span>最小反例与可重放错误证书</span></div>
+          <div class="summary-row"><b>04</b><span>独立展示误报率与人工核验边界</span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="step"></div><div class="step"></div><div class="step"></div>
+      <div class="step"></div><div class="step"></div><div class="step"></div>
+      <div class="step-label"><span id="current">01</span> / 06</div>
+    </footer>
+
+    <div class="controls">
+      <button id="prev">←</button><button id="restart">RESTART</button><button id="next">→</button>
+    </div>
+  </div>
+
+  <script>
+    const scenes = [...document.querySelectorAll('.scene')];
+    const steps = [...document.querySelectorAll('.step')];
+    const counter = document.querySelector('#current');
+    let index = 0;
+    let timer = null;
+
+    function show(next, autoplay = false) {
+      clearTimeout(timer);
+      index = (next + scenes.length) % scenes.length;
+      scenes.forEach((scene, i) => scene.classList.toggle('active', i === index));
+      steps.forEach((step, i) => {
+        step.classList.remove('done', 'current');
+        if (i < index) step.classList.add('done');
+      });
+      counter.textContent = String(index + 1).padStart(2, '0');
+      if (autoplay) {
+        const duration = Number(scenes[index].dataset.duration || 12000);
+        document.documentElement.style.setProperty('--scene-duration', `${duration}ms`);
+        void steps[index].offsetWidth;
+        steps[index].classList.add('current');
+        timer = setTimeout(() => {
+          if (index < scenes.length - 1) show(index + 1, true);
+        }, duration);
+      }
+    }
+
+    function restart() { show(0, true); }
+    document.querySelector('#prev').addEventListener('click', () => show(index - 1));
+    document.querySelector('#next').addEventListener('click', () => show(index + 1));
+    document.querySelector('#restart').addEventListener('click', restart);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight' || event.key === ' ') show(index + 1);
+      if (event.key === 'ArrowLeft') show(index - 1);
+      if (event.key.toLowerCase() === 'r') restart();
+    });
+
+    const params = new URLSearchParams(location.search);
+    if (params.get('recording') === '1') document.body.classList.add('recording');
+    if (params.get('autoplay') === '1') setTimeout(restart, 900);
+    else show(0, false);
+  </script>
+</body>
+</html>

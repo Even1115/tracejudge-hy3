@@ -184,19 +184,26 @@ def test_gate_e_documents_preserve_scope_and_release_authority_boundary():
     assert "v0.2 已实现" not in combined
 
 
-def test_implementation_status_marks_gate_e_content_complete_without_claiming_release():
+def test_implementation_status_marks_release_complete_and_p1_as_preparation_only():
     status = IMPLEMENTATION_STATUS.read_text(encoding="utf-8")
 
-    assert "阶段四 P0 Gate E" in status
+    assert "阶段四 P0 + P1 Gate D 准备" in status
     assert "phase4_public_charts_v1" in status
     assert "P0 仓库内交付、审查和提交已完成" in status
     assert PHASE4_MERGE_SHA in status
     assert "合并到 `main`" in status
-    assert "tag、Release 和附件上传仍待" in status
-    assert "交互式 Web UI 与跨运行可视化看板" in status
+    assert "v0.1.0" in status
+    assert "已正式发布" in status
+    assert "伦理状态为 `READY`" in status
+    assert "pending_completion" in status
+    assert "phase4_p1_formal_subset_v1" in status
+    assert "15 条自然 + 5 条反事实" in status
+    assert "未收集第二标注者答案" in status
+    assert "本地过程评估工作台" in status
+    assert "跨运行历史持久化与比较看板" in status
 
 
-def test_canonical_project_documents_mark_gate_e_complete_without_claiming_release():
+def test_canonical_project_documents_mark_release_and_p1_boundaries():
     readme = ROOT_README.read_text(encoding="utf-8")
     design = DESIGN_DOCUMENT.read_text(encoding="utf-8")
     protocol = PHASE4_PROTOCOL.read_text(encoding="utf-8")
@@ -204,7 +211,7 @@ def test_canonical_project_documents_mark_gate_e_complete_without_claiming_relea
 
     assert "P0 Gate A、B、C、E" in readme
     assert "P0 Gate A、B、C、E 仓库内交付已完成" in design
-    assert "P0 Gate B/C/E 封版版" in protocol
+    assert "P0 封版 + P1 Gate D 标注准备版" in protocol
     assert "charts-verify" in readme
     assert "charts-verify" in protocol
     assert "P0 尚需聚合图表" not in combined
@@ -214,4 +221,10 @@ def test_canonical_project_documents_mark_gate_e_complete_without_claiming_relea
     assert "Gate B 实现草案" not in protocol
     assert PHASE4_MERGE_SHA in combined
     assert "合并到 `main`" in combined
-    assert "tag、Release 和附件上传" in combined
+    assert "v0.1.0" in combined
+    assert "GitHub Release 和 11 个白名单附件已发布" in protocol
+    assert "伦理状态为 `READY`" in combined
+    assert "pending_completion" in combined
+    assert "仍未发包或开始人类数据收集" in protocol
+    assert "phase4_p1_formal_subset_v1" in combined
+    assert "不含入选 ID" in protocol

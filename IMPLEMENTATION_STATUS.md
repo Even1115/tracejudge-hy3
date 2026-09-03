@@ -1,4 +1,4 @@
-# 实现状态（v0.1 + 阶段四 P0 Gate E）
+# 实现状态（v0.1 + 阶段四 P0 + P1 Gate D 准备）
 
 本文档如实区分"已经实现并通过测试"和"未来计划"，不把计划写成已完成。
 
@@ -34,8 +34,12 @@
 - 阶段三 Gate F 结果解读与脱敏报告（`phase3/report.py`）：只读绑定 E4 聚合统计、E3 结构化运行账本与 Gate D 公开 confirmed 证书，先核对 57×5、14/57 错误基率、两项主比较、首错定位和五类反事实再渲染结论。报告强制 11/11 统计谬误扫描、Material Passport、`ANALYZED / CAUTION / CANNOT_VERIFY` 边界；Test-only 结构性缺少的过程字段标记为 N/A，不把反事实单方法 Wilson 区间用于推断，不把不显著或 `[0,0]` 解释为等效。正式 `phase3_report_primary_round1_v1` 已发布，manifest / Markdown / validation SHA256 分别为 `0b8285ec04344e29670d752a37c4d5ecb41ea07d5dfc18a5715b56de3e800b06` / `29eaef9f44a964308ab26b9821c472b0d13837eee587a3e687faa861edb4d725` / `702bf96be5d0911088dfea5cb95562d6b8e25d147d972c78b0b6870cecbae113`；权限、脱敏声明和 11/11 覆盖已独立验收。
 - 阶段四 Gate B 复现加固（`phase4/contracts.py`、`phase4/reproducibility.py`）：正式 inventory 绑定 103 个关键产物、13 个公开锚点和 0 个权限警告，确定性 artifact-set SHA256 为 `84c584a116700430b7fea14c5f81d8b23f6094badc1dc410a013c7bd7615f13b`；私有 manifest 为 Git-ignored `0600` 文件，公开 digest SHA256 为 `9094352967dbe90598d477c8abc0cdf6d0ac2dc311ab1d675b61d4460b477033`。公开 Fixture replay receipt SHA256 为 `c1ba43dfe40b19af6929ddc9749a24f335933e22dad43ba626cbfc7c56e1d784`；该 replay 未调用 Provider、Docker 或网络，也未重跑 Hy3。
 - 阶段四 Gate C 脱敏发布：Gate F Markdown 已以逐字节一致、受 Git 跟踪的 `docs/releases/phase4/phase3_research_report_public_v1.md` 发布，SHA256 保持 `29eaef9f44a964308ab26b9821c472b0d13837eee587a3e687faa861edb4d725`；发布说明单独记录阶段四 receipt、隐私审计和 Gate F 正文未展示 E4 `valid_only_confusion` 字段的已知缺口。结论边界保持 `ANALYZED / CAUTION / CANNOT_VERIFY`。
-- 阶段四 Gate E 图表、Demo 与封版：正式 `phase4_public_charts_v1` 已从冻结 E4 聚合报告生成三张确定性 SVG，manifest SHA256 为 `20d94ad514400ff7ebe72b8d288eb6a208b571069878091b4b6b481659f30d71`，逐字节重绘验证通过；公开 `safe_mean` Fixture Demo 覆盖完整评估、反例、`confirmed_bug` 证书和精确白名单 replay，Provider/Docker/网络调用均为 0。Release 检查单与封版报告已就绪，P0 仓库内交付、审查和提交已完成；[Pull Request #4](https://github.com/Even1115/tracejudge-hy3/pull/4) 已通过 merge commit `9627d93b668891c1fba0b255e403168afa731bf1` 合并到 `main`；tag、Release 和附件上传仍待项目负责人授权。
-- CLI：`doctor` / `demo --mock --case {correct,faulty}` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `evalplus` / 阶段三 Gate B–F 命令 / 阶段四 `artifact-preflight`、`artifact-freeze`、`artifact-verify`、`replay-receipt-preflight`、`replay-receipt`、`charts-preflight`、`charts-publish`、`charts-verify` / `run` / `batch`。
+- 阶段四 Gate E 图表、Demo 与封版：正式 `phase4_public_charts_v1` 已从冻结 E4 聚合报告生成三张确定性 SVG，manifest SHA256 为 `20d94ad514400ff7ebe72b8d288eb6a208b571069878091b4b6b481659f30d71`，逐字节重绘验证通过；公开 `safe_mean` Fixture Demo 覆盖完整评估、反例、`confirmed_bug` 证书和精确白名单 replay，Provider/Docker/网络调用均为 0。Release 检查单与封版报告已就绪，P0 仓库内交付、审查和提交已完成；[Pull Request #4](https://github.com/Even1115/tracejudge-hy3/pull/4) 已通过 merge commit `9627d93b668891c1fba0b255e403168afa731bf1` 合并到 `main`，[v0.1.0](https://github.com/Even1115/tracejudge-hy3/releases/tag/v0.1.0) 已正式发布。
+- 阶段四 P1 Gate D 第二标注者准备（`phase4/p1_annotations.py`、`phase4/p1_study.py`、`phase4/p1_formal_packet.py`）：冻结安排/Protocol SHA256 为 `15a0de0efc0b6695b8021f5912ea6670bfc234f686a89cfcf5d267b53e3d7c6b` / `3f7268eb757f452d3902de3d60274ce2d45fb022ba047e64bfd5e680b044bf6c`；伦理状态为 `READY`。新建 5 条 cohort 外 MIT 公开 Fixture，精确源 SHA256 为 `f2c99f44a35a821d00da0625b2847ee4628055548886ccce621a381efef744c9`。正式练习包 `phase4_p1_public_practice_v1` 对阶段三题号/代码/说明零重合，执行 15 个公开用例，manifest SHA256 为 `cc6beef9b439a42a3011700096a9e8541edad211d5ea1733b47d07c9ad8ce855`，Provider/Docker/网络调用各 0；协调者参考继续保存在 Git-ignored `0700/0600` 目录，公开 manifest 只保存无答案的逻辑 artifact ID、存储类别和 SHA256。练习回传通过 5/5 Schema、5/5 `has_error`、5/5 `process_correct`和 3/3 错误条目首错层校验，零隐私/盲法异常；已书面准入正式 20 条，私有准入记录 SHA256 为 `d7461f2562ae62162733fdde945e28b92b433e96f54de34d8a4e788d9f2fb1ae`，练习标签排除于研究终点。正式子集 `phase4_p1_formal_subset_v1` 已冻结 15 条自然 + 5 条反事实，私有 manifest / 公开 commitment SHA256 分别为 `03782826f5054238962c5a007116e9df204fc9f69e8dc746925c8bef2ac2082c` / `b5090ad78715857455852e3450fa606f4963ca726a3df91a1b6603d372c491a2`。正式包生成/校验已实现并经测试，但单次交付记录仍为 `pending_completion`、缺 6 项具体交付记录，所以 `data_collection_allowed=false`，正式包未创建/发送；当前未收集正式 20 条第二标注者答案，也未生成一致性统计。
+- 阶段四竞赛呈现与难度代理（`phase4/contest_summary.py`）：新增面向评审的一页结果总览，独立展示 57 条轨迹、285 个配对、五方法 TP/FP/TN/FN、FPR 和人工核验覆盖；Full TraceJudge 的有效判断 FPR 为 1/43（2.33%）。HumanEval+ 原字段继续保持 `difficulty=unknown`，另以不读取模型输出、人工标签或执行结果的参考实现结构复杂度代理，在 45 题来源队列上先作 15/15/15 等量分层，再连接 42 条自然轨迹的 EvalPlus Base+Plus 结果；观察到 easy 14/14、medium 13/14、hard 13/14，只报告从 medium 开始的探索性下降，不冒充官方难度或稳定退化规律。两份公开文档均可由哈希绑定输入只读复算，且不覆盖阶段三冻结报告。
+- 本地过程评估工作台（`demo_app/`、`scripts/run_demo.sh`）：保留 localhost-only 和白名单 API 边界，新增三个 SHA256 绑定的公开典型案例、答案×过程 2×2 矩阵、独立竞赛展示 SVG、公开 Fixture 版本化回归卡片、启动 readiness 检查，以及单次运行的结果 JSON / 人类可读 HTML / 错误证书导出；不读取私有标注、逐条正式方法预测或隐藏评测正文。
+- 阶段四 Judge 稳定性附加实验工具（`phase4/stability.py`）：固定 `safe_mean` 的正常正确、reasoning swap、边界错误和等价实现四个公开案例，采用 5 轮 repeat-major 顺序运行现有 Full TraceJudge；为 20 个评审单元逐条原子 checkpoint，严格绑定 Git、公开源/执行证据、Provider 配置、Prompt/Schema/方法输入与实现哈希，并生成字段/联合标签成对一致率、5/5 全一致、Provider/解析/其他失败和实际请求数报告。正式入口要求 `--confirm-real-provider`，支持同身份续跑，且 `main_experiment_merge_allowed=false`。离线 Mock 的 20/20 稳定路径与 Provider/解析失败路径已经通过测试；真实 Hy3 运行尚未启动，因此当前没有可报告的正式稳定性数值。
+- CLI：`doctor` / `demo --mock --case {correct,faulty}` / `dataset convert-humanevalplus` / `dataset sample` / `dataset validate` / `baseline` / `evalplus` / 阶段三 Gate B–F 命令 / 阶段四 `artifact-*`、`replay-receipt*`、`charts-*`、`p1-practice-*`、`p1-delivery-*`、`p1-formal-subset-*`、`p1-formal-packet-*`、`stability-preflight`、`stability-run` / `run` / `batch`。
 - 指标函数（10 个，`reporting/metrics.py`），全部为纯函数，缺少人工标注时返回 `not_computable`；`data/demo_annotations.jsonl` 提供 4 条 Fixture 标注用于测试。
 - 单元测试覆盖：schema 校验、JSONL 加载、结构化输出解析（含 Markdown 围栏/多余文本容错）、AST 正确代码与语法错误、可见通过/隐藏失败、运行时异常、超时结构、空输入对齐判断（含误报防护）、反例差分验证、错误证书状态聚合、完整 Mock Demo Pipeline、指标函数，以及阶段一 Prompt 不泄露、原始/结构化输出分存、单题失败隔离、断点续跑、manifest 脱敏、JSONL 中断可读、汇总一致性和 Mock 无网络。阶段三另覆盖确定性探针顺序/预算、三等级公开证书、原子权限、canary、证书/冻结哈希篡改拒绝和单公开用例重放证据哈希一致。HumanEval+ 测试另覆盖受控快照校验、答案/官方测试不可达、固定抽样、原子且不可覆盖的 bundle 发布、manifest/provenance 篡改拒绝、baseline 只生成以及 `run`/`batch` 拒绝。
 
@@ -51,6 +55,7 @@
 - **EvalPlus 容器边界**：阶段二不把候选放到宿主执行，并使用无网络、只读根文件系统、capability/资源限制、两个预创建宿主文件的精确 bind、退出后读取和强制清理；批次截止后并行清理，再给 worker 固定 5 秒确认尾段。官方镜像中候选与 wrapper 仍共享 UID；manifest 将边界明确标为 `basic_non_adversarial`，`reliability_guard` 也不是安全沙盒，当前完整性加固只面向基础非对抗 Pilot，不替代独立 UID 或 VM/microVM。
 - **Hy3 Provider**：网络可达性、认证和 `extra_body.reasoning_effort` 的兼容性取决于用户配置的具体 OpenAI-compatible 服务。普通测试不做真实网络调用；真实 pilot 的成功与失败应由当次实验产物和报告记录，不作为永久产品状态。
 - **阶段三研究验证**：Gate A–F 已完成。正式研究输入为 42 条自然 + 15 条反事实 = 57 条轨迹，五方法完整配对为 285；单人首轮人工标签已冻结，真实 Hy3 已完成配对并保留 2 条 Provider 失败，聚合统计和脱敏研究报告已正式发布。阶段四 P0 Gate A、B、C、E 已完成仓库内复现加固、公开证书 replay receipt、受 Git 跟踪的脱敏报告、确定性聚合图表、公开 Fixture Demo 和封版文档，Gate D 研究增强延期且不阻塞 P0；阶段四没有独立重跑 Hy3。验证状态仍为 `ANALYZED`、总体置信为 `CAUTION`、复现判定为 `CANNOT_VERIFY`。所有结果仍只是当前固定 cohort/模型/Prompt/单标注者下的探索性证据，不得写成因果、等效或完整 benchmark 结论。
+- **Judge 稳定性证据**：四案例 × 五次的协议、实现、续跑和报告链路已经完成，但仅做了离线 Mock 工程验收；尚未产生真实 Hy3 稳定性结果。即使正式运行完成，也只能描述目的性选择的四个公开案例，不能代表 57 条主实验或其他任务的总体稳定性。
 
 ## 尚未实现
 
@@ -59,8 +64,8 @@
 - 第二标注者或重测轮次的 inter-rater / intra-rater 一致性证据（当前只有已冻结的单人首轮 57 条主标注；`data/demo_annotations.jsonl` 仍只是 4 条工程 Fixture）；
 - 能支持模块因果归因的扩展消融证据；
 - 通用属性测试（Hypothesis 等）；
-- 多模型 Judge / 多次评估一致性分析；
-- 交互式 Web UI 与跨运行可视化看板；阶段四仅实现了当前冻结统计的静态聚合 SVG；
+- 多模型 Judge、更多任务和更大样本的重复评估一致性分析；当前只实现四个公开案例的 4 × 5 单模型附加实验，且真实 Hy3 尚未运行；
+- 跨运行历史持久化与比较看板；当前工作台只保留进程内最近运行，并提供单次运行导出；
 - 自动代码修复；
 - 完整控制流图、符号执行、mutation testing 框架；
 - 多文件/仓库级代码生成任务、多语言执行。

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="560" viewBox="0 0 1120 560" role="img" aria-labelledby="title desc">
+  <title id="title">答案正确不等于过程正确：reasoning_swap 检出数</title>
+  <desc id="desc">在三条公开 reasoning swap 反事实上，Test-only 正确检出零条，四种 Judge 方法均正确检出三条。样本量仅为三，结果仅作探索性机制展示。</desc>
+  <rect width="1120" height="560" fill="#071018"/>
+  <circle cx="990" cy="28" r="230" fill="#0e3141" opacity="0.55"/>
+  <text x="72" y="78" fill="#41d9ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="2">TRACEJUDGE-HY3 · PUBLIC COUNTERFACTUAL</text>
+  <text x="72" y="130" fill="#f5f8fb" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="34" font-weight="760">答案正确，不等于过程正确</text>
+  <text x="72" y="168" fill="#91a3b7" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="18">reasoning_swap：代码保持正确，只替换为与需求、代码矛盾的解释</text>
+
+  <line x1="334" y1="228" x2="1030" y2="228" stroke="#213244"/>
+  <line x1="334" y1="228" x2="334" y2="418" stroke="#213244"/>
+  <line x1="566" y1="228" x2="566" y2="418" stroke="#213244" stroke-dasharray="6 8"/>
+  <line x1="798" y1="228" x2="798" y2="418" stroke="#213244" stroke-dasharray="6 8"/>
+  <line x1="1030" y1="228" x2="1030" y2="418" stroke="#213244"/>
+  <text x="334" y="210" fill="#718397" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">0</text>
+  <text x="560" y="210" fill="#718397" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">1</text>
+  <text x="792" y="210" fill="#718397" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">2</text>
+  <text x="1022" y="210" fill="#718397" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14">3</text>
+
+  <text x="72" y="287" fill="#c5d1dd" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="650">Test-only</text>
+  <rect x="334" y="254" width="10" height="48" fill="#ff6f79"/>
+  <text x="362" y="286" fill="#ff6f79" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="25" font-weight="750">0 / 3</text>
+
+  <text x="72" y="375" fill="#c5d1dd" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="22" font-weight="650">四种 Judge 方法</text>
+  <rect x="334" y="342" width="696" height="48" fill="#41d9ff"/>
+  <text x="922" y="375" fill="#04121c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="25" font-weight="800">3 / 3</text>
+
+  <rect x="72" y="448" width="976" height="56" fill="#0b1723" stroke="#213244"/>
+  <text x="94" y="482" fill="#91a3b7" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="16">n = 3 · exploratory only · 数据来自冻结公开聚合；用于说明机制，不构成总体性能或显著性结论</text>
+</svg>

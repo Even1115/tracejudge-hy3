@@ -431,6 +431,33 @@ working JSONL 的每行保留 packet 给定的 `annotation_item_id`、协议/标
 
 公共 payload 发布前必须通过 `assert_public_payload_safe()`；它拒绝 canonical solution、官方测试/失败输入、EvalPlus raw、reference code、Provider raw、请求头、Cookie、token/secret 等敏感字段及调用方 canary，异常消息不回显秘密值。身份哈希使用 `canonical_sha256()`；精确 JSONL 行使用包含末尾 LF 的 `jsonl_record_sha256()`。
 
+### 阶段四 P1 第二标注者练习包
+
+`tracejudge_phase4_p1_second_annotator_protocol` schema v1 冻结安排/阶段三指南哈希、指导老师于 2026-09-02 作出的 `approved / READY` 认定、20 条正式子集规则、5 条练习准入门槛、最多两轮校准、盲法、交付、停止、退出和一致性分析政策。伦理就绪和子集冻结都不替代单次交付记录；当前 `delivery_record_status=pending_completion`，所以 `data_collection_allowed=false`、`formal_packet_created=false` 和 `formal_data_collected=false` 仍不得改写为已完成。
+
+`P1SingleDeliveryRecord` schema v1 作为公开、无个人信息的结构定义；实际记录只保存在 Git-ignored、`0700/0600` 私有目录。它绑定 Schema/Protocol/伦理身份，覆盖参与同意、五类实际渠道、确认收件与期限、报酬/致谢/署名、退出/保留/销毁、单次负责人授权、归档哈希、异常数和删除确认。`pending_completion` 可保留空值但强制 `data_collection_allowed=false`；只有全部前置项完整并显式切换为 `ready_for_practice_delivery` 时才可为真。CLI 只回显状态、缺失项数量和哈希，不回显渠道或联系人正文。
+
+`tracejudge_phase4_p1_formal_subset_private_manifest` schema v1 保存确定性入选身份，只位于 Git-ignored `0700/0600` 目录；`tracejudge_phase4_p1_formal_subset_public_commitment` 只发布源 manifest 哈希、固定种子/算法、15+5 计数、3 个父题覆盖、单父题上限、顺序承诺哈希和私有 manifest 哈希，不包含入选 trace/problem ID、私有路径、标签、方法预测、Provider 状态或事后结果。两者均声明正式 packet 和人类数据尚未生成。
+
+`tracejudge_phase4_p1_practice_admission` schema v1 是 Git-ignored 私有准入记录。它精确绑定完成标签、回传归档和协调者参考的 SHA256，仅保存 Schema 有效数、三项预注册一致计数、零隐私/盲法异常确认和书面准入决定。它不复制标签、rationale、个人信息或渠道正文，并明确将练习分数排除于研究终点。
+
+`tracejudge_phase4_p1_formal_annotation_packet` schema v1 只在单次交付记录允许数据收集、练习准入通过、正式 20 条子集逐字节验证后才可创建。它按固定哈希顺序产生 `formal_item_001..020`，并绑定三个文件：
+
+- `participant/packet.jsonl`：20 条公开可见题面、结构化说明、候选代码、功能证据和公开动态证据；
+- `participant/labels_template.jsonl`：20 条待填空标签，固定标注者、轮次和盲法元数据；
+- `coordinator/identity_map.jsonl`：opaque item ID 到真实 trace 身份的映射，仅协调者保管。
+
+参与者两个文件不含主标签、方法预测、Provider raw、反事实 mutation/预期影响、官方隐藏输入或身份映射。全部文件以 `0700/0600` 私有权限、不可覆盖写入，并可由 manifest 确定性重建后逐字节校验。
+
+`tracejudge_phase4_p1_public_practice_source` schema v1 只包含 5 条 MIT 公开自建 Fixture，不包含协调者参考。它不是人类参与者数据；生成器只在源文件精确匹配冻结 SHA256 后执行候选代码，并与阶段三自然/overlay manifest 的题号、代码哈希和结构化说明哈希检查零重合。
+
+`tracejudge_phase4_p1_public_practice_bundle` schema v1 是确定性、不可覆盖的公开练习冻结：
+
+- `manifest.json` 绑定安排、Protocol、阶段三指南、练习源、自然/overlay manifest、生成实现、顺序、三个 JSONL 哈希及 Provider/Docker/网络零调用声明；
+- `participant/packet.jsonl` 只包含公开题面、结构化说明、候选代码、脱敏状态和公开执行证据，不包含参考答案或阶段三标签；
+- `participant/labels_template.jsonl` 固定化名 `p1_rater_02`、第一轮校准和八个 `null` 标签字段；
+- 协调者参考是非参与者的公开 Fixture 参考，但为保护准入练习有效性，只保存于 Git-ignored、`0700/0600` 受限目录；公开 manifest 只保存逻辑 artifact ID 和精确 SHA256，不保存私有路径或正文。
+
 ### Resume identity
 
 `Phase3ResumeIdentity` 精确绑定 overlay 与自然 manifest、轨迹顺序、方法材料组合哈希、五方法规格、Prompt bundle、输出 schema、完整实现、Provider 公开配置、人工标签 manifest/完成标签/回连记录哈希、Git、Python/依赖、AST、公开证据策略、标注协议和随机种子。clean Git 状态不保存伪造工作树指纹；dirty 状态必须有指纹。Gate B freeze 是不可变的一次性原子发布，不使用 resume。Gate E3 writer 每次 invocation 保存私有 `provider_raw.jsonl` 和通过敏感键/canary 检查的 `results.jsonl`；中断运行的 manifest 保持 `running`，续跑时先将前一 invocation 标为 `interrupted`。新 invocation 对历史已有终态的每一对只写 `reused` 和精确旧行 SHA256，不再调用 Provider；完成时输出完整 57 × 5 索引。

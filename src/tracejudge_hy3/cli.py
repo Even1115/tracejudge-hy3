@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 import typer
@@ -73,37 +74,65 @@ from tracejudge_hy3.phase3 import (
     replay_public_certificate,
 )
 from tracejudge_hy3.phase4 import (
+    P1_ADJUDICATION_COMPLETED_DEFAULT_MANIFEST,
+    P1_ADJUDICATION_DEFAULT_MANIFEST,
+    P1_ADJUDICATION_DEFAULT_OUTPUT,
+    P1_AGREEMENT_DEFAULT_MANIFEST,
+    P1_AGREEMENT_DEFAULT_OUTPUT,
     P1_ARRANGEMENT_RELATIVE_PATH,
     P1_COORDINATOR_REFERENCE_DEFAULT_PATH,
     P1_DELIVERY_RECORD_DEFAULT_PATH,
     P1_DELIVERY_SCHEMA_RELATIVE_PATH,
+    P1_FORMAL_LABELS_DEFAULT_MANIFEST,
+    P1_FORMAL_LABELS_DEFAULT_OUTPUT,
+    P1_FORMAL_PACKET_DEFAULT_DIR,
     P1_FORMAL_PACKET_DEFAULT_OUTPUT,
     P1_FORMAL_PACKET_ID,
+    P1_FORMAL_PACKET_MANIFEST_SHA256,
     P1_FORMAL_PRIVATE_MANIFEST_DEFAULT_PATH,
     P1_FORMAL_PUBLIC_COMMITMENT_DEFAULT_PATH,
+    P1_POST_ADJUDICATION_SENSITIVITY_DEFAULT_OUTPUT,
     P1_PRACTICE_ADMISSION_DEFAULT_PATH,
     P1_PRACTICE_ID,
     P1_PRACTICE_SOURCE_RELATIVE_PATH,
+    P1_PRIMARY_LABELS_DEFAULT_MANIFEST,
     P1_PROTOCOL_RELATIVE_PATH,
+    P1InterRaterAgreementAnalysis,
+    P1PostAdjudicationSensitivityError,
     Phase4P1AnnotationError,
     Phase4ReleaseError,
     Phase4ReproducibilityError,
     Phase4StabilityError,
+    Phase4StabilitySensitivityError,
+    complete_p1_consensus_adjudication,
     create_p1_delivery_record_template,
     execute_hy3_judge_stability,
     freeze_artifact_inventory,
+    freeze_p1_formal_labels,
     freeze_p1_formal_subset,
+    initialize_p1_adjudication,
     preflight_artifact_inventory,
     preflight_hy3_judge_stability,
+    preflight_p1_adjudication,
+    preflight_p1_agreement,
     preflight_p1_delivery_record,
+    preflight_p1_formal_labels,
     preflight_p1_formal_packet,
     preflight_p1_formal_subset,
     preflight_p1_practice_bundle,
     prepare_public_charts,
     prepare_public_replay_receipt,
+    publish_p1_agreement,
+    publish_p1_post_adjudication_sensitivity,
+    publish_stability_sensitivity_release,
     verify_artifact_inventory,
+    verify_p1_adjudication,
+    verify_p1_agreement,
+    verify_p1_completed_adjudication,
+    verify_p1_formal_labels,
     verify_p1_formal_packet,
     verify_p1_formal_subset,
+    verify_p1_post_adjudication_sensitivity,
     verify_p1_practice_bundle,
     verify_public_charts,
     write_p1_formal_packet,
@@ -203,6 +232,10 @@ DEFAULT_PHASE4_P1_EXECUTION_RUN = (
     "artifacts/experiments/phase3-public-evidence/phase3_cf_public_15_v1"
 )
 DEFAULT_PHASE4_STABILITY_OUTPUT = "artifacts/experiments/phase4-judge-stability"
+DEFAULT_PHASE4_STABILITY_RUN = (
+    f"{DEFAULT_PHASE4_STABILITY_OUTPUT}/phase4_stability_hy3_public4x5_v1"
+)
+DEFAULT_PHASE4_STABILITY_RELEASE_OUTPUT = "docs/releases/phase4"
 
 
 def _reject_phase1_projection_execution(problems: list[ProblemSpec]) -> None:
@@ -2486,6 +2519,56 @@ def phase4_stability_run(
     )
 
 
+@phase4_app.command("stability-sensitivity-publish")
+def phase4_stability_sensitivity_publish(
+    run_dir: str = typer.Option(
+        DEFAULT_PHASE4_STABILITY_RUN,
+        "--run-dir",
+        help="已完成且哈希有效的四案例稳定性 run",
+    ),
+    output_dir: str = typer.Option(
+        DEFAULT_PHASE4_STABILITY_RELEASE_OUTPUT,
+        "--output-dir",
+        help="公开聚合报告与结果卡片目录",
+    ),
+) -> None:
+    """离线发布原始结果卡片和 post-hoc 标识符规范化敏感性报告。"""
+
+    try:
+        result = publish_stability_sensitivity_release(
+            run_dir=run_dir,
+            output_dir=output_dir,
+        )
+    except (Phase4StabilitySensitivityError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    fields = {item.field_name: item for item in result.analysis.overall_fields}
+    step = fields["first_faulty_step"]
+    table = Table(title="阶段四 Judge 稳定性结果卡片与敏感性报告")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("有效判断 / Provider / 解析失败", "20 / 0 / 0")
+    table.add_row(
+        "has_error / error_type 原始一致率",
+        "100.0% / 100.0%",
+    )
+    table.add_row(
+        "首错步骤：原始 / post-hoc 规范化",
+        f"{step.raw.pairwise_agreement * 100:.1f}% / "
+        f"{step.normalized.pairwise_agreement * 100:.1f}%",
+    )
+    table.add_row("新增 Provider / Docker / 网络调用", "0 / 0 / 0")
+    table.add_row("报告 JSON SHA256", result.json_sha256)
+    table.add_row("报告 Markdown SHA256", result.markdown_sha256)
+    table.add_row("结果卡片 SVG SHA256", result.card_sha256)
+    console.print(table)
+    console.print(f"[dim]report: {result.markdown_path}[/dim]")
+    console.print(f"[dim]card: {result.card_path}[/dim]")
+    console.print(
+        "[yellow]规范化 100% 是事后敏感性读数；预注册原始首错步骤一致率仍为 90%。[/yellow]"
+    )
+
+
 @phase4_app.command("artifact-preflight")
 def phase4_artifact_preflight(
     inventory_id: str = typer.Option("phase4_artifact_inventory_v1", "--inventory-id"),
@@ -3495,6 +3578,552 @@ def phase4_p1_formal_packet_verify(
     table.add_row("条数", str(result.item_count))
     table.add_row("manifest SHA256", result.manifest_sha256)
     table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+def _parse_timezone_aware_datetime(value: str, *, label: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise Phase4P1AnnotationError(
+            f"{label} must be an ISO 8601 timestamp",
+            safe_stage="P4D_P1_FORMAL_LABELS_RECEIPT",
+        ) from None
+    if parsed.tzinfo is None:
+        raise Phase4P1AnnotationError(
+            f"{label} must include a UTC offset",
+            safe_stage="P4D_P1_FORMAL_LABELS_RECEIPT",
+        )
+    return parsed
+
+
+def _phase4_p1_formal_labels_options(
+    *,
+    completed_labels: str,
+    returned_archive: str,
+    received_at: str,
+    archive_extraction_confirmed: bool,
+    packet_dir: str,
+    packet_manifest_sha256: str,
+    delivery_record: str,
+    output_dir: str,
+) -> dict[str, object]:
+    return {
+        "completed_labels_path": completed_labels,
+        "returned_archive_path": returned_archive,
+        "received_at": _parse_timezone_aware_datetime(received_at, label="received_at"),
+        "archive_extraction_binding_confirmed": archive_extraction_confirmed,
+        "packet_dir": packet_dir,
+        "expected_packet_manifest_sha256": packet_manifest_sha256,
+        "delivery_record_path": delivery_record,
+        "output_dir": output_dir,
+    }
+
+
+@phase4_app.command("p1-formal-labels-preflight")
+def phase4_p1_formal_labels_preflight(
+    completed_labels: str = typer.Option(..., "--completed-labels"),
+    returned_archive: str = typer.Option(..., "--returned-archive"),
+    received_at: str = typer.Option(..., "--received-at"),
+    archive_extraction_confirmed: bool = typer.Option(
+        False,
+        "--archive-extraction-confirmed",
+        help="协调者确认 completed labels 来自该回传归档",
+    ),
+    packet_dir: str = typer.Option(P1_FORMAL_PACKET_DEFAULT_DIR, "--packet-dir"),
+    packet_manifest_sha256: str = typer.Option(
+        P1_FORMAL_PACKET_MANIFEST_SHA256, "--packet-manifest-sha256"
+    ),
+    delivery_record: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_RECORD, "--delivery-record"),
+    output_dir: str = typer.Option(P1_FORMAL_LABELS_DEFAULT_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：只读校验正式 20 条回传、交付证据和盲化绑定。"""
+
+    try:
+        result = preflight_p1_formal_labels(**_phase4_p1_formal_labels_options(**locals()))
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式回传预检：{result.label_set_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("完成 / 预期", f"{result.completed_count} / {result.record_count}")
+    table.add_row(
+        "有错误 / 无错误", f"{result.has_error_true_count} / {result.has_error_false_count}"
+    )
+    table.add_row("按时收到", "是" if result.received_within_formal_deadline else "否")
+    table.add_row("回传 archive SHA256", result.source_archive_sha256)
+    table.add_row("完成标签 SHA256", result.source_completed_labels_sha256)
+    table.add_row("可冻结", "是" if result.ready_to_freeze else "否")
+    table.add_row("写入文件", "否")
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-formal-labels-freeze")
+def phase4_p1_formal_labels_freeze(
+    completed_labels: str = typer.Option(..., "--completed-labels"),
+    returned_archive: str = typer.Option(..., "--returned-archive"),
+    received_at: str = typer.Option(..., "--received-at"),
+    archive_extraction_confirmed: bool = typer.Option(
+        False,
+        "--archive-extraction-confirmed",
+        help="协调者确认 completed labels 来自该回传归档",
+    ),
+    packet_dir: str = typer.Option(P1_FORMAL_PACKET_DEFAULT_DIR, "--packet-dir"),
+    packet_manifest_sha256: str = typer.Option(
+        P1_FORMAL_PACKET_MANIFEST_SHA256, "--packet-manifest-sha256"
+    ),
+    delivery_record: str = typer.Option(DEFAULT_PHASE4_P1_DELIVERY_RECORD, "--delivery-record"),
+    output_dir: str = typer.Option(P1_FORMAL_LABELS_DEFAULT_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：原子冻结正式回传、身份回连记录和原始归档。"""
+
+    try:
+        result = freeze_p1_formal_labels(**_phase4_p1_formal_labels_options(**locals()))
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式标签冻结：{result.label_set_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("正式标签", f"{result.completed_count} / {result.record_count}")
+    table.add_row("按时收到", "是")
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("回传 archive SHA256", result.source_archive_sha256)
+    table.add_row("完成标签 SHA256", result.completed_labels_sha256)
+    table.add_row("私有冻结目录", str(result.run_dir))
+    table.add_row("一致性统计", "尚未计算")
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-formal-labels-verify")
+def phase4_p1_formal_labels_verify(
+    manifest: str = typer.Option(P1_FORMAL_LABELS_DEFAULT_MANIFEST, "--manifest"),
+    manifest_sha256: str | None = typer.Option(None, "--manifest-sha256"),
+) -> None:
+    """Gate D/P1：验证已冻结正式回传的 schema、权限和逐文件哈希。"""
+
+    try:
+        result = verify_p1_formal_labels(
+            manifest_path=manifest, expected_manifest_sha256=manifest_sha256
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 正式标签验证：{result.label_set_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("验证", "通过" if result.verified else "失败")
+    table.add_row("条数", str(result.record_count))
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("回传 archive SHA256", result.source_archive_sha256)
+    table.add_row("完成标签 SHA256", result.completed_labels_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+def _render_p1_agreement_summary(
+    *,
+    title: str,
+    analysis: P1InterRaterAgreementAnalysis,
+    analysis_sha256: str,
+    report_sha256: str,
+) -> None:
+    has_error = next(item for item in analysis.binary_fields if item.field_name == "has_error")
+    table = Table(title=title)
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("配对条目", str(analysis.item_count))
+    table.add_row(
+        "has_error 原始一致率",
+        f"{has_error.raw_agreement.agreeing_count}/{has_error.raw_agreement.denominator} "
+        f"({has_error.raw_agreement.estimate:.1%})",
+    )
+    table.add_row(
+        "has_error Cohen's κ",
+        (f"{has_error.cohen_kappa:.3f}" if has_error.cohen_kappa is not None else "N/A"),
+    )
+    table.add_row("原始标签已改写", "否")
+    table.add_row("分歧清单已输出", "否")
+    table.add_row("analysis SHA256", analysis_sha256)
+    table.add_row("report SHA256", report_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-agreement-preflight")
+def phase4_p1_agreement_preflight(
+    primary_manifest: str = typer.Option(P1_PRIMARY_LABELS_DEFAULT_MANIFEST, "--primary-manifest"),
+    secondary_manifest: str = typer.Option(
+        P1_FORMAL_LABELS_DEFAULT_MANIFEST, "--secondary-manifest"
+    ),
+    output_dir: str = typer.Option(P1_AGREEMENT_DEFAULT_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：只读复算 20 条两位标注者的聚合一致性。"""
+
+    try:
+        result = preflight_p1_agreement(
+            primary_manifest_path=primary_manifest,
+            secondary_manifest_path=secondary_manifest,
+            output_dir=output_dir,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    _render_p1_agreement_summary(
+        title="阶段四 P1 一致性分析预检（未写盘）",
+        analysis=result.analysis,
+        analysis_sha256=result.analysis_sha256,
+        report_sha256=result.report_sha256,
+    )
+
+
+@phase4_app.command("p1-agreement-publish")
+def phase4_p1_agreement_publish(
+    primary_manifest: str = typer.Option(P1_PRIMARY_LABELS_DEFAULT_MANIFEST, "--primary-manifest"),
+    secondary_manifest: str = typer.Option(
+        P1_FORMAL_LABELS_DEFAULT_MANIFEST, "--secondary-manifest"
+    ),
+    output_dir: str = typer.Option(P1_AGREEMENT_DEFAULT_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：原子冻结聚合一致性 JSON、报告和来源哈希。"""
+
+    try:
+        result = publish_p1_agreement(
+            primary_manifest_path=primary_manifest,
+            secondary_manifest_path=secondary_manifest,
+            output_dir=output_dir,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    _render_p1_agreement_summary(
+        title="阶段四 P1 一致性分析已冻结",
+        analysis=result.analysis,
+        analysis_sha256=result.analysis_sha256,
+        report_sha256=result.report_sha256,
+    )
+    console.print(f"私有聚合目录：{result.run_dir}")
+    console.print(f"manifest SHA256：{result.manifest_sha256}")
+
+
+@phase4_app.command("p1-agreement-verify")
+def phase4_p1_agreement_verify(
+    manifest: str = typer.Option(P1_AGREEMENT_DEFAULT_MANIFEST, "--manifest"),
+    manifest_sha256: str | None = typer.Option(None, "--manifest-sha256"),
+    primary_manifest: str = typer.Option(P1_PRIMARY_LABELS_DEFAULT_MANIFEST, "--primary-manifest"),
+    secondary_manifest: str = typer.Option(
+        P1_FORMAL_LABELS_DEFAULT_MANIFEST, "--secondary-manifest"
+    ),
+) -> None:
+    """Gate D/P1：逐哈希验证并从两份冻结标签确定性复算。"""
+
+    try:
+        result = verify_p1_agreement(
+            manifest_path=manifest,
+            expected_manifest_sha256=manifest_sha256,
+            primary_manifest_path=primary_manifest,
+            secondary_manifest_path=secondary_manifest,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 一致性验证：{result.analysis_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("验证", "通过" if result.verified else "失败")
+    table.add_row("条数", str(result.item_count))
+    table.add_row("manifest SHA256", result.manifest_sha256)
+    table.add_row("analysis SHA256", result.analysis_sha256)
+    table.add_row("report SHA256", result.report_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+def _render_p1_adjudication_summary(
+    *,
+    title: str,
+    status: str,
+    record_sha256: str,
+    working_template_sha256: str,
+    instructions_sha256: str,
+) -> None:
+    table = Table(title=title)
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("状态", status)
+    table.add_row("完整记录分歧", "1 / 20")
+    table.add_row("has_error 分歧", "0 / 20")
+    table.add_row("已访问逐条原始标签", "否")
+    table.add_row("已写入裁决结论", "否")
+    table.add_row("pending record SHA256", record_sha256)
+    table.add_row("working template SHA256", working_template_sha256)
+    table.add_row("instructions SHA256", instructions_sha256)
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    console.print(table)
+
+
+@phase4_app.command("p1-adjudication-preflight")
+def phase4_p1_adjudication_preflight(
+    agreement_manifest: str = typer.Option(P1_AGREEMENT_DEFAULT_MANIFEST, "--agreement-manifest"),
+    output_dir: str = typer.Option(P1_ADJUDICATION_DEFAULT_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：仅从聚合一致性包预检单条分歧待裁决记录。"""
+
+    try:
+        result = preflight_p1_adjudication(
+            agreement_manifest_path=agreement_manifest,
+            output_dir=output_dir,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    _render_p1_adjudication_summary(
+        title="阶段四 P1 单条分歧裁决记录预检（未写盘）",
+        status=result.record.status,
+        record_sha256=result.record_sha256,
+        working_template_sha256=result.working_template_sha256,
+        instructions_sha256=result.instructions_sha256,
+    )
+
+
+@phase4_app.command("p1-adjudication-init")
+def phase4_p1_adjudication_init(
+    agreement_manifest: str = typer.Option(P1_AGREEMENT_DEFAULT_MANIFEST, "--agreement-manifest"),
+    output_dir: str = typer.Option(P1_ADJUDICATION_DEFAULT_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：初始化不可覆盖、未含逐条数据的待人工裁决记录。"""
+
+    try:
+        result = initialize_p1_adjudication(
+            agreement_manifest_path=agreement_manifest,
+            output_dir=output_dir,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    _render_p1_adjudication_summary(
+        title="阶段四 P1 单条分歧待裁决记录已初始化",
+        status=result.record.status,
+        record_sha256=result.record_sha256,
+        working_template_sha256=result.working_template_sha256,
+        instructions_sha256=result.instructions_sha256,
+    )
+    console.print(f"私有目录：{result.run_dir}")
+    console.print(f"manifest SHA256：{result.manifest_sha256}")
+
+
+@phase4_app.command("p1-adjudication-verify")
+def phase4_p1_adjudication_verify(
+    manifest: str = typer.Option(P1_ADJUDICATION_DEFAULT_MANIFEST, "--manifest"),
+    manifest_sha256: str | None = typer.Option(None, "--manifest-sha256"),
+) -> None:
+    """Gate D/P1：验证待裁决记录的私有权限、Schema 和逐文件哈希。"""
+
+    try:
+        result = verify_p1_adjudication(
+            manifest_path=manifest, expected_manifest_sha256=manifest_sha256
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    _render_p1_adjudication_summary(
+        title=f"阶段四 P1 单条分歧裁决记录验证：{result.bundle_id}",
+        status=result.status,
+        record_sha256=result.record_sha256,
+        working_template_sha256=result.working_template_sha256,
+        instructions_sha256=result.instructions_sha256,
+    )
+
+
+def _parse_boolean_decision(value: str, *, label: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise Phase4P1AnnotationError(
+        f"{label} must be true or false",
+        safe_stage="P4D_P1_ADJUDICATION_COMPLETE_INPUT",
+    )
+
+
+@phase4_app.command("p1-adjudication-consensus-complete")
+def phase4_p1_adjudication_consensus_complete(
+    annotation_item_id: str = typer.Option(..., "--annotation-item-id"),
+    plan_code_aligned: str = typer.Option(..., "--plan-code-aligned"),
+    first_faulty_layer: str = typer.Option(..., "--first-faulty-layer"),
+    first_faulty_step: str = typer.Option(..., "--first-faulty-step"),
+    error_type: str = typer.Option(..., "--error-type"),
+    rationale: str = typer.Option(..., "--rationale"),
+    started_at: str = typer.Option(..., "--started-at"),
+    completed_at: str = typer.Option(..., "--completed-at"),
+    both_confirmed: bool = typer.Option(False, "--both-confirmed"),
+    method_blinding_confirmed: bool = typer.Option(False, "--method-blinding-confirmed"),
+    pending_manifest: str = typer.Option(P1_ADJUDICATION_DEFAULT_MANIFEST, "--pending-manifest"),
+    formal_packet_manifest: str = typer.Option(
+        f"{P1_FORMAL_PACKET_DEFAULT_DIR}/manifest.json", "--formal-packet-manifest"
+    ),
+    output_dir: str = typer.Option(P1_ADJUDICATION_DEFAULT_OUTPUT, "--output-dir"),
+) -> None:
+    """Gate D/P1：追加冻结两位原始标注者记录在案的单条共识。"""
+
+    try:
+        result = complete_p1_consensus_adjudication(
+            annotation_item_id=annotation_item_id,
+            plan_code_aligned=_parse_boolean_decision(plan_code_aligned, label="plan_code_aligned"),
+            first_faulty_layer=first_faulty_layer,
+            first_faulty_step=first_faulty_step,
+            error_type=error_type,
+            decision_rationale=rationale,
+            adjudication_started_at=_parse_timezone_aware_datetime(
+                started_at, label="adjudication_started_at"
+            ),
+            adjudication_completed_at=_parse_timezone_aware_datetime(
+                completed_at, label="adjudication_completed_at"
+            ),
+            both_original_raters_confirmed=both_confirmed,
+            adjudicators_blinded_to_method_predictions=method_blinding_confirmed,
+            pending_manifest_path=pending_manifest,
+            formal_packet_manifest_path=formal_packet_manifest,
+            output_dir=output_dir,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title="阶段四 P1 单条分歧人类共识已追加冻结")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("状态", result.record.status)
+    table.add_row("盲化条目", result.record.annotation_item_id)
+    table.add_row("裁决模式", result.record.adjudication_mode)
+    table.add_row("双方确认 / 方法预测盲法", "是 / 是")
+    table.add_row("原标签 / raw agreement 已覆盖", "否 / 否")
+    table.add_row("decision SHA256", result.decision_sha256)
+    table.add_row("report SHA256", result.report_sha256)
+    console.print(table)
+    console.print(f"私有目录：{result.run_dir}")
+    console.print(f"manifest SHA256：{result.manifest_sha256}")
+
+
+@phase4_app.command("p1-adjudication-completed-verify")
+def phase4_p1_adjudication_completed_verify(
+    manifest: str = typer.Option(P1_ADJUDICATION_COMPLETED_DEFAULT_MANIFEST, "--manifest"),
+    manifest_sha256: str | None = typer.Option(None, "--manifest-sha256"),
+) -> None:
+    """Gate D/P1：验证追加完成的共识记录及其来源绑定。"""
+
+    try:
+        result = verify_p1_completed_adjudication(
+            manifest_path=manifest,
+            expected_manifest_sha256=manifest_sha256,
+        )
+    except (Phase4P1AnnotationError, OSError, ValueError) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 完成态裁决验证：{result.bundle_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("状态", result.status)
+    table.add_row("盲化条目", result.annotation_item_id)
+    table.add_row("decision SHA256", result.decision_sha256)
+    table.add_row("report SHA256", result.report_sha256)
+    table.add_row("验证", "通过" if result.verified else "失败")
+    console.print(table)
+
+
+@phase4_app.command("p1-adjudication-sensitivity-publish")
+def phase4_p1_adjudication_sensitivity_publish(
+    agreement_manifest: str = typer.Option(P1_AGREEMENT_DEFAULT_MANIFEST, "--agreement-manifest"),
+    completed_adjudication_manifest: str = typer.Option(
+        P1_ADJUDICATION_COMPLETED_DEFAULT_MANIFEST,
+        "--completed-adjudication-manifest",
+    ),
+    output_dir: str = typer.Option(
+        P1_POST_ADJUDICATION_SENSITIVITY_DEFAULT_OUTPUT,
+        "--output-dir",
+    ),
+) -> None:
+    """Gate D/P1：发布不读取逐条原标签的裁决后影响上界报告。"""
+
+    try:
+        result = publish_p1_post_adjudication_sensitivity(
+            agreement_manifest_path=agreement_manifest,
+            completed_adjudication_manifest_path=completed_adjudication_manifest,
+            output_dir=output_dir,
+        )
+    except (
+        P1PostAdjudicationSensitivityError,
+        Phase4P1AnnotationError,
+        OSError,
+        ValueError,
+    ) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    binary = {item.field_name: item for item in result.analysis.raw_binary_fields}
+    table = Table(title="阶段四 P1 裁决后敏感性分析")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row(
+        "原始完整记录一致率",
+        f"{result.analysis.raw_full_record_exact_agreement.agreeing_count}/20（保持不变）",
+    )
+    table.add_row(
+        "原始 has_error 一致率",
+        f"{binary['has_error'].raw_agreement.agreeing_count}/20（保持不变）",
+    )
+    table.add_row("分歧解决", "1 / 1；不是新的 20/20 一致率")
+    table.add_row("固定 20 条最大影响", "计划/定位类指标 ≤ 1 条，即 5.0 pp")
+    table.add_row("固定 6 条定位分母最大影响", "≤ 1 条，即 16.7 pp")
+    table.add_row("精确方法分数变化", "未计算；未读取方法预测或逐条原标签")
+    table.add_row("Provider / Docker / 网络", "0 / 0 / 0")
+    table.add_row("JSON SHA256", result.json_sha256)
+    table.add_row("Markdown SHA256", result.markdown_sha256)
+    console.print(table)
+    console.print(f"[dim]report: {result.markdown_path}[/dim]")
+
+
+@phase4_app.command("p1-adjudication-sensitivity-verify")
+def phase4_p1_adjudication_sensitivity_verify(
+    agreement_manifest: str = typer.Option(P1_AGREEMENT_DEFAULT_MANIFEST, "--agreement-manifest"),
+    completed_adjudication_manifest: str = typer.Option(
+        P1_ADJUDICATION_COMPLETED_DEFAULT_MANIFEST,
+        "--completed-adjudication-manifest",
+    ),
+    output_dir: str = typer.Option(
+        P1_POST_ADJUDICATION_SENSITIVITY_DEFAULT_OUTPUT,
+        "--output-dir",
+    ),
+    json_sha256: str | None = typer.Option(None, "--json-sha256"),
+    markdown_sha256: str | None = typer.Option(None, "--markdown-sha256"),
+) -> None:
+    """Gate D/P1：从两个固定聚合来源重建并验证敏感性报告。"""
+
+    try:
+        result = verify_p1_post_adjudication_sensitivity(
+            agreement_manifest_path=agreement_manifest,
+            completed_adjudication_manifest_path=completed_adjudication_manifest,
+            output_dir=output_dir,
+            expected_json_sha256=json_sha256,
+            expected_markdown_sha256=markdown_sha256,
+        )
+    except (
+        P1PostAdjudicationSensitivityError,
+        Phase4P1AnnotationError,
+        OSError,
+        ValueError,
+    ) as exc:
+        _render_phase4_failure(exc)
+        raise typer.Exit(code=1) from exc
+    table = Table(title=f"阶段四 P1 裁决后敏感性验证：{result.analysis_id}")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("JSON SHA256", result.json_sha256)
+    table.add_row("Markdown SHA256", result.markdown_sha256)
+    table.add_row("确定性重建", "通过" if result.verified else "失败")
+    table.add_row("逐条原标签 / 方法预测访问", "0 / 0")
     console.print(table)
 
 

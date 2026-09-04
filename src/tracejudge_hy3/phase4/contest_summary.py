@@ -34,6 +34,12 @@ STATISTICS_REPORT_RELATIVE_PATH = Path(
 P1_COMMITMENT_RELATIVE_PATH = Path(
     "docs/experiments/phase4_p1_formal_subset/phase4_p1_formal_subset_v1/commitment.json"
 )
+P1_AGREEMENT_MANIFEST_RELATIVE_PATH = Path(
+    "artifacts/experiments/phase4-p1-agreement/phase4_p1_inter_rater_agreement_v1/manifest.json"
+)
+P1_AGREEMENT_ANALYSIS_RELATIVE_PATH = P1_AGREEMENT_MANIFEST_RELATIVE_PATH.with_name(
+    "agreement.json"
+)
 
 RAW_SNAPSHOT_SHA256 = "908377f1daf28dcb36846db73a5662b2e05a9907407c2696c89ad9d3b0b04492"
 SOURCE_COHORT_SHA256 = "701ed34b3a66032f0f356734607709fb3d65f753dbe01cf4b4395c4409df2dc0"
@@ -41,6 +47,8 @@ NATURAL_MANIFEST_SHA256 = "a4116a7ddb7ac910b79bd52e9530db79dd0f05c9edee8ecd947fc
 CHART_MANIFEST_SHA256 = "20d94ad514400ff7ebe72b8d288eb6a208b571069878091b4b6b481659f30d71"
 STATISTICS_REPORT_SHA256 = "972e7c0f5eac36d59035ec65376133fbcc0dfa941281e97fb7dcc70f02360a10"
 P1_COMMITMENT_SHA256 = "b5090ad78715857455852e3450fa606f4963ca726a3df91a1b6603d372c491a2"
+P1_AGREEMENT_MANIFEST_SHA256 = "20d11548ed638c34bb9054d12893e28bd5c18e3028091dc5186e914182471c76"
+P1_AGREEMENT_ANALYSIS_SHA256 = "fe9c66d505c0ce472deb652676ac38ea4d6849547323a1e3061ad1d9deea2135"
 
 DIFFICULTY_PROXY_ID = "canonical_solution_structure_tertiles_v1"
 DIFFICULTY_TIER_NAMES = ("easy-proxy", "medium-proxy", "hard-proxy")
@@ -412,6 +420,22 @@ def build_contest_summary(repo_root: str | Path) -> dict[str, Any]:
         ),
         label="P1 commitment",
     )
+    p1_agreement_manifest = _decode_json(
+        _read_hash_bound(
+            root / P1_AGREEMENT_MANIFEST_RELATIVE_PATH,
+            P1_AGREEMENT_MANIFEST_SHA256,
+            label="P1 agreement manifest",
+        ),
+        label="P1 agreement manifest",
+    )
+    p1_agreement = _decode_json(
+        _read_hash_bound(
+            root / P1_AGREEMENT_ANALYSIS_RELATIVE_PATH,
+            P1_AGREEMENT_ANALYSIS_SHA256,
+            label="P1 aggregate agreement analysis",
+        ),
+        label="P1 aggregate agreement analysis",
+    )
     difficulty = build_difficulty_analysis(root)
 
     methods = chart_manifest.get("methods")
@@ -464,7 +488,41 @@ def build_contest_summary(repo_root: str | Path) -> dict[str, Any]:
     )
     full = next(row for row in method_rows if row["method_id"] == "full_tracejudge")
     if p1_commitment.get("formal_data_collected") is not False:
-        raise ContestSummaryError("P1 status no longer matches the pending summary")
+        raise ContestSummaryError("P1 commitment no longer matches its pre-collection identity")
+    if (
+        p1_agreement_manifest.get("analysis_sha256") != P1_AGREEMENT_ANALYSIS_SHA256
+        or p1_agreement_manifest.get("item_count") != 20
+        or p1_agreement_manifest.get("contains_trace_ids") is not False
+        or p1_agreement_manifest.get("contains_per_item_labels") is not False
+        or p1_agreement_manifest.get("contains_rationales") is not False
+        or p1_agreement.get("item_count") != 20
+        or p1_agreement.get("adjudication_performed") is not False
+        or p1_agreement.get("raw_labels_unchanged") is not True
+    ):
+        raise ContestSummaryError("P1 aggregate agreement identity or privacy flags are invalid")
+    binary_fields = p1_agreement.get("binary_fields")
+    if not isinstance(binary_fields, list):
+        raise ContestSummaryError("P1 aggregate agreement binary fields are invalid")
+    has_error_agreement = next(
+        (
+            item
+            for item in binary_fields
+            if isinstance(item, dict) and item.get("field_name") == "has_error"
+        ),
+        None,
+    )
+    if not isinstance(has_error_agreement, dict) or not isinstance(
+        has_error_agreement.get("raw_agreement"), dict
+    ):
+        raise ContestSummaryError("P1 has_error agreement is missing")
+    p1_raw = has_error_agreement["raw_agreement"]
+    if (
+        p1_raw.get("agreeing_count") != 20
+        or p1_raw.get("denominator") != 20
+        or p1_raw.get("estimate") != 1.0
+        or has_error_agreement.get("cohen_kappa") != 1.0
+    ):
+        raise ContestSummaryError("P1 has_error agreement differs from the frozen result")
     return {
         "schema_version": 1,
         "kind": "tracejudge_phase4_contest_results_overview",
@@ -498,9 +556,13 @@ def build_contest_summary(repo_root: str | Path) -> dict[str, Any]:
             "primary_cohort_trace_count": cohort.get("trace_count"),
             "primary_coverage": 1.0,
             "second_rater_planned_subset_count": p1_commitment.get("selected_total_count"),
-            "second_rater_completed_count": 0,
-            "second_rater_coverage": 0.0,
-            "agreement_status": "not_computed",
+            "second_rater_completed_count": 20,
+            "second_rater_coverage": 1.0,
+            "agreement_status": "computed",
+            "has_error_raw_agreement_numerator": p1_raw["agreeing_count"],
+            "has_error_raw_agreement_denominator": p1_raw["denominator"],
+            "has_error_raw_agreement": p1_raw["estimate"],
+            "has_error_cohen_kappa": has_error_agreement["cohen_kappa"],
         },
         "difficulty": difficulty,
         "source_identities": {
@@ -508,6 +570,8 @@ def build_contest_summary(repo_root: str | Path) -> dict[str, Any]:
             "aggregate_statistics_report_sha256": STATISTICS_REPORT_SHA256,
             "difficulty_natural_manifest_sha256": NATURAL_MANIFEST_SHA256,
             "p1_commitment_sha256": P1_COMMITMENT_SHA256,
+            "p1_agreement_manifest_sha256": P1_AGREEMENT_MANIFEST_SHA256,
+            "p1_agreement_analysis_sha256": P1_AGREEMENT_ANALYSIS_SHA256,
         },
         "evidence_status": {
             "verification_status": chart_manifest.get("verification_status"),
@@ -618,7 +682,7 @@ def render_overview_markdown(summary: Mapping[str, Any]) -> str:
         "",
         "## 一句话结论",
         "",
-        "TraceJudge-Hy3 在 57 条冻结轨迹上对 5 种方法完成 285 个严格配对判断；最佳观察到的错误检测准确率为 56/57（98.2%），Full TraceJudge 的有效判断混淆矩阵为 TP=13、FP=1、TN=42、FN=1，对应误报率 1/43（2.33%）。这些是单主标注者、探索性结果，不构成普遍优越性结论。",
+        "TraceJudge-Hy3 在 57 条冻结轨迹上对 5 种方法完成 285 个严格配对判断；最佳观察到的错误检测准确率为 56/57（98.2%），Full TraceJudge 的有效判断混淆矩阵为 TP=13、FP=1、TN=42、FN=1，对应误报率 1/43（2.33%）。预先冻结的 20 条独立复标中，`has_error` 原始一致率为 20/20、Cohen's κ=1.000；结果仍属探索性，不构成普遍优越性结论。",
         "",
         "## 四个核心数字",
         "",
@@ -668,9 +732,11 @@ def render_overview_markdown(summary: Mapping[str, Any]) -> str:
             "| 核验层 | 已完成/计划 | 覆盖率 | 当前状态 |",
             "|---|---:|---:|---|",
             f"| 单主标注者盲法标签 | {review['primary_labeled_trace_count']}/{review['primary_cohort_trace_count']} | {_percent(review['primary_coverage'])} | 已冻结，用于当前结果 |",
-            f"| 第二标注者独立复标 | {review['second_rater_completed_count']}/{review['second_rater_planned_subset_count']} | {_percent(review['second_rater_coverage'])} | 尚未收集，agreement=`{review['agreement_status']}` |",
+            f"| 第二标注者独立复标 | {review['second_rater_completed_count']}/{review['second_rater_planned_subset_count']} | {_percent(review['second_rater_coverage'])} | 已冻结；has_error raw={review['has_error_raw_agreement_numerator']}/{review['has_error_raw_agreement_denominator']}，κ={review['has_error_cohen_kappa']:.3f}；agreement=`{review['agreement_status']}` |",
             "",
-            "这里的 100% 表示当前 57 条研究 cohort 都有第一位标注者标签，不表示已完成跨标注者验证。第二标注者完成前不报告 raw agreement 或 Cohen's κ。",
+            "第二标注者覆盖的是预先冻结的 20/57 子集，不是另外 20 条新轨迹。该子集的 `has_error` 20/20 一致（Wilson 95% CI 83.9%–100.0%），完整七字段记录 19/20 一致；这增强了子集上的标注可靠性证据，但不把其外推为全部 57 条或其他任务的完美一致。",
+            "",
+            "唯一过程细节分歧随后通过 `documented_consensus` 完成 1/1 裁决；原始 19/20 指标保持不变，不能改写为裁决后 20/20 一致率。零影响字段与固定分母变化上界见[P1 裁决后敏感性分析](phase4_p1_post_adjudication_sensitivity_v1.md)。",
             "",
             "## 难度代理结果",
             "",
@@ -698,12 +764,16 @@ def render_overview_markdown(summary: Mapping[str, Any]) -> str:
             "",
             "- [冻结正式研究报告](phase3_research_report_public_v1.md)",
             "- [难度代理分层分析](phase4_difficulty_proxy_analysis_v1.md)",
+            "- [四案例 Judge 稳定性与标识符规范化敏感性分析](phase4_judge_stability_sensitivity_v1.md)",
+            "- [P1 裁决后敏感性分析](phase4_p1_post_adjudication_sensitivity_v1.md)",
+            "- [P1 一致性分析协议、命令与结果身份](../../experiments/phase4_protocol.md#26-gate-dp1-第二标注者准备)",
             "- [确定性聚合图表](charts/phase4_public_charts_v1/)",
             "- [2 分钟公开 Fixture Demo 脚本](phase4_fixture_demo_v1.md)",
             "",
             "## 解释限制",
             "",
-            "- 当前为单主标注者、单轮标签；第二标注者一致性尚未计算。",
+            "- 主要 57 条方法性能仍以第一位标注者标签为参照；第二位标注者只独立复标预先冻结的 20 条子集。",
+            "- `has_error` 零分歧使经验分布 bootstrap 的 κ 区间退化为 1–1；应同时看 20/20 原始一致率的 Wilson 下限 83.9%，不能宣称总体可靠性必为 1。",
             "- 57 条研究集和 3 个反事实父题不足以支持一般模型能力或因果结论。",
             "- `ANALYZED / CAUTION / CANNOT_VERIFY` 边界保持不变；本总览没有重跑 Hy3，也没有覆盖任何冻结产物。",
             "",

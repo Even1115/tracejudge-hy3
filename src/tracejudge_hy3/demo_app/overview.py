@@ -29,7 +29,7 @@ DIFFICULTY_MARKDOWN_RELATIVE_PATH = Path(
 DIFFICULTY_TIERS = ("easy-proxy", "medium-proxy", "hard-proxy")
 
 DISCLAIMER = (
-    "单主标注者、固定 57 条 cohort 下的探索性结果；第二标注者一致性尚未计算，不构成普遍优越性结论。"
+    "固定 57 条 cohort 下的探索性结果；第二标注者只复标预先冻结的 20 条子集，不构成普遍优越性结论。"
 )
 
 
@@ -64,6 +64,9 @@ def _normalize_structured(summary: dict[str, Any]) -> dict[str, Any]:
             "second_completed": review["second_rater_completed_count"],
             "second_planned": review["second_rater_planned_subset_count"],
             "agreement_status": review["agreement_status"],
+            "has_error_raw_agreement_numerator": review["has_error_raw_agreement_numerator"],
+            "has_error_raw_agreement_denominator": review["has_error_raw_agreement_denominator"],
+            "has_error_cohen_kappa": review["has_error_cohen_kappa"],
         },
         "difficulty": [
             {
@@ -101,7 +104,8 @@ def parse_overview_markdown(text: str) -> dict[str, Any]:
         label="the primary-rater coverage row",
     )
     second = _require_match(
-        r"第二标注者独立复标\s*\|\s*(\d+)/(\d+)\s*\|[^|]*\|\s*尚未收集，agreement=`(\w+)`",
+        r"第二标注者独立复标\s*\|\s*(\d+)/(\d+)\s*\|[^|]*\|\s*已冻结；"
+        r"has_error raw=(\d+)/(\d+)，κ=([\d.]+)；agreement=`(\w+)`",
         text,
         label="the second-rater coverage row",
     )
@@ -137,7 +141,10 @@ def parse_overview_markdown(text: str) -> dict[str, Any]:
             "primary_total": int(primary.group(2)),
             "second_completed": int(second.group(1)),
             "second_planned": int(second.group(2)),
-            "agreement_status": second.group(3),
+            "has_error_raw_agreement_numerator": int(second.group(3)),
+            "has_error_raw_agreement_denominator": int(second.group(4)),
+            "has_error_cohen_kappa": float(second.group(5)),
+            "agreement_status": second.group(6),
         },
         "difficulty": difficulty,
     }

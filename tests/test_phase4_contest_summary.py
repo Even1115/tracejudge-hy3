@@ -53,9 +53,12 @@ def test_contest_overview_surfaces_confusion_fpr_and_human_coverage():
     assert (full["true_positive"], full["false_positive"]) == (13, 1)
     assert (full["true_negative"], full["false_negative"]) == (42, 1)
     assert summary["human_review"]["primary_labeled_trace_count"] == 57
-    assert summary["human_review"]["second_rater_completed_count"] == 0
+    assert summary["human_review"]["second_rater_completed_count"] == 20
     assert summary["human_review"]["second_rater_planned_subset_count"] == 20
-    assert summary["human_review"]["agreement_status"] == "not_computed"
+    assert summary["human_review"]["agreement_status"] == "computed"
+    assert summary["human_review"]["has_error_raw_agreement_numerator"] == 20
+    assert summary["human_review"]["has_error_raw_agreement_denominator"] == 20
+    assert summary["human_review"]["has_error_cohen_kappa"] == 1.0
 
 
 def test_published_contest_documents_are_exact_deterministic_renders():
@@ -73,11 +76,12 @@ def test_readme_first_screen_links_contribution_results_demo_and_case():
     assert "## 60 秒看懂项目" in first_screen
     assert "### 一句话研究问题" in first_screen
     assert "### 四项贡献" in first_screen
-    assert "### 四个核心数字" in first_screen
+    assert "### 五个核心数字" in first_screen
     assert "**98.2%**" in first_screen
     assert "**2.33%**" in first_screen
     assert "### 代表案例：答案正确，但过程错误" in first_screen
     assert "phase4_contest_results_overview_v1.md" in first_screen
+    assert "phase4_p1_post_adjudication_sensitivity_v1.md" in first_screen
     assert "phase4_difficulty_proxy_analysis_v1.md" in first_screen
     assert "phase4_fixture_demo_v1.md" in first_screen
     assert "tracejudge_hy3_contest_demo.mp4" in first_screen
@@ -86,8 +90,9 @@ def test_readme_first_screen_links_contribution_results_demo_and_case():
     assert "版本化公开 Fixture 回归卡片" in first_screen
 
 
-def test_release_index_exposes_overview_and_difficulty_analysis():
+def test_release_index_exposes_overview_and_sensitivity_analyses():
     release_index = RELEASE_INDEX.read_text(encoding="utf-8")
 
     assert "phase4_contest_results_overview_v1.md" in release_index
     assert "phase4_difficulty_proxy_analysis_v1.md" in release_index
+    assert "phase4_p1_post_adjudication_sensitivity_v1.md" in release_index

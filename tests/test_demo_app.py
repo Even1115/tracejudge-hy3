@@ -141,8 +141,13 @@ def test_overview_markdown_parses_published_numbers():
     assert parsed["full_false_positive_rate"]["denominator"] == 43
     review = parsed["human_review"]
     assert (review["primary_labeled"], review["primary_total"]) == (57, 57)
-    assert (review["second_completed"], review["second_planned"]) == (0, 20)
-    assert review["agreement_status"] == "not_computed"
+    assert (review["second_completed"], review["second_planned"]) == (20, 20)
+    assert review["agreement_status"] == "computed"
+    assert (
+        review["has_error_raw_agreement_numerator"],
+        review["has_error_raw_agreement_denominator"],
+    ) == (20, 20)
+    assert review["has_error_cohen_kappa"] == 1.0
     assert parsed["difficulty"] == [
         {"tier": "easy-proxy", "included": 14, "passed": 14},
         {"tier": "medium-proxy", "included": 14, "passed": 13},

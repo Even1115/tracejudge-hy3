@@ -433,11 +433,11 @@ working JSONL 的每行保留 packet 给定的 `annotation_item_id`、协议/标
 
 ### 阶段四 P1 第二标注者练习包
 
-`tracejudge_phase4_p1_second_annotator_protocol` schema v1 冻结安排/阶段三指南哈希、指导老师于 2026-09-02 作出的 `approved / READY` 认定、20 条正式子集规则、5 条练习准入门槛、最多两轮校准、盲法、交付、停止、退出和一致性分析政策。伦理就绪和子集冻结都不替代单次交付记录；当前 `delivery_record_status=pending_completion`，所以 `data_collection_allowed=false`、`formal_packet_created=false` 和 `formal_data_collected=false` 仍不得改写为已完成。
+`tracejudge_phase4_p1_second_annotator_protocol` schema v1 冻结安排/阶段三指南哈希、指导老师于 2026-09-02 作出的 `approved / READY` 认定、20 条正式子集规则、5 条练习准入门槛、最多两轮校准、盲法、交付、停止、退出和一致性分析政策。其 `delivery_record_status=pending_completion`、`formal_packet_created=false` 和 `formal_data_collected=false` 是预注册冻结时的状态，不回写；后续状态分别由受限交付记录、正式 packet manifest 和正式标签 manifest 追加证明。当前正式回传已由后续私有 manifest 证明完成并冻结，不反向修改预注册时点字段。
 
 `P1SingleDeliveryRecord` schema v1 作为公开、无个人信息的结构定义；实际记录只保存在 Git-ignored、`0700/0600` 私有目录。它绑定 Schema/Protocol/伦理身份，覆盖参与同意、五类实际渠道、确认收件与期限、报酬/致谢/署名、退出/保留/销毁、单次负责人授权、归档哈希、异常数和删除确认。`pending_completion` 可保留空值但强制 `data_collection_allowed=false`；只有全部前置项完整并显式切换为 `ready_for_practice_delivery` 时才可为真。CLI 只回显状态、缺失项数量和哈希，不回显渠道或联系人正文。
 
-`tracejudge_phase4_p1_formal_subset_private_manifest` schema v1 保存确定性入选身份，只位于 Git-ignored `0700/0600` 目录；`tracejudge_phase4_p1_formal_subset_public_commitment` 只发布源 manifest 哈希、固定种子/算法、15+5 计数、3 个父题覆盖、单父题上限、顺序承诺哈希和私有 manifest 哈希，不包含入选 trace/problem ID、私有路径、标签、方法预测、Provider 状态或事后结果。两者均声明正式 packet 和人类数据尚未生成。
+`tracejudge_phase4_p1_formal_subset_private_manifest` schema v1 保存确定性入选身份，只位于 Git-ignored `0700/0600` 目录；`tracejudge_phase4_p1_formal_subset_public_commitment` 只发布源 manifest 哈希、固定种子/算法、15+5 计数、3 个父题覆盖、单父题上限、顺序承诺哈希和私有 manifest 哈希，不包含入选 trace/problem ID、私有路径、标签、方法预测、Provider 状态或事后结果。两者的“未生成 formal packet”声明是子集冻结时状态；当前状态以后续的正式 packet manifest 为准。
 
 `tracejudge_phase4_p1_practice_admission` schema v1 是 Git-ignored 私有准入记录。它精确绑定完成标签、回传归档和协调者参考的 SHA256，仅保存 Schema 有效数、三项预注册一致计数、零隐私/盲法异常确认和书面准入决定。它不复制标签、rationale、个人信息或渠道正文，并明确将练习分数排除于研究终点。
 
@@ -448,6 +448,20 @@ working JSONL 的每行保留 packet 给定的 `annotation_item_id`、协议/标
 - `coordinator/identity_map.jsonl`：opaque item ID 到真实 trace 身份的映射，仅协调者保管。
 
 参与者两个文件不含主标签、方法预测、Provider raw、反事实 mutation/预期影响、官方隐藏输入或身份映射。全部文件以 `0700/0600` 私有权限、不可覆盖写入，并可由 manifest 确定性重建后逐字节校验。
+
+`tracejudge_phase4_p1_formal_labels` schema v1 是正式第二标注者回传的 Git-ignored 私有冻结集。它保存协调者报告的带时区收件时间，并分别记录本地文件系统观察到的 archive/labels 修改时间，不用文件修改时间反推发送时间；绑定正式截止时间、原始 `.7z`、原字节 `completed_labels.jsonl`、正式 packet manifest/packet/template/identity map、交付记录和回连后的 `annotations.jsonl`。预检只回显条数、类别计数、期限状态和 SHA256，不回显条目身份、具体标签或 rationale。冻结目录与文件权限为 `0700/0600` 且不可覆盖；一致性分析前 `agreement_kind=not_computed`。
+
+`tracejudge_phase4_p1_adjudication_bundle` schema v1 是唯一一条过程细节分歧的 Git-ignored 私有待裁决包。它绑定冻结的 aggregate-only 一致性 manifest/analysis SHA256，并通过 `tracejudge_phase4_p1_adjudication_record` 保存精确的聚合分歧形状、`record_version=1` 和 `status=pending_human_review`。初始版本的条目 ID、trace 哈希、两份原标签哈希、裁决者、结论、rationale 和时间均必须为 `null`，并声明初始化器未访问逐条参与者数据。`tracejudge_phase4_p1_adjudication_working_record` 是供授权协调者复制到新的受限目录后填写的工作模板；本包内冻结模板本身不允许携带任何决定字段。初始化目录不可覆盖，manifest 绑定三个 payload 的逐字节 SHA256，目录/文件权限为 `0700/0600`。该 schema 只证明已建立可审计起点，不表示人工裁决已完成。
+
+`tracejudge_phase4_p1_completed_adjudication_bundle` schema v1 是上述起点之后独立追加的私有完成态包。`tracejudge_phase4_p1_completed_adjudication_record` 绑定 pending manifest/record、aggregate-only 来源、正式非标签 packet 及盲化案例的规范化 SHA256，只保存发生分歧的 `plan_code_aligned`、`first_faulty_layer`、`first_faulty_step`、`error_type` 四字段及人类共识理由。它要求两位原始标注者确认、方法预测盲法、带时区起止时间和 AI 技术建议披露；明确不复制非分歧字段、不读取或嵌入两份逐条原标签/原 rationale，也不把共识回写主标签或 raw agreement。完成态目录仍为不可覆盖的 `0700/0600`，manifest 绑定 decision/report 哈希，并标记 `public_release_allowed=false`。
+
+`tracejudge_phase4_p1_post_adjudication_sensitivity` schema v1 是完成裁决后的公开、聚合级 post-hoc 敏感性分析。它只绑定 aggregate-only 一致性 manifest 和私有完成态 manifest，保留原始完整记录 19/20、`has_error` 20/20 等 raw agreement，并另行记录 1/1 分歧已解决；`post_adjudication_inter_rater_agreement_created=false`，禁止把裁决状态写成新的 20/20 标注者一致率。`impact_envelopes` 对无分歧字段给出零影响，对四个分歧字段、联合定位标签和完整记录给出固定分母下最多一个样本的绝对变化上界。该 schema 不含逐条身份、原标签、最终裁决值、裁决理由或方法预测，也不创建共识标签集；公开 JSON / Markdown SHA256 为 `377725050f8adbb4afe88f0b0e01ae05b4a2bc670c6920034fc8bb5b0472a48b` / `7dd2f1f244c3bd09a2928b61c1ee36cb25e59a88e8631e0be3807d504384866d`。
+
+`tracejudge_phase4_p1_inter_rater_agreement` schema v1 将第二标注者的 20 条与首轮主标注 57 条中的相同轨迹配对，只输出 aggregate-only 统计。分析前要求两份 manifest 匹配已记录 SHA256、两份 annotation records 匹配各自 manifest、20 条代码/结构化说明/功能证据哈希一致、15+5 构成正确。两轮协议文件的 SHA256 不同，但都绑定同一份阶段三标注指南，并经同一个 `AnnotationRecord` 七字段 Schema 约束；分析显式保存两份协议哈希和共享指南哈希，不以协议字节相同作为伪条件。
+
+二元字段保存双向四格计数、原始一致率及 Wilson 95% 区间、正/负类一致率和适用条件下的 Cohen's κ；κ 区间使用固定 seed `20260904` 的 10,000 次配对条目 percentile bootstrap。首错层/步骤/错误类型及其联合标签分别报告“全 20 条（含共同 null）/至少一人判错/双方都判错”三个精确一致率，不对稀疏条件多分类字段报告 κ。产物明确声明原始标签未改写、未裁决、未输出分歧条目、trace ID、逐条标签或 rationale，Provider/Docker/网络调用均为 0。
+
+正式聚合包 `phase4_p1_inter_rater_agreement_v1` 的 manifest / `agreement.json` / `report.md` SHA256 分别为 `20d11548ed638c34bb9054d12893e28bd5c18e3028091dc5186e914182471c76` / `fe9c66d505c0ce472deb652676ac38ea4d6849547323a1e3061ad1d9deea2135` / `0f3134d18a1d3fda1c4235951c442d57651fe587c6201df0549568818f677734`，目录/文件权限为 `0700/0600`，不可覆盖，且已从两份冻结源确定性复算验证。
 
 `tracejudge_phase4_p1_public_practice_source` schema v1 只包含 5 条 MIT 公开自建 Fixture，不包含协调者参考。它不是人类参与者数据；生成器只在源文件精确匹配冻结 SHA256 后执行候选代码，并与阶段三自然/overlay manifest 的题号、代码哈希和结构化说明哈希检查零重合。
 

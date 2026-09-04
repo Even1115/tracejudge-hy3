@@ -184,10 +184,10 @@ def test_gate_e_documents_preserve_scope_and_release_authority_boundary():
     assert "v0.2 已实现" not in combined
 
 
-def test_implementation_status_marks_release_complete_and_p1_as_preparation_only():
+def test_implementation_status_marks_release_and_p1_agreement_complete():
     status = IMPLEMENTATION_STATUS.read_text(encoding="utf-8")
 
-    assert "阶段四 P0 + P1 Gate D 准备" in status
+    assert "阶段四 P0 + P1 Gate D 一致性分析" in status
     assert "phase4_public_charts_v1" in status
     assert "P0 仓库内交付、审查和提交已完成" in status
     assert PHASE4_MERGE_SHA in status
@@ -195,10 +195,12 @@ def test_implementation_status_marks_release_complete_and_p1_as_preparation_only
     assert "v0.1.0" in status
     assert "已正式发布" in status
     assert "伦理状态为 `READY`" in status
-    assert "pending_completion" in status
     assert "phase4_p1_formal_subset_v1" in status
     assert "15 条自然 + 5 条反事实" in status
-    assert "未收集第二标注者答案" in status
+    assert "正式包已以 `0700/0600` 权限生成并逐字节验证" in status
+    assert "`has_error` 20/20、κ=1.000" in status
+    assert "完整七字段 19/20" in status
+    assert "20d11548ed638c34bb9054d12893e28bd5c18e3028091dc5186e914182471c76" in status
     assert "本地过程评估工作台" in status
     assert "跨运行历史持久化与比较看板" in status
 
@@ -211,7 +213,7 @@ def test_canonical_project_documents_mark_release_and_p1_boundaries():
 
     assert "P0 Gate A、B、C、E" in readme
     assert "P0 Gate A、B、C、E 仓库内交付已完成" in design
-    assert "P0 封版 + P1 Gate D 标注准备版" in protocol
+    assert "P0 封版 + P1 Gate D 两标注者一致性分析版" in protocol
     assert "charts-verify" in readme
     assert "charts-verify" in protocol
     assert "P0 尚需聚合图表" not in combined
@@ -225,6 +227,7 @@ def test_canonical_project_documents_mark_release_and_p1_boundaries():
     assert "GitHub Release 和 11 个白名单附件已发布" in protocol
     assert "伦理状态为 `READY`" in combined
     assert "pending_completion" in combined
-    assert "仍未发包或开始人类数据收集" in protocol
+    assert "正式 20 条复标、删除确认和聚合一致性分析均已完成并验证" in protocol
+    assert "`has_error` 原始一致率为 20/20" in protocol
     assert "phase4_p1_formal_subset_v1" in combined
     assert "不含入选 ID" in protocol

@@ -9,7 +9,7 @@
 
 ## 一句话结论
 
-TraceJudge-Hy3 在 57 条冻结轨迹上对 5 种方法完成 285 个严格配对判断；最佳观察到的错误检测准确率为 56/57（98.2%），Full TraceJudge 的有效判断混淆矩阵为 TP=13、FP=1、TN=42、FN=1，对应误报率 1/43（2.33%）。这些是单主标注者、探索性结果，不构成普遍优越性结论。
+TraceJudge-Hy3 在 57 条冻结轨迹上对 5 种方法完成 285 个严格配对判断；最佳观察到的错误检测准确率为 56/57（98.2%），Full TraceJudge 的有效判断混淆矩阵为 TP=13、FP=1、TN=42、FN=1，对应误报率 1/43（2.33%）。预先冻结的 20 条独立复标中，`has_error` 原始一致率为 20/20、Cohen's κ=1.000；结果仍属探索性，不构成普遍优越性结论。
 
 ## 四个核心数字
 
@@ -36,9 +36,11 @@ TraceJudge-Hy3 在 57 条冻结轨迹上对 5 种方法完成 285 个严格配�
 | 核验层 | 已完成/计划 | 覆盖率 | 当前状态 |
 |---|---:|---:|---|
 | 单主标注者盲法标签 | 57/57 | 100.0% | 已冻结，用于当前结果 |
-| 第二标注者独立复标 | 0/20 | 0.0% | 尚未收集，agreement=`not_computed` |
+| 第二标注者独立复标 | 20/20 | 100.0% | 已冻结；has_error raw=20/20，κ=1.000；agreement=`computed` |
 
-这里的 100% 表示当前 57 条研究 cohort 都有第一位标注者标签，不表示已完成跨标注者验证。第二标注者完成前不报告 raw agreement 或 Cohen's κ。
+第二标注者覆盖的是预先冻结的 20/57 子集，不是另外 20 条新轨迹。该子集的 `has_error` 20/20 一致（Wilson 95% CI 83.9%–100.0%），完整七字段记录 19/20 一致；这增强了子集上的标注可靠性证据，但不把其外推为全部 57 条或其他任务的完美一致。
+
+唯一过程细节分歧随后通过 `documented_consensus` 完成 1/1 裁决；原始 19/20 指标保持不变，不能改写为裁决后 20/20 一致率。零影响字段与固定分母变化上界见[P1 裁决后敏感性分析](phase4_p1_post_adjudication_sensitivity_v1.md)。
 
 ## 难度代理结果
 
@@ -60,11 +62,15 @@ TraceJudge-Hy3 在 57 条冻结轨迹上对 5 种方法完成 285 个严格配�
 
 - [冻结正式研究报告](phase3_research_report_public_v1.md)
 - [难度代理分层分析](phase4_difficulty_proxy_analysis_v1.md)
+- [四案例 Judge 稳定性与标识符规范化敏感性分析](phase4_judge_stability_sensitivity_v1.md)
+- [P1 裁决后敏感性分析](phase4_p1_post_adjudication_sensitivity_v1.md)
+- [P1 一致性分析协议、命令与结果身份](../../experiments/phase4_protocol.md#26-gate-dp1-第二标注者准备)
 - [确定性聚合图表](charts/phase4_public_charts_v1/)
 - [2 分钟公开 Fixture Demo 脚本](phase4_fixture_demo_v1.md)
 
 ## 解释限制
 
-- 当前为单主标注者、单轮标签；第二标注者一致性尚未计算。
+- 主要 57 条方法性能仍以第一位标注者标签为参照；第二位标注者只独立复标预先冻结的 20 条子集。
+- `has_error` 零分歧使经验分布 bootstrap 的 κ 区间退化为 1–1；应同时看 20/20 原始一致率的 Wilson 下限 83.9%，不能宣称总体可靠性必为 1。
 - 57 条研究集和 3 个反事实父题不足以支持一般模型能力或因果结论。
 - `ANALYZED / CAUTION / CANNOT_VERIFY` 边界保持不变；本总览没有重跑 Hy3，也没有覆盖任何冻结产物。

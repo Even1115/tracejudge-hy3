@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
+  <title id="title">Full TraceJudge 四案例运行内稳定性结果卡片</title>
+  <desc id="desc">四个公开案例各重复五次，共二十次有效判断。错误存在性与错误类型原始精确成对一致率均为百分之百，首错步骤原始精确一致率为百分之九十；事后精确别名规范化后为百分之百，但不替代原始结果。</desc>
+  <rect width="1120" height="620" rx="24" fill="#071018"/>
+  <circle cx="1030" cy="10" r="250" fill="#0e3141" opacity="0.58"/>
+  <circle cx="90" cy="610" r="210" fill="#13233a" opacity="0.45"/>
+  <text x="72" y="70" fill="#41d9ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="2">TRACEJUDGE-HY3 · RUN-INTERNAL STABILITY</text>
+  <text x="72" y="122" fill="#f5f8fb" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="34" font-weight="760">稳定发现错误，定位写法需要规范化</text>
+  <text x="72" y="160" fill="#91a3b7" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="18">4 个公开案例 × 每例 5 次 · Full TraceJudge · temperature = 0</text>
+
+  <rect x="72" y="202" width="214" height="112" rx="14" fill="#0b1723" stroke="#213244"/>
+  <text x="94" y="235" fill="#91a3b7" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="15">有效判断</text>
+  <text x="94" y="283" fill="#f5f8fb" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="38" font-weight="800">20 / 20</text>
+
+  <rect x="304" y="202" width="214" height="112" rx="14" fill="#0b1723" stroke="#213244"/>
+  <text x="326" y="235" fill="#91a3b7" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="15">Provider / 解析失败</text>
+  <text x="326" y="283" fill="#7ce7b2" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="38" font-weight="800">0 / 0</text>
+
+  <rect x="536" y="202" width="236" height="112" rx="14" fill="#0b1723" stroke="#213244"/>
+  <text x="558" y="235" fill="#91a3b7" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="15">has_error 原始一致率</text>
+  <text x="558" y="283" fill="#41d9ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="38" font-weight="800">100.0%</text>
+
+  <rect x="790" y="202" width="258" height="112" rx="14" fill="#0b1723" stroke="#213244"/>
+  <text x="812" y="235" fill="#91a3b7" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="15">error_type 原始一致率</text>
+  <text x="812" y="283" fill="#41d9ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="38" font-weight="800">100.0%</text>
+
+  <text x="72" y="365" fill="#c5d1dd" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="650">首错步骤 · 原始精确字符串</text>
+  <rect x="400" y="340" width="576" height="34" rx="8" fill="#142334"/>
+  <rect x="400" y="340" width="518" height="34" rx="8" fill="#ffbd59"/>
+  <text x="998" y="366" text-anchor="end" fill="#ffcf7d" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" font-weight="800">90.0%</text>
+
+  <text x="72" y="429" fill="#c5d1dd" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="20" font-weight="650">首错步骤 · 精确别名规范化</text>
+  <rect x="400" y="404" width="576" height="34" rx="8" fill="#142334"/>
+  <rect x="400" y="404" width="576" height="34" rx="8" fill="#41d9ff"/>
+  <text x="998" y="430" text-anchor="end" fill="#8ce9ff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" font-weight="800">100.0%</text>
+  <rect x="72" y="463" width="976" height="50" rx="10" fill="#0b1723" stroke="#30445a" stroke-dasharray="7 6"/>
+  <text x="94" y="494" fill="#aebdca" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="16">post-hoc：仅合并同一字段的两种路径写法；规范化 100% 不替代预注册原始 90%</text>
+
+  <line x1="72" y1="548" x2="1048" y2="548" stroke="#213244"/>
+  <text x="72" y="582" fill="#718397" font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif" font-size="15">exploratory only · n = 4 purposefully selected public cases · 20 judgments · not merged into frozen 57×5 study</text>
+</svg>

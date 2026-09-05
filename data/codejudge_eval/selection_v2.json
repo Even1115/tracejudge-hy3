@@ -1,0 +1,917 @@
+{
+  "dataset_id": "codejudge-eval",
+  "dataset_revision": "6541deb0c42e56ec1300d94d4e9ae7b3b4cc764a",
+  "seed": 20240904,
+  "per_difficulty": 30,
+  "algorithm": "codejudge_eval_v2:per_difficulty_sort(task_id,data_id);one_candidate_per_task=min_data_id;random.Random(20240904).sample(eligible_task_ids,30);disjoint_task_ids_across_difficulties;ordered=easy,medium,hard",
+  "file_sha256": {
+    "CodeJudge_Eval_0shot_easy.json": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+    "CodeJudge_Eval_0shot_hard.json": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+    "CodeJudge_Eval_0shot_middle.json": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70"
+  },
+  "entries": [
+    {
+      "task_id": "easy/3756",
+      "candidate_id": "easy/3756/1073",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "9a0bc950be8ad7867274af7724becaa6c4a1db51513c807e3087fc0c95e0336e",
+      "candidate_code_sha256": "c8bbbe5220ad03c6d1bcd8daf6c2390e8ac553f977d3bc0b59ab3952ac751142"
+    },
+    {
+      "task_id": "easy/4123",
+      "candidate_id": "easy/4123/1954",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "d29b862890a6e31fa0d32f9641b9f0462d8798c6699ea78292cb4366c35cd431",
+      "candidate_code_sha256": "b82c2ab0eb59bed18fcd6b01b120868c917aeb582aabf21f44d0632ac48145a7"
+    },
+    {
+      "task_id": "easy/3741",
+      "candidate_id": "easy/3741/1012",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "6a0b9bdef0edc9d683cc388077baae9f2e2ae0738810ab91c39efc5870aaa6f3",
+      "candidate_code_sha256": "5b722aa6c840b98802d2de7827eb5188da0129dee524e38ca36f42c31694b9de"
+    },
+    {
+      "task_id": "easy/13",
+      "candidate_id": "easy/13/64",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "0fe3d81ba60ac5ee9cebac9cefe1dfd65198a72e22671ee8615db5017a62d78a",
+      "candidate_code_sha256": "81886cdd99963e32f746300217c6c20f046680739deccb0cae33f85d9d6173df"
+    },
+    {
+      "task_id": "easy/34",
+      "candidate_id": "easy/34/150",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "ddda3feedfdc7aaa63909168b248afff929fd09c00597e6812de094ca030ea82",
+      "candidate_code_sha256": "9d5662c2e5b955f1104da773262da70506782bc61174658ebcb2ec3964fb4527"
+    },
+    {
+      "task_id": "easy/4074",
+      "candidate_id": "easy/4074/1749",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "022f1f5474be332c9b20df9b7a4f724100ae210b4029328be2b614555e651764",
+      "candidate_code_sha256": "7761aac8757189947ecf65a5743663000baf98eee30c0fd09be2ef4531cd3d86"
+    },
+    {
+      "task_id": "easy/64",
+      "candidate_id": "easy/64/271",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "564b9020da94a7ff02f0ac0a1af9aea707b1f4f7925c24b442f9fc770dad45b1",
+      "candidate_code_sha256": "5d7b7b7812c088ac34cc4e7580f4c5bbca9cb0044ed15d3be44af2e666a0fcd6"
+    },
+    {
+      "task_id": "easy/4080",
+      "candidate_id": "easy/4080/1775",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "a15b0b186845daf787709db4068cdf955a2cf6660b9505a451b83373467cf1af",
+      "candidate_code_sha256": "25d0e87b69e6663050108bb0b1a51e7240ab1d00af56133ffd1079b088edc67b"
+    },
+    {
+      "task_id": "easy/3780",
+      "candidate_id": "easy/3780/1185",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "202ac513eb2a8e632e23c694da1c335dee631dbba55d17b5275657efaf4b389b",
+      "candidate_code_sha256": "ab4a50baf381e15a59eb55534e5c294eb738b127aa407efcddfba1cef4bdf09e"
+    },
+    {
+      "task_id": "easy/3845",
+      "candidate_id": "easy/3845/1426",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "80d2cdb5dab12a5fbd7aeb3bdc80295d7de81b71fc6714ab587c2c1ca5897bf4",
+      "candidate_code_sha256": "006d2e467b447febd43514fca02d64b916cdae923c8996667086707465b17bb4"
+    },
+    {
+      "task_id": "easy/3",
+      "candidate_id": "easy/3/17",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "6a2cb798c776fa1e0d9bd07b596b4ffd6100e8acf46bd2eedffc5f45c9a5d2fa",
+      "candidate_code_sha256": "8655679812fdc49e5fe49c5ea2b02187e203291d13b2f5cecd48714c8e61c881"
+    },
+    {
+      "task_id": "easy/4005",
+      "candidate_id": "easy/4005/1456",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "8b4e20d51586f864aec369e2bf61650a8f5800d3df54cc63ece2acd37a664021",
+      "candidate_code_sha256": "f8dbb7956f029bbbe23916f022e5c42182692ced4e4b65bfcde6ff88407a7c5c"
+    },
+    {
+      "task_id": "easy/4045",
+      "candidate_id": "easy/4045/1626",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "7f7f406f414800963ee299eb5dc291b6c5020b35d04691048b17553b511dbe03",
+      "candidate_code_sha256": "d7c06a6aa2337a10c28453476de0544b86aa2f48c6a379f7ed0489480beb260a"
+    },
+    {
+      "task_id": "easy/120",
+      "candidate_id": "easy/120/517",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "dd5bf1356879761631b7f650c6c74e75e99e478bc9257517bc9ffac22a45bf24",
+      "candidate_code_sha256": "de618e5984e493255b5ec47d879b724bdccd4d0cc1e6e58957abe73a5865599c"
+    },
+    {
+      "task_id": "easy/4077",
+      "candidate_id": "easy/4077/1764",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "6e740f8b2e72d4c40a43721d7e488b4339d3c86950e884be70ab592378699032",
+      "candidate_code_sha256": "4037a92acbf3fd97de5e0dbb36d2fb525adf641bdf90f312756332ab757d62cd"
+    },
+    {
+      "task_id": "easy/174",
+      "candidate_id": "easy/174/765",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "3be59f90fd65573d95f2596406b469efcb2182bb011d5be16c8b740765a87ae1",
+      "candidate_code_sha256": "8fee19ba5c7eec1f9a03690de534338d627359b8da2c657367cd92d13672351a"
+    },
+    {
+      "task_id": "easy/163",
+      "candidate_id": "easy/163/716",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "4688d3e988fed3e9124c97c5928300fcee24a8a8c191dd25c29c90f8df665c96",
+      "candidate_code_sha256": "fe26504060407c06c931a0e623fc671fd6dc86ab20d77e5ec17e72d867bb28b6"
+    },
+    {
+      "task_id": "easy/3749",
+      "candidate_id": "easy/3749/1043",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "1a554e53c03c2c5140544bd61038f1cc1be9216b8d7438e1ad845aeb6cae7ebe",
+      "candidate_code_sha256": "be73f973d9adbd0ce08c6d631c8ef93bef167600688751a04cb3d36dfafb81db"
+    },
+    {
+      "task_id": "easy/15",
+      "candidate_id": "easy/15/71",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "ce19ec18115994a5bb807cda416e3952d45aafd40edec2b89e3ebfaa651c3b89",
+      "candidate_code_sha256": "459413608889d9094c9c78c48a733cbe30ec743ef43980172a415c98727271d9"
+    },
+    {
+      "task_id": "easy/129",
+      "candidate_id": "easy/129/554",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "07a2a8231b57ba4ab66834371534672f5ba58a2af84cbba788a521cfbd221427",
+      "candidate_code_sha256": "b33a990def0664be686d5dd523e1f87f5682f16a8b5a1ce145c713c6fbf3315c"
+    },
+    {
+      "task_id": "easy/175",
+      "candidate_id": "easy/175/769",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "e89f58584d33471d37ddcc5586906c7a17781c08c166bfb77713e5871a53817f",
+      "candidate_code_sha256": "22b722e589f7ee0144c7551bcdef92390bad54d204581597a0aa11201475980b"
+    },
+    {
+      "task_id": "easy/35",
+      "candidate_id": "easy/35/152",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "ca6222b396f51384a918671fd5930d851bb2ddcbfe068221f94478f67fee619a",
+      "candidate_code_sha256": "0fba28eedf6bd0d900f958c9e189664135b279da0e570717c278e70247355d10"
+    },
+    {
+      "task_id": "easy/3717",
+      "candidate_id": "easy/3717/908",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "5052c8055caa39f88ef6e01991b7b06e7f98ba7543f8643d76bbb0c058598532",
+      "candidate_code_sha256": "c24f0ad875b5bd4c883766657b8b1eb351307173b1d31c951b72e41d0a4b54ac"
+    },
+    {
+      "task_id": "easy/4038",
+      "candidate_id": "easy/4038/1598",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "3cbadabccb135a15e71bbb0286873ee4df501fc037304012c5a8772792452f28",
+      "candidate_code_sha256": "a4342c17aba611d04ca22590b8a8cd36fcc7dfc219d6d79d8132eba1fc51a19a"
+    },
+    {
+      "task_id": "easy/3733",
+      "candidate_id": "easy/3733/982",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "0f1c21097848839c626cdda6420fe5e88c1f7801b3416f8b959646c015eb86fb",
+      "candidate_code_sha256": "c8d9f40e6889761c267e2446663a4a9d602074cba737b4a4d75e4bb3c02d9cab"
+    },
+    {
+      "task_id": "easy/4115",
+      "candidate_id": "easy/4115/1922",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "60e52ea2748c1d2a8505065e436e8ba067427740e8b723dd551a8356f6b07522",
+      "candidate_code_sha256": "fb4f7c5d72e1934bc2983841140c49ec277218e49ee0408144169ccfff883850"
+    },
+    {
+      "task_id": "easy/4007",
+      "candidate_id": "easy/4007/1466",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "edb4c62ed4a8b5d898f69b60337091829ded384315440ca9b84adb67d992a844",
+      "candidate_code_sha256": "49ee532e7f91c95eb96b1244cfa07947ff0f5dda35953dbb98a21b44dde0163d"
+    },
+    {
+      "task_id": "easy/3797",
+      "candidate_id": "easy/3797/1263",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "ffbe7414cc9dbd32d91d38058a608e750ec3af0af826c6b325a79e33713e55e2",
+      "candidate_code_sha256": "aca649ba3b134a40a29b6b320c555865651456e922f8332a271aeaf841ac6d39"
+    },
+    {
+      "task_id": "easy/135",
+      "candidate_id": "easy/135/583",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "1387558828f0702a8e9b37ad9fc8dfcb38df62595366ba064b8cf119c7fb4018",
+      "candidate_code_sha256": "410c19086ae6b09535cfb0b7899de24203cdd85a477ef0f8150dd7a423db1550"
+    },
+    {
+      "task_id": "easy/4012",
+      "candidate_id": "easy/4012/1486",
+      "difficulty": "easy",
+      "source_file": "CodeJudge_Eval_0shot_easy.json",
+      "source_file_sha256": "9be680763406afad9233a33e5a1fd41bac2c1004febd4dd3c9bb5b2f95d1c7e5",
+      "source_record_sha256": "43405465e9e0cc9c7bc94a888b21a285db601a2723f6e4122fc55be4015be267",
+      "candidate_code_sha256": "9f5cea230dfb4a9b98f2c02d2d810c4925a5d136eec8a9050804eb71e3851bf2"
+    },
+    {
+      "task_id": "medium/3825",
+      "candidate_id": "medium/3825/1389",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "3fc2176aa38903bcb5ba31103f70ac62e0da4135b8461b7f5045a0e971a1c7eb",
+      "candidate_code_sha256": "099d5d2a0ec5da978dee036ddd44e1eb3e4831428c69ebffda624299eac6e47a"
+    },
+    {
+      "task_id": "medium/4022",
+      "candidate_id": "medium/4022/1526",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "8031f1ce1fda7c8a060abcff9681996e64832268a14d6c000bf7b08db7e90461",
+      "candidate_code_sha256": "2c64b2d3d6fcc4238fb41c679364acbc5158cfe3ac59e168e844c06ec7169d11"
+    },
+    {
+      "task_id": "medium/3826",
+      "candidate_id": "medium/3826/1395",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "97f58167228c09d456da83c1689fac42eea95852941ad365d4ee9047c1b5eeb5",
+      "candidate_code_sha256": "038002b03edeed8ce2c8aa8d18eff00c2d4e69526d6aa0b107cd80dd754a32ae"
+    },
+    {
+      "task_id": "medium/3804",
+      "candidate_id": "medium/3804/1292",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "bde086154a52e80e4151754d0a01d1db6794bcc435dea152239964568062f0c3",
+      "candidate_code_sha256": "32da5ee73acacf39eba29d814ea6abd0675cacb099dcb2028e07fe4b10131a5b"
+    },
+    {
+      "task_id": "medium/27",
+      "candidate_id": "medium/27/123",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "088d6137468487d1e59aeee1d68289e80e86585c6bffcd1f969788e1ced2a761",
+      "candidate_code_sha256": "c99a95b00997017fd2f8bde8eda21a5eb2246b130a054ff2049d1d56b2b44616"
+    },
+    {
+      "task_id": "medium/145",
+      "candidate_id": "medium/145/628",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "0ccff7e7993c83820aaa3cbb2a9d3e7cb3e4ca912e843ba8cac42c012f666560",
+      "candidate_code_sha256": "477c41430e36cf89566b22600665ff169aa7415942b20992a56c262fb4a07e60"
+    },
+    {
+      "task_id": "medium/93",
+      "candidate_id": "medium/93/396",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "666c61950ec52d59f064e2294333709c7557019bf26ae297ec3720d4d9c9823d",
+      "candidate_code_sha256": "3b1784a05b8e19f18a493ba02bb4556ccb2269593bb3946e22385160aae7dc88"
+    },
+    {
+      "task_id": "medium/3767",
+      "candidate_id": "medium/3767/1126",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "46f12c5b323a78c7ad73fccbe9346278f20bb44222dd9b8872de55d6c32f38dd",
+      "candidate_code_sha256": "30fbcc1c0e97436508f244181c9388908495dca35c5144ca5e16a6b6810be7c4"
+    },
+    {
+      "task_id": "medium/58",
+      "candidate_id": "medium/58/244",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "eb500e7395b4ce4d88ef5a594edd6f8f3f1c3c7af21253ca4e0455bf7f3bcf86",
+      "candidate_code_sha256": "d23df467bd091d0971bbef378eb1c82a5e5af8a61b46b8d34f8ab691a8c3abd3"
+    },
+    {
+      "task_id": "medium/3727",
+      "candidate_id": "medium/3727/956",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "58f65093629ce6c2c77859d46f40975fcfb4499c70998d2914d65332201d45da",
+      "candidate_code_sha256": "503a7bcc5eba09a78fec1cfdd9c6ad1a8c90a31c7550c61d1b49a439e2da7439"
+    },
+    {
+      "task_id": "medium/159",
+      "candidate_id": "medium/159/695",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "ad07d4fdfee42d724d9b0f234995fc4456a213db655c5e37a280d079f456230b",
+      "candidate_code_sha256": "db2778afc66d2dcf5eba55d7a8661576e9e97f2581d4f2f5efb4f0dfb25b970a"
+    },
+    {
+      "task_id": "medium/56",
+      "candidate_id": "medium/56/235",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "37dfc04f334c37c2e62c643790d7f26090aace105094eac80d072e5161c5f61e",
+      "candidate_code_sha256": "37481783f80facda36bd82462307b2dc2b4985fa77a2d764d8e87a664b6f0754"
+    },
+    {
+      "task_id": "medium/4010",
+      "candidate_id": "medium/4010/1479",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "a41736fa19a9278bfe2dfdc14e69698da13795357e812c5eef49d37ab0263c2c",
+      "candidate_code_sha256": "3d45eebe79aa10f25a77f9439994c03b86a8e051087e034b09bcdcdb0fed045f"
+    },
+    {
+      "task_id": "medium/3781",
+      "candidate_id": "medium/3781/1192",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "eaacaf86c1a416274b899aaa7e5244ff49524c948193f12e96aaf39d4a71affe",
+      "candidate_code_sha256": "ea51fcfc70d170bc2df758e745784582572812202cdd94a91d4f7538bf18a43e"
+    },
+    {
+      "task_id": "medium/108",
+      "candidate_id": "medium/108/463",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "140ef0e30ad86f0ab0fdd8cf78d6c2434e879d6881b29b59a58b52498c23d5ed",
+      "candidate_code_sha256": "4bac85ba5fc84e57f3a6cc3bc70fad33244f8dbaf90440bcb061ddf1adad010a"
+    },
+    {
+      "task_id": "medium/3785",
+      "candidate_id": "medium/3785/1208",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "9d0b46e89df97211af8c78121952b28922464db9b14517bf6f96eb5065775841",
+      "candidate_code_sha256": "68c3b3db7172318e305665b967144100c965c2c7f553531c2b0aa15523b11337"
+    },
+    {
+      "task_id": "medium/37",
+      "candidate_id": "medium/37/161",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "8e309f0b6756a9a4181af410bb8e1499e78700493a21c7f6f059e4e717b7b4fa",
+      "candidate_code_sha256": "8dff6172e514ef19dc50f4efa8544c866d89b1971c66fe6232a908be25b8d5c0"
+    },
+    {
+      "task_id": "medium/3852",
+      "candidate_id": "medium/3852/1431",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "4078f60091fd6801251a6a699c07a63baa192fb839b50ccd0de474e96f2f1a1f",
+      "candidate_code_sha256": "09d7b6ece5c9dbfab9e12e667013bc1a556bec0c2477d32d4184c2b493d7159a"
+    },
+    {
+      "task_id": "medium/4055",
+      "candidate_id": "medium/4055/1669",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "1ff90998326401d68d717d6c224584996de3cbaf9d58539f9664a9960d9da1ee",
+      "candidate_code_sha256": "377288f92997a3d2f705bf07f4e2f34a86cf2b3675e42c59dc7eafe767cf4409"
+    },
+    {
+      "task_id": "medium/161",
+      "candidate_id": "medium/161/705",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "b8504792b9d35627fa581488415ce6120d394a91997cbb3dfe0af2eef7ea4653",
+      "candidate_code_sha256": "38f696be07605db6a039b7c3ccfab6db28ee26adb9c513d081e3b5402b715702"
+    },
+    {
+      "task_id": "medium/4128",
+      "candidate_id": "medium/4128/1973",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "cefbe8e5a2636591fc13dfc65454898a21fadac2b0f3e2d739ce79a6cb408b98",
+      "candidate_code_sha256": "e83a4153604f1e6a54c33598ed6976dd163aee8be97ec3c29e40cb1f04d1c9e2"
+    },
+    {
+      "task_id": "medium/16",
+      "candidate_id": "medium/16/77",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "9392677f691bcd4616c57bf4c17cbdfd5b2048ef24e91f89419c4c7a59b41733",
+      "candidate_code_sha256": "84e77bb408767e1d087a8ff8c169eafcfb6e76ae270bce1699f700c1b9421f57"
+    },
+    {
+      "task_id": "medium/3758",
+      "candidate_id": "medium/3758/1083",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "d6c7fdf309fd18e904dd2099e59bdb8b4eb758769f20b8105ad4ca2f637751d3",
+      "candidate_code_sha256": "0e8eb8ae664adb34850b82c58f5fbfa1f67c19dbe2b31d1fb3ebff76ee82ef93"
+    },
+    {
+      "task_id": "medium/83",
+      "candidate_id": "medium/83/350",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "27a5593918b269ac1be7d88ffe16771aaa8620bd2b3f3c85126edd8dc3cb4486",
+      "candidate_code_sha256": "714b72d4b55c5183104926d5f4c19fd1e65769799f0b7c60ca9483d36b253973"
+    },
+    {
+      "task_id": "medium/3779",
+      "candidate_id": "medium/3779/1182",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "cd413cad88a5404c3d86a11d5fa386a0313986d1c8faf1c0abae53a6587c4765",
+      "candidate_code_sha256": "734e12d5fe5b83173e6ec057cb7b0daa66387898cb80326fc271807d70fc158e"
+    },
+    {
+      "task_id": "medium/61",
+      "candidate_id": "medium/61/256",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "bd602b2841be89b2dc429f30b123ad0875f0ac1bb39b36cb6474949580c1e71e",
+      "candidate_code_sha256": "773354f3481a842846aeb436ea67edca977dc75dcded48f48c56cdf8b7816781"
+    },
+    {
+      "task_id": "medium/4070",
+      "candidate_id": "medium/4070/1737",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "53b63a22c1bf11fe5850ff8424115b67d68e5d77045a5982e688e74f0f7c0025",
+      "candidate_code_sha256": "e2773d96538d52bc764feff561e06a7960d279d3dd30a341d4f619fd2f6cc5db"
+    },
+    {
+      "task_id": "medium/157",
+      "candidate_id": "medium/157/687",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "dd7a432aef1a0f53db317222804e18d15d47fd99423b37668e0c839f4be74c32",
+      "candidate_code_sha256": "341916cd68202c8d11df10e414998e0276353a2f5f6b829322551aefd4c5d837"
+    },
+    {
+      "task_id": "medium/4075",
+      "candidate_id": "medium/4075/1756",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "3ba8617b9f7a7b3f7611bdd57bb9fd2cb317c3968ef59dce7a84fc3449a59d57",
+      "candidate_code_sha256": "5e0ca4b63b90ffa9d171130fb637e49cbbf42d9a55d07bf6c584a7c30c753a33"
+    },
+    {
+      "task_id": "medium/3820",
+      "candidate_id": "medium/3820/1373",
+      "difficulty": "medium",
+      "source_file": "CodeJudge_Eval_0shot_middle.json",
+      "source_file_sha256": "4690ec01132fc7fc3c7e05f464d3311fb7cb4184695d16d436c84c30e9a63e70",
+      "source_record_sha256": "ffb32a6e88034dcee784f3c9f196c8b743017c385b4924fac125b646c210885f",
+      "candidate_code_sha256": "df078bbaec381370cb735ede3a5edc6b694c018f3d0ebd514bd4ece41f8576c6"
+    },
+    {
+      "task_id": "hard/40",
+      "candidate_id": "hard/40/171",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "47eef1d3e96ae2dcd20d482f527026a88268de738b0a5d37b20b5ac1cbac8f58",
+      "candidate_code_sha256": "5671ba9f54b16b507ab96fccb94cf9fb319c479ec999b2c5c04addad1387443b"
+    },
+    {
+      "task_id": "hard/141",
+      "candidate_id": "hard/141/608",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "ce5ea5ef065f14657ca6ecf1b9a3dab0eda43da249a413f75c8e632c3697b1ae",
+      "candidate_code_sha256": "881fe9d45e11eb229a4b59686600f0cba7779cb17f3ae17c7b4b8c0170e53981"
+    },
+    {
+      "task_id": "hard/4026",
+      "candidate_id": "hard/4026/1541",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "d307a6c03687bae56015267aa92d2aab0e1ebd11f92b86817b096d6624813d84",
+      "candidate_code_sha256": "1954d04a9ad57f493d612f3498b5836d06372df0e5b738f778e32d6c7fef86fa"
+    },
+    {
+      "task_id": "hard/12",
+      "candidate_id": "hard/12/59",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "5f0043927d1ae3869600390afad3bd62f30e4866846cef6de360b169ded8bfb0",
+      "candidate_code_sha256": "eb1b6cd379c4b5ab2a1254a6273b2cc84036ed56170e1d9f192061314eee035b"
+    },
+    {
+      "task_id": "hard/4086",
+      "candidate_id": "hard/4086/1801",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "d73a0f2840150ef21d73dcdb5ee7639cc5b75f378ab866ecfdaa4f313af13cad",
+      "candidate_code_sha256": "c823bd52fabdf6fe3fafae2888fef4ea2e78e0041d9efa64b8e921d505c26ada"
+    },
+    {
+      "task_id": "hard/23",
+      "candidate_id": "hard/23/104",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "8b26f1f274f64821daad9698ac71f4347a412498d69bcd7ead9251b3c9267348",
+      "candidate_code_sha256": "12fc89837cae3e0aa19c9a507c7bcf651b1d2a9183a57034d86b3ab17fcc0678"
+    },
+    {
+      "task_id": "hard/4016",
+      "candidate_id": "hard/4016/1504",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "10ca713dace0e1b710eb7f7f91a800a55e55cc29d2d7980b7e154fe69f4ed2fa",
+      "candidate_code_sha256": "be41f5f351093924f340ff2e345821e2e2ece943eb1ff0ffc98b5fc7f473f0ec"
+    },
+    {
+      "task_id": "hard/3737",
+      "candidate_id": "hard/3737/999",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "8d639952a2ce5d390114d2cbd570e72643cf933db1e6b15dc3c90c400532216f",
+      "candidate_code_sha256": "012fd538012df33321d57dbdf4f167bbc0d1a5b492039625d3f4fb79c6517bf6"
+    },
+    {
+      "task_id": "hard/171",
+      "candidate_id": "hard/171/754",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "fbcc669f166e3fd507e375deb2b76aac2070874cc04a803b46c2c55a20d64be5",
+      "candidate_code_sha256": "71e7493b751f8e5e938fdd95dffbbdb78415e102ee884821e16e115440a56ecc"
+    },
+    {
+      "task_id": "hard/3819",
+      "candidate_id": "hard/3819/1369",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "ef787a881959bb27e767cba85700105742772e5b476bbe9e9f4697484e7dd6d3",
+      "candidate_code_sha256": "a0814a07cd0ba07f1416b17880a67910801b15123f0411f1951a7d9ca628b5c1"
+    },
+    {
+      "task_id": "hard/4059",
+      "candidate_id": "hard/4059/1685",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "eeab3c32dabb0b0d9a7c459d5c6be97e99d92ae20e9ccac0e0867f4161dd9286",
+      "candidate_code_sha256": "a4d18121e0e5ce238e0076c18832dc01a589fb49e36b92a459b65d92634ba103"
+    },
+    {
+      "task_id": "hard/103",
+      "candidate_id": "hard/103/445",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "49c63d88593e1e9b39d559d8f046ebda4ae4ee8645fb289c407547697e37afd6",
+      "candidate_code_sha256": "3adfcebac63e71322d2ca7c12a2240009fafc9b439b2a2e76d3fbb51881e7deb"
+    },
+    {
+      "task_id": "hard/128",
+      "candidate_id": "hard/128/549",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "6c5aeaf8c9ca8ea94913dfe770fe3dd438b17816808d5c3ba2ec8ac1c4691cb5",
+      "candidate_code_sha256": "c3909efbd01bd57502eae98783f2a54bd0d499a709674ef22a3a6eb838472f06"
+    },
+    {
+      "task_id": "hard/3713",
+      "candidate_id": "hard/3713/888",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "d7f9a8b6495c2a225d3c346b00fba88584b20feca46c198681b6c047d821f63a",
+      "candidate_code_sha256": "e7dc33d6211e80b22ba8a9f3fc18d2ebfe279ea7e30c38fc5a5660f2a7ffee36"
+    },
+    {
+      "task_id": "hard/3801",
+      "candidate_id": "hard/3801/1281",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "0f7558921d1fe88a66be5f29efecab0a241ca1ade32f062502bedbb8d25089ff",
+      "candidate_code_sha256": "d680f8dbadd35a8acd37e9e53ca2fa9aa7402cd6fe06bbed4f3b5d8fe249c7f5"
+    },
+    {
+      "task_id": "hard/3694",
+      "candidate_id": "hard/3694/807",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "32cb08da781ab55f995740389129e59def9eef42c50a3f0f7cd72e4323d44e27",
+      "candidate_code_sha256": "b078c4463546d5ea9e6111569fe08bc24bc08f38ad170db6fc19f42564a51825"
+    },
+    {
+      "task_id": "hard/6",
+      "candidate_id": "hard/6/31",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "cfa276183e028549780edf0758a7b268c65dd16ce43e2b036fc74a852c9990be",
+      "candidate_code_sha256": "630da54f8cdf5338de57fab5d68c7eecd969544ce509b9132b9589ec16ad04cd"
+    },
+    {
+      "task_id": "hard/3707",
+      "candidate_id": "hard/3707/864",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "1770e82664347ac2cef85d40c33110e74fddaa5c5f17d49fa0a080886da55fb9",
+      "candidate_code_sha256": "1b0439264846640f356a6426de116d05cfaa09f7946b203b994af1b190a38d1f"
+    },
+    {
+      "task_id": "hard/123",
+      "candidate_id": "hard/123/528",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "d888dc2f857cb0d8f0740b5d346d367e6db1dab8f7b8b97c7e869250a5b18e4f",
+      "candidate_code_sha256": "0e8ef9e3b3cf638a11331f518a2749ccbe39ad738d55bdaff3d6acd19ac62f58"
+    },
+    {
+      "task_id": "hard/4096",
+      "candidate_id": "hard/4096/1841",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "b9cdf8b5640dfeb20fcfc5f66100d8beec1bc3aa074ac3493fbbddeffd95388a",
+      "candidate_code_sha256": "3fbab022b1dc7f5de783245af16d1487da51caaaa795c369dcf72e890eaf3769"
+    },
+    {
+      "task_id": "hard/3701",
+      "candidate_id": "hard/3701/835",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "3827db5837cc375e1564873e7d6859dfd1a34b3f506926c2c03ec47f3abb93ef",
+      "candidate_code_sha256": "5a1da008c8808514695d6bf93b93606256fa0c4db964da77ae6542ef081e385f"
+    },
+    {
+      "task_id": "hard/22",
+      "candidate_id": "hard/22/102",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "b2e2f1767675ef008c2dbe72c92a67de25932a64cd4c938951620968574d637f",
+      "candidate_code_sha256": "9a36f8c8c5b6d719bfb3cb424e7eb25ba19ef465e3aff2a8ba854e8460410f7c"
+    },
+    {
+      "task_id": "hard/4091",
+      "candidate_id": "hard/4091/1823",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "fa0a8882a056227e558a8702ed3023798a9d1c30fb938bc7febea8ff9eb4c0bf",
+      "candidate_code_sha256": "f6345c0a5de7541c01157c9f9671a944b67fa370485467e5a64f2cac25504aa2"
+    },
+    {
+      "task_id": "hard/47",
+      "candidate_id": "hard/47/198",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "ae76a8ab3f57da70bb42b406f33a2bf4ba68bc75784f8ee7dc64fac2f703e2c6",
+      "candidate_code_sha256": "d690f36a766a2b78bba08e63326f29bb739f8bdcf5ca1413678efcfa153f069f"
+    },
+    {
+      "task_id": "hard/4019",
+      "candidate_id": "hard/4019/1517",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "0d51f2e4bc1cb1ce20c783d2bc702a4212124f15f09fca9a66eacbb7595eac37",
+      "candidate_code_sha256": "d66382876c93cccbd9189620428735ef441863e340d5e7b9db6772005e72a6b2"
+    },
+    {
+      "task_id": "hard/162",
+      "candidate_id": "hard/162/711",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "13c594c05a64df08eae769688d2aff0976c3de4fe960112fee2568963f4c6186",
+      "candidate_code_sha256": "0d792c389967b0e1619f439b842893e623b45cf9695ac2780bcb198d8c535905"
+    },
+    {
+      "task_id": "hard/3827",
+      "candidate_id": "hard/3827/1399",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "0e9233b0dee3b035cd51b1032a0bccc9cf83bb39ac96ebe099bc7390b2c8ebbd",
+      "candidate_code_sha256": "3f386ea053f24e860b1b5d8feb42c5ac6a7d77d6ceef02501abbbc562385655f"
+    },
+    {
+      "task_id": "hard/52",
+      "candidate_id": "hard/52/221",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "b8dc955cc795197b1abd992a205b1d7117d2d657ba23c50ff906ac7266dd4c16",
+      "candidate_code_sha256": "57b8eb699555b3967bfde077932812114b8c5e14893bf6db57d2d15112764c39"
+    },
+    {
+      "task_id": "hard/48",
+      "candidate_id": "hard/48/201",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "f538a10f5615819624edc8237a78116c0fcd1cc99cf98ba0bd08d108310401dc",
+      "candidate_code_sha256": "ca0d4d35a9b8bc8d909b1174bcbf0fe89548dfa958a905f9860de6d259695356"
+    },
+    {
+      "task_id": "hard/3729",
+      "candidate_id": "hard/3729/963",
+      "difficulty": "hard",
+      "source_file": "CodeJudge_Eval_0shot_hard.json",
+      "source_file_sha256": "eb86bf286478c19016d899f75db6394b037a46b95af7968cbfa2a854aff77581",
+      "source_record_sha256": "08a9d7f316b1ad2d03a050a16a15a7a60a893b49741b0a3694ec394f6478db8c",
+      "candidate_code_sha256": "04a02695c890fc29558180110a3e21e01dbdca600b3d8a41abc335632e6a76b8"
+    }
+  ],
+  "selected_task_ids": [
+    "easy/3756",
+    "easy/4123",
+    "easy/3741",
+    "easy/13",
+    "easy/34",
+    "easy/4074",
+    "easy/64",
+    "easy/4080",
+    "easy/3780",
+    "easy/3845",
+    "easy/3",
+    "easy/4005",
+    "easy/4045",
+    "easy/120",
+    "easy/4077",
+    "easy/174",
+    "easy/163",
+    "easy/3749",
+    "easy/15",
+    "easy/129",
+    "easy/175",
+    "easy/35",
+    "easy/3717",
+    "easy/4038",
+    "easy/3733",
+    "easy/4115",
+    "easy/4007",
+    "easy/3797",
+    "easy/135",
+    "easy/4012",
+    "medium/3825",
+    "medium/4022",
+    "medium/3826",
+    "medium/3804",
+    "medium/27",
+    "medium/145",
+    "medium/93",
+    "medium/3767",
+    "medium/58",
+    "medium/3727",
+    "medium/159",
+    "medium/56",
+    "medium/4010",
+    "medium/3781",
+    "medium/108",
+    "medium/3785",
+    "medium/37",
+    "medium/3852",
+    "medium/4055",
+    "medium/161",
+    "medium/4128",
+    "medium/16",
+    "medium/3758",
+    "medium/83",
+    "medium/3779",
+    "medium/61",
+    "medium/4070",
+    "medium/157",
+    "medium/4075",
+    "medium/3820",
+    "hard/40",
+    "hard/141",
+    "hard/4026",
+    "hard/12",
+    "hard/4086",
+    "hard/23",
+    "hard/4016",
+    "hard/3737",
+    "hard/171",
+    "hard/3819",
+    "hard/4059",
+    "hard/103",
+    "hard/128",
+    "hard/3713",
+    "hard/3801",
+    "hard/3694",
+    "hard/6",
+    "hard/3707",
+    "hard/123",
+    "hard/4096",
+    "hard/3701",
+    "hard/22",
+    "hard/4091",
+    "hard/47",
+    "hard/4019",
+    "hard/162",
+    "hard/3827",
+    "hard/52",
+    "hard/48",
+    "hard/3729"
+  ],
+  "selected_task_ids_sha256": "53c99dc181d24e4cd9ce994b5c7e40f7b38fa0540c78def2bb990205d59caf82"
+}

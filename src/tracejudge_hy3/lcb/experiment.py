@@ -103,6 +103,11 @@ def execution_identity(root: Path, dataset: str) -> dict:
     package = root / "src/tracejudge_hy3"
     files = (
         sorted((package / "evalplus_mbpp").glob("*.py"))
+        + [
+            package / "evalplus/parser.py",
+            package / "benchmark/mbpp_readiness.py",
+            root / "scripts/smoke_external_benchmarks.py",
+        ]
         if dataset == "mbpp"
         else [
             package / "lcb/docker_runner.py",

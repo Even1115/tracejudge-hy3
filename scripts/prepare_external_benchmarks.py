@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import shlex
 import subprocess
@@ -15,6 +16,9 @@ from tracejudge_hy3.lcb.experiment import require_idle_benchmark_containers  # n
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", choices=("mbpp", "lcb", "both"), default="both")
+    args = parser.parse_args()
     # No container creation or source snapshot while another evaluation is active.
     require_idle_benchmark_containers()
     subprocess.run(
@@ -22,7 +26,6 @@ def main():
     )
     frozen = json.loads((ROOT / "artifacts/benchmark-runtime/current.json").read_text())
     runtime = Path(frozen["runtime_root"])
-    image = json.loads((ROOT / "artifacts/datasets/livecodebench/image.json").read_text())["image"]
 
     def step(script, *args):
         subprocess.run(
@@ -31,14 +34,23 @@ def main():
             check=True,
         )
 
-    step("run_livecodebench.py", "--prepare")
-    step("smoke_external_benchmarks.py", "--dataset", "mbpp")
-    step("smoke_external_benchmarks.py", "--dataset", "lcb", "--image", image)
-    step("run_mbppplus.py", "--preflight")
-    step("run_livecodebench.py", "--preflight")
-    print("[ready] Both cohorts passed real container gates. No model API calls were made.")
+    launches = []
+    if args.dataset in {"mbpp", "both"}:
+        step("smoke_external_benchmarks.py", "--dataset", "mbpp")
+        step("run_mbppplus.py", "--preflight")
+        launches.append(("run_mbppplus.py", "mbpp120-v1"))
+    if args.dataset in {"lcb", "both"}:
+        image = json.loads((ROOT / "artifacts/datasets/livecodebench/image.json").read_text())[
+            "image"
+        ]
+        step("run_livecodebench.py", "--prepare")
+        step("smoke_external_benchmarks.py", "--dataset", "lcb", "--image", image)
+        step("run_livecodebench.py", "--preflight")
+        launches.append(("run_livecodebench.py", "lcb60-v1"))
+    label = "Both cohorts" if args.dataset == "both" else args.dataset.upper()
+    print(f"[ready] {label} passed real container gates. No model API calls were made.")
     print("Run these separately, waiting for each evaluation to finish:")
-    for script, run_id in (("run_mbppplus.py", "mbpp120-v1"), ("run_livecodebench.py", "lcb60-v1")):
+    for script, run_id in launches:
         print(
             shlex.join(
                 [

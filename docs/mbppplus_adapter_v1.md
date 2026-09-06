@@ -1,6 +1,6 @@
 # MBPP+ 接入适配 v1
 
-状态：适配层与 120 题批量入口已实现，固定镜像已拉取；真实容器预检发现的问题已修复，最终冒烟待资源空闲后验证。见 [正式运行手册](mbpp_lcb_formal_execution.md)。
+状态：适配层与 120 题批量入口已实现，固定镜像已拉取；预检修复及 v2 四项冒烟已实现，运行就绪状态以真实凭证为准。见 [正式运行手册](mbpp_lcb_formal_execution.md)。
 实现：`src/tracejudge_hy3/dataset/mbppplus.py`、`src/tracejudge_hy3/benchmark/mbppplus.py`、`src/tracejudge_hy3/evalplus_mbpp/`
 契约：遵循 `docs/benchmark_contract_v1.md`（v1 未做任何修改）
 
@@ -40,7 +40,7 @@
 ## 执行边界
 
 - 候选代码只在 pinned、断网的官方 EvalPlus 容器内执行；`evalplus_mbpp/` 是 `evalplus/` 的 MBPP+ 对等包，单独成包以保持 HumanEval+ 阶段二实现指纹逐字节不变；
-- 官方 raw schema 与 HumanEval+ 相同（`date`/`hash`/`eval`，状态仅 `pass`/`fail`/`timeout`）；`fail` 合并 wrong answer 与候选异常，无法细分，summary 中 `execution_error_count` 恒为 `None` 并标注 `not_available_in_pinned_evalplus_raw_schema`；
+- 官方 raw schema 与 HumanEval+ 相同（`date`/`hash`/`eval`，状态仅 `pass`/`fail`/`timeout`）；`fail` 合并 wrong answer、候选异常及被逐测试捕获的超时，无法细分，summary 中 `execution_error_count` 恒为 `None` 并标注 `not_available_in_pinned_evalplus_raw_schema`；`timeout` 表示官方评测子进程未完成，不能把它的计数当作所有测试调用超时的总数；
 - 断点恢复要求 dataset manifest、候选字节、实现指纹、executor/镜像身份与资源限制完全一致，任一变化拒绝续跑。
 
 ## 官方数据 quirk（已核验）
@@ -66,5 +66,5 @@ tracejudge evalplus-mbpp --dataset-manifest <sample>/dataset_manifest.json --can
 
 完整 378 题投影与 `sample120` 均已生成；本轮先运行固定 120，不扩至 378。
 `scripts/run_mbppplus.py` 串接基线生成、严格候选导出、官方执行和组合报告，支持 `--resume`、`--phase`、`--preflight`、`--report-only`；默认容器并发 1。
-真实运行必须通过 pass/WA/TLE 三项冒烟与 120 题公开身份核验。生成覆盖不足时保留成功结果，返回未完成，补跑失败项后再执行。
+真实运行必须通过正确答案、错误答案、调用内超时、评测子进程超时四项冒烟与 120 题公开身份核验；检查两组官方状态而不重新归类。生成覆盖不足时保留成功结果，返回未完成，补跑失败项后再执行。
 具体无费用准备、固定代码版本、付费启动和报告合并命令见 [正式运行手册](mbpp_lcb_formal_execution.md)。

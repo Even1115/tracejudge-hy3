@@ -213,6 +213,7 @@ class EvalPlusDockerRunner:
         image: str = DEFAULT_EVALPLUS_IMAGE,
         requested_platform: str = DEFAULT_PLATFORM,
         limits: DockerLimits | None = None,
+        reference_cache_compression: Literal["none", "gzip"] = "none",
         command_runner: CommandRunner = subprocess.run,
         which: Callable[[str], str | None] = shutil.which,
         clock: Clock = time.monotonic,
@@ -225,6 +226,9 @@ class EvalPlusDockerRunner:
         self.image = image
         self.requested_platform = requested_platform
         self.limits = limits or DockerLimits()
+        if reference_cache_compression not in {"none", "gzip"}:
+            raise ValueError("unsupported reference cache compression")
+        self.reference_cache_compression = reference_cache_compression
         self._command_runner = command_runner
         self._uses_native_subprocess = command_runner is subprocess.run
         self._which = which
@@ -240,7 +244,7 @@ class EvalPlusDockerRunner:
     def public_identity(self) -> Mapping[str, Any]:
         """Return the immutable executor identity and its enforced isolation policy."""
 
-        return {
+        identity = {
             "name": "official_evalplus_docker",
             "version": 1,
             "candidate_execution": True,
@@ -335,6 +339,15 @@ class EvalPlusDockerRunner:
                 "cleanup_seconds": self.limits.cleanup_timeout_seconds,
             },
         }
+        if self.reference_cache_compression != "none":
+            identity["reference_cache"] = {
+                "storage": "gzip-stream-v1",
+                "scope": "private_oracle_pickle_only",
+                "logical_pickle_contents": "unchanged",
+                "compression_level": 1,
+                "file_size_limit_unchanged": True,
+            }
+        return identity
 
     def is_available(self) -> tuple[bool, str | None]:
         """Probe only the Docker CLI/daemon and return a bounded safe reason."""
@@ -1094,6 +1107,12 @@ class EvalPlusDockerRunner:
             raise DockerRunnerError("container_start_error", "workspace path is not mount-safe")
         if detached != (output_files is not None):
             raise DockerRunnerError("container_start_error", "output transport is invalid")
+        if detached and self.reference_cache_compression != "none":
+            entrypoint_args = [
+                *entrypoint_args,
+                "--reference-cache-compression",
+                self.reference_cache_compression,
+            ]
         command = [
             "docker",
             "run",

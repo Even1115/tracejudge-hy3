@@ -10,6 +10,7 @@ import json
 import re
 import sys
 import uuid
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -17,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from tracejudge_hy3.baseline import run_baseline_experiment  # noqa: E402
+from tracejudge_hy3.benchmark.mbpp_readiness import validate_mbpp_readiness  # noqa: E402
+from tracejudge_hy3.config import get_settings  # noqa: E402
 from tracejudge_hy3.dataset.loader import load_problems  # noqa: E402
 from tracejudge_hy3.evalplus_mbpp.docker_runner import (  # noqa: E402
     DEFAULT_EVALPLUS_IMAGE,
@@ -35,6 +38,7 @@ from tracejudge_hy3.lcb.experiment import (  # noqa: E402
     now,
     require_idle_benchmark_containers,
     run_lock,
+    source_identity,
     write_json,
 )
 from tracejudge_hy3.providers.hy3_openai import Hy3OpenAIProvider  # noqa: E402
@@ -104,10 +108,9 @@ def main():
         print(json.dumps(combined_report(run_dir, 120, run_id), ensure_ascii=False, indent=2))
         return 0
     readiness = json.loads((project / "artifacts/benchmark-readiness/mbpp.json").read_text())
-    if not readiness.get("ready") or readiness.get("image") != DEFAULT_EVALPLUS_IMAGE:
-        raise ValueError("real MBPP container smoke has not passed")
-    if readiness.get("execution_source_sha256") != execution_identity(ROOT, "mbpp"):
-        raise ValueError("MBPP execution source differs from its real smoke receipt")
+    validate_mbpp_readiness(
+        readiness, image=DEFAULT_EVALPLUS_IMAGE, execution_source=execution_identity(ROOT, "mbpp")
+    )
     require_idle_benchmark_containers()
     executor = MbppPlusDockerRunner(limits=DockerLimits(per_task_timeout_seconds=180))
     # Verify every selected prompt/entry point against the container dataset,
@@ -128,6 +131,40 @@ def main():
         print(f"[blocked] MBPP preflight: {preflight.infrastructure_error_type}")
         return 1
     if args.preflight:
+        # Check configuration presence only, without constructing an API client.
+        # Authentication, quota and remote availability remain untested.
+        configured = get_settings().hy3_configured()
+        environment = source_identity(ROOT)
+        write_json(
+            work / "receipt.json",
+            {
+                "schema": "mbpp120-preflight-v1",
+                "ready": configured,
+                "completed_at": now(),
+                "runtime_root": str(ROOT),
+                "planned_n": len(problems),
+                "dataset_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                "problems_sha256": hashlib.sha256(
+                    (bundle / "problems.jsonl").read_bytes()
+                ).hexdigest(),
+                "smoke_receipt_sha256": hashlib.sha256(
+                    (project / "artifacts/benchmark-readiness/mbpp.json").read_bytes()
+                ).hexdigest(),
+                "execution_source_sha256": execution_identity(ROOT, "mbpp"),
+                "official_runtime": preflight.runtime,
+                "execution_limits": asdict(executor.limits),
+                "formal_parallel": 1,
+                "formal_batch_timeout_seconds": args.batch_timeout,
+                "python": environment["python"],
+                "dependencies": environment["dependencies"],
+                "provider_configuration_present": configured,
+                "remote_auth_quota_availability_checked": False,
+                "uses_model_api": False,
+            },
+        )
+        if not configured:
+            print("[blocked] HY3 configuration missing; no API calls")
+            return 1
         print(
             "[ready] 120 selected tasks, official EvalPlus image and public identities verified; no API calls"
         )

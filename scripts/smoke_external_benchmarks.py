@@ -23,6 +23,11 @@ from tracejudge_hy3.benchmark.livecodebench import (  # noqa: E402
     candidate_from_code,
     parse_source_record,
 )
+from tracejudge_hy3.benchmark.mbpp_readiness import (  # noqa: E402
+    MBPP_SMOKE_EXPECTATIONS,
+    MBPP_SMOKE_SCHEMA,
+    mbpp_smoke_case_ok,
+)
 from tracejudge_hy3.dataset.loader import load_problems  # noqa: E402
 from tracejudge_hy3.evalplus_mbpp.docker_runner import (  # noqa: E402
     DEFAULT_EVALPLUS_IMAGE,
@@ -61,35 +66,79 @@ def mbpp(project, work):
         }
     cases = {}
     implementations = {
-        "pass": ("def similar_elements(a, b):\n    return tuple(set(a) & set(b))\n", "pass"),
-        "wrong_answer": ("def similar_elements(a, b):\n    return ()\n", "fail"),
-        "timeout": ("def similar_elements(a, b):\n    while True:\n        pass\n", "timeout"),
+        "pass": "def similar_elements(a, b):\n    return tuple(set(a) & set(b))\n",
+        "wrong_answer": "def similar_elements(a, b):\n    return ()\n",
+        # Mbpp/2 base calls each hit the official per-input time_limit and
+        # record False. Extra may hit that too or the whole-child deadline.
+        "call_timeout": "def similar_elements(a, b):\n    while True:\n        pass\n",
+        # exec() never completes, so the official child deadline (not our
+        # container deadline) must produce timeout for both test groups.
+        "process_timeout": "while True:\n    pass\n\ndef similar_elements(a, b):\n    return ()\n",
     }
-    for name, (code, expected) in implementations.items():
+    for name, code in implementations.items():
         folder = work / name
         folder.mkdir()
         sample = MbppPlusSample(task_id=problem.problem_id, solution=code)
         result = runner.run_task(sample=sample, task_metadata=meta, workspace=folder)
+        actual = None
         if result.infrastructure_error_type:
-            actual = result.infrastructure_error_type
+            raw_hash = None
         else:
             safe = parse_official_result(
                 result.raw_result,
                 expected_problem_id=problem.problem_id,
                 expected_solution_sha256=hashlib.sha256(code.encode()).hexdigest(),
             )
-            actual = safe["base_status"]
-            if expected == "pass" and not safe["passed_plus"]:
-                actual = "plus_failed"
-        cases[name] = {"expected": expected, "actual": actual, "ok": actual == expected}
+            actual = {key: safe[key] for key in ("base_status", "plus_status")}
+            raw_hash = hashlib.sha256(
+                json.dumps(result.raw_result, sort_keys=True, allow_nan=False).encode()
+            ).hexdigest()
+        case = {
+            "expected": MBPP_SMOKE_EXPECTATIONS[name],
+            "actual": actual,
+            "infrastructure_error_type": result.infrastructure_error_type,
+            "duration_seconds": result.duration_seconds,
+            "solution_sha256": hashlib.sha256(code.encode()).hexdigest(),
+            "raw_result_canonical_sha256": raw_hash,
+        }
+        case["ok"] = mbpp_smoke_case_ok(name, case)
+        cases[name] = case
         print(f"[mbpp smoke] {name}: {actual}", flush=True)
     return {
+        "schema": MBPP_SMOKE_SCHEMA,
         "ready": all(c["ok"] for c in cases.values()),
         "image": DEFAULT_EVALPLUS_IMAGE,
         "runtime": preflight.runtime,
         "cases": cases,
         "uses_model_api": False,
+        "status_semantics": {
+            "call_timeout": "Per-input time_limit exceptions become failed tests, not a distinct verdict.",
+            "process_timeout": "An unfinished official evaluation child yields timeout.",
+            "no_result_relabeling": True,
+            "official_eval_py_sha256": "76857b678cddca08dcaf54d7927b9a77826715cf657654ca5baf6c2b267f4c34",
+            "source_basis": "Inspected evalplus/eval/__init__.py in the pinned image; untrusted_check/unsafe_execute.",
+        },
     }
+
+
+def save_readiness(path, report):
+    """Archive exact old bytes before atomically replacing the current pointer."""
+    if path.is_symlink():
+        raise ValueError("symlinked readiness receipt")
+    if path.exists():
+        data = path.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        archive = path.parent / "history" / f"{path.stem}-{digest}.json"
+        archive.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if archive.is_symlink():
+            raise ValueError("symlinked readiness archive")
+        if archive.exists():
+            if archive.read_bytes() != data:
+                raise ValueError("readiness archive was modified")
+        else:
+            with archive.open("xb") as handle:
+                handle.write(data)
+    write_json(path, report)
 
 
 def lcb(project, work, image):
@@ -202,7 +251,7 @@ def main():
             report = lcb(project, Path(folder), args.image)
     report["completed_at"] = now()
     report["execution_source_sha256"] = execution_identity(ROOT, args.dataset)
-    write_json(output / f"{args.dataset}.json", report)
+    save_readiness(output / f"{args.dataset}.json", report)
     print(f"[ready={report['ready']}] {output / (args.dataset + '.json')}")
     return 0 if report["ready"] else 1
 

@@ -1,9 +1,11 @@
-"""Phase-two orchestration for isolated official EvalPlus execution.
+"""Phase-two orchestration for isolated official EvalPlus MBPP+ execution.
 
-The orchestration boundary is intentionally independent from every Provider
-and from the process-evaluation pipeline.  Candidate source is only copied to
-``samples.jsonl`` and handed to an injected executor; this module never
-imports, compiles, evaluates, or executes it on the host.
+Mirrors the HumanEval+ phase-two runner's safety posture with an MBPP+-specific
+input boundary: instead of a phase-one export, execution is conditioned on a
+validated MBPP+ public-projection selection bundle plus a ``candidates.jsonl``
+of ``{"task_id", "candidate_id", "code"}`` rows.  Candidate source is only
+copied to ``samples.jsonl`` and handed to an injected executor; this module
+never imports, compiles, evaluates, or executes it on the host.
 """
 
 from __future__ import annotations
@@ -25,37 +27,53 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, Protocol
 
-from .exporter import (
-    RESEARCH_NATURAL_COUNT,
-    SelectionPolicy,
-    load_validated_phase1_export,
-    serialize_samples_jsonl,
+from tracejudge_hy3.dataset.loader import load_problems
+from tracejudge_hy3.dataset.mbppplus import (
+    ADAPTER_NAME,
+    ADAPTER_VERSION,
+    DATASET_ID,
+    DATASET_MANIFEST_SCHEMA_VERSION,
+    DATASET_SOURCE,
+    EXPECTED_RECORD_COUNT,
+    FULL_PROJECTION_KIND,
+    FULL_SELECTION_ALGORITHM,
+    MBPP_PLUS_VERSION,
+    PINNED_MBPPPLUS_REVISION,
+    SELECTION_ALGORITHM,
+    SELECTION_MANIFEST_KIND,
+    validate_mbppplus_public_problems,
 )
+from tracejudge_hy3.exceptions import DatasetError
+
 from .parser import (
     INFRASTRUCTURE_ERROR_TYPES,
     RAW_BUNDLE_KIND,
+    RAW_MOCK_BUNDLE_KIND,
     EvalPlusParseError,
     build_summary,
     infrastructure_error_result,
     parse_official_result,
 )
 from .schemas import (
-    EvalPlusSample,
-    HumanEvalPlusTaskMetadata,
-    ValidatedSampleExport,
+    MbppCandidateRecord,
+    MbppPlusDatasetIdentity,
+    MbppPlusSample,
+    MbppPlusTaskMetadata,
+    ValidatedMbppInputs,
 )
 
-RAW_MOCK_BUNDLE_KIND = "tracejudge_evalplus_mock_no_execution_bundle"
-
-
 _RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_TASK_ID_PATTERN = re.compile(r"^Mbpp/(?:0|[1-9][0-9]*)$")
+_CANDIDATE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_MD5_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 _ISO_UTC_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 _DIRECT_DEPENDENCIES = ("pydantic", "pydantic-settings", "openai", "typer", "rich")
 _MAX_EXECUTION_LOG_BYTES = 64 * 1024
 _MAX_SAFE_ARTIFACT_BYTES = 128 * 1024 * 1024
+_MAX_CANDIDATE_CODE_BYTES = 2 * 1024 * 1024
 _BATCH_CLEANUP_GRACE_SECONDS = 5.0
 _CLEANUP_STATUSES = frozenset({"not_needed", "removed", "not_found", "failed"})
 _RESUME_IDENTITY_ERROR = (
@@ -77,7 +95,6 @@ _MANIFEST_FIELDS = {
     "created_at",
     "completed_at",
     "execution_mode",
-    "phase1_source",
     "dataset",
     "input",
     "executor",
@@ -109,98 +126,37 @@ _RESULT_FIELDS = {
     "started_at",
     "ended_at",
     "failure_count_scope",
-    "source_response",
+    "source_candidate",
 }
+_CANDIDATE_ROW_FIELDS = {"task_id", "candidate_id", "code"}
 
 
-def _phase2_identity(
-    exported: ValidatedSampleExport,
-) -> tuple[str, str, list[str], str]:
+class MbppExperimentError(ValueError):
+    """Raised when an MBPP+ phase-two run cannot be created or safely resumed."""
+
+
+def _phase2_identity(task_count: int) -> tuple[str, str, list[str], str]:
     """Return (experiment_label, metrics_scope, limitations, cohort_description)."""
 
-    dataset_identity = exported.dataset
-    selection = exported.export_selection
-    source_count = selection.source_problem_count
-    exported_count = selection.exported_success_count
     shared_limitations = [
         "not_an_official_benchmark_ranking",
         "public_benchmark_training_contamination_or_memorization_is_possible",
-        "phase1_parse_success_is_not_phase2_functional_success",
         "pinned_evalplus_fail_combines_wrong_answers_and_candidate_exceptions",
+        "single_sample_generation_to_execution",
     ]
-    if dataset_identity.selection_role == "full":
-        if source_count != 164:
-            raise EvalPlusExperimentError("full HumanEval+ source must contain exactly 164 tasks")
-        limitations = ["single_sample_per_exported_phase1_success", *shared_limitations]
-        if exported_count == source_count:
-            return (
-                "humanevalplus_164_evalplus_execution_full",
-                "full_164_task_single_sample_generation_to_execution",
-                limitations,
-                "full_164_task_single_sample_generation_to_execution",
-            )
-        limitations.append("phase2_conditioned_on_phase1_success")
+    if task_count == EXPECTED_RECORD_COUNT:
         return (
-            f"humanevalplus_{exported_count}_of_164_evalplus_execution_full",
-            f"full_{exported_count}_of_164_phase1_success_conditioned_execution",
-            limitations,
-            f"full_{exported_count}_of_164_phase1_successful_tasks_execution",
-        )
-    if dataset_identity.selection_role == "pilot":
-        limitations = [
-            f"fixed_{source_count}_problem_subset_not_full_humanevalplus",
-            "single_sample_generation_to_execution_engineering_pilot",
-            *shared_limitations,
-        ]
-        if exported_count != source_count:
-            limitations.append("phase2_conditioned_on_phase1_success")
-        if exported_count == source_count:
-            return (
-                f"humanevalplus_{source_count}_evalplus_execution_pilot",
-                f"fixed_{source_count}_task_generation_to_execution_engineering_pilot",
-                limitations,
-                f"fixed_{source_count}_problem_single_sample_generation_to_execution_pilot",
-            )
-        return (
-            f"humanevalplus_{exported_count}_of_{source_count}_evalplus_execution_pilot",
-            f"fixed_{exported_count}_of_{source_count}_task_generation_to_execution_pilot",
-            limitations,
-            f"fixed_{exported_count}_of_{source_count}_problem_single_sample_execution_pilot",
-        )
-    if (
-        dataset_identity.selection_role == "research_natural"
-        and source_count == RESEARCH_NATURAL_COUNT
-    ):
-        limitations = [
-            "research_natural_45_source_task_subset_not_full_humanevalplus",
-            "single_sample_per_exported_phase1_success",
-            *shared_limitations,
-        ]
-        if selection.selection_policy == "phase1-success-only":
-            limitations.append("phase2_conditioned_on_phase1_success")
-        if exported_count == source_count:
-            return (
-                "humanevalplus_45_evalplus_execution_research_natural",
-                "research_natural_45_task_generation_to_execution",
-                limitations,
-                "research_natural_45_task_single_sample_generation_to_execution",
-            )
-        return (
-            f"humanevalplus_{exported_count}_of_45_evalplus_execution_research_natural",
-            f"research_natural_{exported_count}_of_45_phase1_success_conditioned_execution",
-            limitations,
-            f"research_natural_{exported_count}_of_45_phase1_successful_tasks_execution",
+            f"mbppplus_{EXPECTED_RECORD_COUNT}_evalplus_execution_full",
+            f"full_{EXPECTED_RECORD_COUNT}_task_generation_to_execution",
+            ["full_mbppplus_cohort", *shared_limitations],
+            f"full_{EXPECTED_RECORD_COUNT}_task_single_sample_execution",
         )
     return (
-        f"humanevalplus_{exported_count}_of_{source_count}_evalplus_execution",
-        f"fixed_{exported_count}_of_{source_count}_task_generation_to_execution",
-        list(shared_limitations),
-        f"fixed_{exported_count}_of_{source_count}_problem_single_sample_execution",
+        f"mbppplus_{task_count}_evalplus_execution_pilot",
+        f"fixed_{task_count}_task_generation_to_execution_engineering_pilot",
+        [f"fixed_{task_count}_problem_subset_not_full_mbppplus", *shared_limitations],
+        f"fixed_{task_count}_problem_single_sample_generation_to_execution_pilot",
     )
-
-
-class EvalPlusExperimentError(ValueError):
-    """Raised when a phase-two run cannot be created or safely resumed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,8 +182,8 @@ class ExecutorPreflight:
     diagnostics: Mapping[str, Any] | None = None
 
 
-class EvalPlusExecutor(Protocol):
-    """Minimal executor surface used by the phase-two runner."""
+class MbppEvalPlusExecutor(Protocol):
+    """Minimal executor surface used by the MBPP+ phase-two runner."""
 
     mode: Literal["docker", "mock"]
 
@@ -236,22 +192,22 @@ class EvalPlusExecutor(Protocol):
     def preflight(
         self,
         *,
-        task_metadata: Sequence[HumanEvalPlusTaskMetadata],
+        task_metadata: Sequence[MbppPlusTaskMetadata],
         workspace: Path,
     ) -> ExecutorPreflight: ...
 
     def run_task(
         self,
         *,
-        sample: EvalPlusSample,
-        task_metadata: HumanEvalPlusTaskMetadata,
+        sample: MbppPlusSample,
+        task_metadata: MbppPlusTaskMetadata,
         workspace: Path,
     ) -> ExecutorTaskOutcome: ...
 
 
 @dataclass(frozen=True, slots=True)
-class EvalPlusRunResult:
-    """Paths and final safe summary returned by a phase-two run."""
+class MbppRunResult:
+    """Paths and final safe summary returned by an MBPP+ phase-two run."""
 
     run_id: str
     run_dir: Path
@@ -284,16 +240,16 @@ def _iso_utc(value: datetime) -> str:
     return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def new_evalplus_run_id() -> str:
-    """Return a collision-resistant phase-two run identifier."""
+def new_mbpp_run_id() -> str:
+    """Return a collision-resistant MBPP+ phase-two run identifier."""
 
     timestamp = _utc_now().strftime("%Y%m%dT%H%M%S%fZ")
-    return f"phase2_{timestamp}_{uuid.uuid4().hex[:12]}"
+    return f"phase2_mbpp_{timestamp}_{uuid.uuid4().hex[:12]}"
 
 
 def _validate_run_id(run_id: str) -> None:
     if not _RUN_ID_PATTERN.fullmatch(run_id):
-        raise EvalPlusExperimentError(
+        raise MbppExperimentError(
             "run_id must contain only letters, digits, '.', '_' or '-' and be at most "
             "128 characters"
         )
@@ -320,7 +276,7 @@ def _require_non_trackable_run_directory(run_dir: Path) -> None:
     try:
         relative = run_dir.relative_to(repository)
     except ValueError:
-        raise EvalPlusExperimentError(
+        raise MbppExperimentError(
             "phase-two output must be inside this repository and covered by .gitignore"
         ) from None
     try:
@@ -334,13 +290,11 @@ def _require_non_trackable_run_directory(run_dir: Path) -> None:
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
-        raise EvalPlusExperimentError(
+        raise MbppExperimentError(
             "cannot verify that the repository-local phase-two output is Git-ignored"
         ) from None
     if completed.returncode != 0:
-        raise EvalPlusExperimentError(
-            "repository-local phase-two output must be covered by .gitignore"
-        )
+        raise MbppExperimentError("repository-local phase-two output must be covered by .gitignore")
 
 
 def _fsync_directory(path: Path) -> None:
@@ -399,7 +353,7 @@ def _json_bytes(value: Any) -> bytes:
             + b"\n"
         )
     except (TypeError, ValueError, UnicodeEncodeError) as exc:
-        raise EvalPlusExperimentError("phase-two safe artifact is not valid UTF-8 JSON") from exc
+        raise MbppExperimentError("phase-two safe artifact is not valid UTF-8 JSON") from exc
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -421,7 +375,7 @@ def _jsonl_bytes(records: Sequence[Mapping[str, Any]]) -> bytes:
                 + b"\n"
             )
     except (TypeError, ValueError, UnicodeEncodeError) as exc:
-        raise EvalPlusExperimentError("phase-two safe JSONL record is invalid") from exc
+        raise MbppExperimentError("phase-two safe JSONL record is invalid") from exc
     return b"".join(encoded)
 
 
@@ -460,69 +414,61 @@ def _strict_json_loads(value: str) -> Any:
 
 def _read_json(path: Path, *, label: str) -> dict[str, Any]:
     try:
-        metadata = path.lstat()
+        file_metadata = path.lstat()
     except OSError:
-        raise EvalPlusExperimentError(f"required {label} is missing or unsafe") from None
+        raise MbppExperimentError(f"required {label} is missing or unsafe") from None
     if (
         path.is_symlink()
-        or not stat.S_ISREG(metadata.st_mode)
-        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or not stat.S_ISREG(file_metadata.st_mode)
+        or stat.S_IMODE(file_metadata.st_mode) != 0o600
     ):
-        raise EvalPlusExperimentError(f"required {label} is missing or unsafe")
+        raise MbppExperimentError(f"required {label} is missing or unsafe")
     try:
         if path.stat().st_size > _MAX_SAFE_ARTIFACT_BYTES:
-            raise EvalPlusExperimentError(f"required {label} exceeds the size limit")
+            raise MbppExperimentError(f"required {label} exceeds the size limit")
         value = _strict_json_loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, _AmbiguousJSON):
-        raise EvalPlusExperimentError(f"required {label} is not valid UTF-8 JSON") from None
+        raise MbppExperimentError(f"required {label} is not valid UTF-8 JSON") from None
     if not isinstance(value, dict):
-        raise EvalPlusExperimentError(f"required {label} must contain a JSON object")
+        raise MbppExperimentError(f"required {label} must contain a JSON object")
     return value
 
 
 def _read_jsonl(path: Path, *, label: str) -> list[dict[str, Any]]:
     try:
-        metadata = path.lstat()
+        file_metadata = path.lstat()
     except OSError:
-        raise EvalPlusExperimentError(f"required {label} is missing or unsafe") from None
+        raise MbppExperimentError(f"required {label} is missing or unsafe") from None
     if (
         path.is_symlink()
-        or not stat.S_ISREG(metadata.st_mode)
-        or stat.S_IMODE(metadata.st_mode) != 0o600
+        or not stat.S_ISREG(file_metadata.st_mode)
+        or stat.S_IMODE(file_metadata.st_mode) != 0o600
     ):
-        raise EvalPlusExperimentError(f"required {label} is missing or unsafe")
+        raise MbppExperimentError(f"required {label} is missing or unsafe")
     records: list[dict[str, Any]] = []
     try:
         if path.stat().st_size > _MAX_SAFE_ARTIFACT_BYTES:
-            raise EvalPlusExperimentError(f"required {label} exceeds the size limit")
+            raise MbppExperimentError(f"required {label} exceeds the size limit")
         with path.open(encoding="utf-8") as stream:
             for raw_line in stream:
                 if not raw_line.strip():
                     continue
                 value = _strict_json_loads(raw_line)
                 if not isinstance(value, dict):
-                    raise EvalPlusExperimentError(f"required {label} contains a non-object")
+                    raise MbppExperimentError(f"required {label} contains a non-object")
                 records.append(value)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, _AmbiguousJSON):
-        raise EvalPlusExperimentError(f"required {label} is not valid UTF-8 JSONL") from None
+        raise MbppExperimentError(f"required {label} is not valid UTF-8 JSONL") from None
     return records
 
 
 def _implementation_sha256() -> str:
-    """Fingerprint the phase-two implementation without inspecting user files."""
+    """Fingerprint the MBPP+ phase-two implementation without inspecting user files."""
 
     package_dir = Path(__file__).resolve().parent
     package_root = package_dir.parent
     files = set(package_dir.glob("*.py"))
-    files.update(
-        {
-            package_root / "cli.py",
-            package_root / "dataset" / "humanevalplus.py",
-            package_root / "dataset" / "loader.py",
-            package_root / "redaction.py",
-            package_root / "resources.py",
-        }
-    )
+    files.add(package_root / "dataset" / "mbppplus.py")
     digest = hashlib.sha256()
     for path in sorted((item for item in files if item.is_file()), key=lambda item: str(item)):
         digest.update(path.relative_to(package_root).as_posix().encode("utf-8"))
@@ -594,30 +540,341 @@ def _canonical_fingerprint(value: Mapping[str, Any]) -> str:
     )
 
 
-def _source_reference(exported: ValidatedSampleExport, problem_id: str) -> dict[str, Any]:
-    return asdict(exported.reference_for(problem_id))
+def _serialize_samples_jsonl(samples: Sequence[MbppPlusSample]) -> bytes:
+    return _jsonl_bytes(
+        [{"task_id": sample.task_id, "solution": sample.solution} for sample in samples]
+    )
 
 
-def _task_metadata_by_id(
-    exported: ValidatedSampleExport,
-) -> dict[str, HumanEvalPlusTaskMetadata]:
-    result = {item.problem_id: item for item in exported.task_metadata}
-    if set(result) != {sample.task_id for sample in exported.samples}:
-        raise EvalPlusExperimentError("public task metadata differs from exported samples")
+def _selection_manifest_identity(manifest_path: Path) -> tuple[dict[str, Any], Path]:
+    """Validate a selection or full-projection bundle manifest and locate its bundle."""
+
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        raise MbppExperimentError("MBPP+ dataset manifest is not valid UTF-8 JSON") from None
+    if not isinstance(payload, dict):
+        raise MbppExperimentError("MBPP+ dataset manifest must contain a JSON object")
+    kind = payload.get("kind")
+    if kind == SELECTION_MANIFEST_KIND:
+        expected_top_level = {
+            "schema_version",
+            "kind",
+            "experiment_label",
+            "metrics_scope",
+            "dataset_id",
+            "source",
+            "revision",
+            "release_tag",
+            "license",
+            "adapter",
+            "source_manifest_sha256",
+            "parent_manifest_sha256",
+            "raw_snapshot",
+            "public_projection",
+            "selection",
+            "withheld_fields",
+            "limitations",
+            "excluded_manifests",
+        }
+    elif kind == FULL_PROJECTION_KIND:
+        expected_top_level = {
+            "schema_version",
+            "kind",
+            "experiment_label",
+            "metrics_scope",
+            "dataset_id",
+            "source",
+            "revision",
+            "release_tag",
+            "license",
+            "adapter",
+            "source_manifest_sha256",
+            "raw_snapshot",
+            "public_projection",
+            "selection",
+            "withheld_fields",
+        }
+    else:
+        raise MbppExperimentError("MBPP+ dataset manifest kind is unsupported")
+    if set(payload) != expected_top_level:
+        raise MbppExperimentError("MBPP+ dataset manifest schema is invalid")
+    if payload.get("schema_version") != DATASET_MANIFEST_SCHEMA_VERSION:
+        raise MbppExperimentError("MBPP+ dataset manifest schema_version must be 1")
+    if (
+        payload.get("dataset_id") != DATASET_ID
+        or payload.get("source") != DATASET_SOURCE
+        or payload.get("metrics_scope") != "generation_and_parsing_only"
+        or payload.get("revision") != PINNED_MBPPPLUS_REVISION
+        or payload.get("release_tag") != MBPP_PLUS_VERSION
+        or payload.get("license") != "apache-2.0"
+        or payload.get("adapter") != {"name": ADAPTER_NAME, "version": ADAPTER_VERSION}
+    ):
+        raise MbppExperimentError("MBPP+ dataset manifest identity is invalid")
+
+    projection = payload.get("public_projection")
+    selection = payload.get("selection")
+    raw_snapshot = payload.get("raw_snapshot")
+    if not all(isinstance(item, Mapping) for item in (projection, selection, raw_snapshot)):
+        raise MbppExperimentError("MBPP+ dataset manifest structured fields are invalid")
+    assert isinstance(projection, Mapping)
+    assert isinstance(selection, Mapping)
+    assert isinstance(raw_snapshot, Mapping)
+    if set(projection) != {"path", "sha256", "record_count", "ordered_problem_ids_sha256"}:
+        raise MbppExperimentError("MBPP+ dataset manifest projection fields are invalid")
+    if set(raw_snapshot) != {
+        "aggregate_sha256",
+        "jsonl_sha256",
+        "official_dataset_md5",
+        "record_count",
+    }:
+        raise MbppExperimentError("MBPP+ dataset manifest raw snapshot fields are invalid")
+    if raw_snapshot.get("record_count") != EXPECTED_RECORD_COUNT:
+        raise MbppExperimentError("MBPP+ dataset manifest raw record count is invalid")
+    official_md5 = raw_snapshot.get("official_dataset_md5")
+    if not isinstance(official_md5, str) or _MD5_PATTERN.fullmatch(official_md5) is None:
+        raise MbppExperimentError("MBPP+ dataset manifest official dataset MD5 is invalid")
+    return payload, manifest_path.parent
+
+
+def _validated_selected_ids(selection: Mapping[str, Any], *, kind: str) -> list[str]:
+    if kind == FULL_PROJECTION_KIND:
+        if set(selection) != {"algorithm", "count", "selected_problem_ids"}:
+            raise MbppExperimentError("MBPP+ full projection selection fields are invalid")
+        if selection.get("algorithm") != FULL_SELECTION_ALGORITHM:
+            raise MbppExperimentError("MBPP+ full projection selection algorithm is invalid")
+    else:
+        if set(selection) != {
+            "algorithm",
+            "seed",
+            "count",
+            "selected_problem_ids",
+            "selected_problem_ids_sha256",
+            "excluded_problem_ids",
+            "excluded_problem_ids_sha256",
+            "excluded_manifests_count",
+            "excluded_manifests_sha256",
+        }:
+            raise MbppExperimentError("MBPP+ selection fields are invalid")
+        if selection.get("algorithm") != SELECTION_ALGORITHM:
+            raise MbppExperimentError("MBPP+ selection algorithm is invalid")
+        if isinstance(selection.get("seed"), bool) or not isinstance(selection.get("seed"), int):
+            raise MbppExperimentError("MBPP+ selection seed is invalid")
+    selected = selection.get("selected_problem_ids")
+    count = selection.get("count")
+    if (
+        not isinstance(selected, list)
+        or not selected
+        or len(selected) > EXPECTED_RECORD_COUNT
+        or any(
+            not isinstance(item, str) or not _TASK_ID_PATTERN.fullmatch(item) for item in selected
+        )
+        or len(set(selected)) != len(selected)
+    ):
+        raise MbppExperimentError("MBPP+ selected problem IDs are invalid")
+    if isinstance(count, bool) or not isinstance(count, int) or count != len(selected):
+        raise MbppExperimentError("MBPP+ selection count is invalid")
+    return list(selected)
+
+
+def _dataset_identity(
+    manifest: Mapping[str, Any],
+    *,
+    manifest_path: Path,
+    selected_ids: Sequence[str],
+) -> MbppPlusDatasetIdentity:
+    kind = str(manifest.get("kind"))
+    projection = manifest.get("public_projection")
+    raw_snapshot = manifest.get("raw_snapshot")
+    selection = manifest.get("selection")
+    adapter = manifest.get("adapter")
+    assert isinstance(projection, Mapping)
+    assert isinstance(raw_snapshot, Mapping)
+    assert isinstance(selection, Mapping)
+    assert isinstance(adapter, Mapping)
+    excluded = selection.get("excluded_problem_ids")
+    if kind == FULL_PROJECTION_KIND:
+        excluded_ids: tuple[str, ...] = ()
+        parent_hash = ""
+        seed = 0
+        algorithm = FULL_SELECTION_ALGORITHM
+        selected_hash = str(projection.get("ordered_problem_ids_sha256"))
+    else:
+        if not isinstance(excluded, list) or any(
+            not isinstance(item, str) or not _TASK_ID_PATTERN.fullmatch(item) for item in excluded
+        ):
+            raise MbppExperimentError("MBPP+ excluded problem IDs are invalid")
+        excluded_ids = tuple(str(item) for item in excluded)
+        parent_value = manifest.get("parent_manifest_sha256")
+        if not isinstance(parent_value, str) or not _SHA256_PATTERN.fullmatch(parent_value):
+            raise MbppExperimentError("MBPP+ parent manifest hash is invalid")
+        parent_hash = parent_value
+        seed = int(selection.get("seed"))
+        algorithm = SELECTION_ALGORITHM
+        selected_hash_value = selection.get("selected_problem_ids_sha256")
+        if not isinstance(selected_hash_value, str) or not _SHA256_PATTERN.fullmatch(
+            selected_hash_value
+        ):
+            raise MbppExperimentError("MBPP+ selected ID hash is invalid")
+        selected_hash = selected_hash_value
+    source_hash = manifest.get("source_manifest_sha256")
+    problems_hash = projection.get("sha256")
+    ordered_hash = projection.get("ordered_problem_ids_sha256")
+    aggregate_hash = raw_snapshot.get("aggregate_sha256")
+    jsonl_hash = raw_snapshot.get("jsonl_sha256")
+    for value in (source_hash, problems_hash, ordered_hash, aggregate_hash, jsonl_hash):
+        if not isinstance(value, str) or not _SHA256_PATTERN.fullmatch(value):
+            raise MbppExperimentError("MBPP+ dataset manifest hashes are invalid")
+    assert isinstance(source_hash, str)
+    assert isinstance(problems_hash, str)
+    assert isinstance(ordered_hash, str)
+    assert isinstance(aggregate_hash, str)
+    assert isinstance(jsonl_hash, str)
+    return MbppPlusDatasetIdentity(
+        manifest_sha256=_sha256_file(manifest_path),
+        dataset_id=DATASET_ID,
+        source=DATASET_SOURCE,
+        revision=str(manifest.get("revision")),
+        release_tag=str(manifest.get("release_tag")),
+        license=str(manifest.get("license")),
+        adapter_name=str(adapter.get("name")),
+        adapter_version=int(adapter.get("version")),
+        source_manifest_sha256=source_hash,
+        parent_manifest_sha256=parent_hash,
+        raw_snapshot_aggregate_sha256=aggregate_hash,
+        raw_jsonl_sha256=jsonl_hash,
+        official_dataset_md5=str(raw_snapshot.get("official_dataset_md5")),
+        problems_sha256=problems_hash,
+        ordered_problem_ids_sha256=ordered_hash,
+        selection_algorithm=algorithm,
+        selection_seed=seed,
+        selected_problem_ids=tuple(selected_ids),
+        selected_problem_ids_sha256=selected_hash,
+        excluded_problem_ids=excluded_ids,
+    )
+
+
+def load_validated_mbpp_inputs(
+    dataset_manifest_path: str | Path,
+    candidates_path: str | Path,
+) -> ValidatedMbppInputs:
+    """Statically validate the selection bundle and candidates before any execution.
+
+    This boundary performs no Docker interaction and never imports or runs
+    candidate code; it only parses JSON and hashes bytes.
+    """
+
+    manifest_path = Path(dataset_manifest_path).expanduser().resolve()
+    manifest, bundle_dir = _selection_manifest_identity(manifest_path)
+    projection = manifest.get("public_projection")
+    assert isinstance(projection, Mapping)
+    kind = str(manifest.get("kind"))
+    selected_ids = _validated_selected_ids(manifest.get("selection") or {}, kind=kind)
+    dataset = _dataset_identity(manifest, manifest_path=manifest_path, selected_ids=selected_ids)
+
+    problems_path = bundle_dir / "problems.jsonl"
+    try:
+        problems_bytes = problems_path.read_bytes()
+    except OSError:
+        raise MbppExperimentError("MBPP+ public projection problems.jsonl is missing") from None
+    if _sha256_bytes(problems_bytes) != dataset.problems_sha256:
+        raise MbppExperimentError("MBPP+ public projection does not match its dataset manifest")
+    try:
+        problems = load_problems(problems_path)
+    except DatasetError as exc:
+        raise MbppExperimentError(f"MBPP+ public projection is invalid: {exc}") from exc
+    try:
+        validate_mbppplus_public_problems(problems)
+    except DatasetError as exc:
+        raise MbppExperimentError(f"MBPP+ public projection is invalid: {exc}") from exc
+    if [problem.problem_id for problem in problems] != selected_ids:
+        raise MbppExperimentError("MBPP+ public projection tasks differ from the selection")
+
+    candidates_file = Path(candidates_path).expanduser().resolve()
+    candidate_rows = _read_jsonl(candidates_file, label="MBPP+ candidates.jsonl")
+    if len(candidate_rows) != len(selected_ids):
+        raise MbppExperimentError("MBPP+ candidates must cover exactly the selected task set")
+    selected_set = set(selected_ids)
+    seen_tasks: set[str] = set()
+    seen_candidates: set[str] = set()
+    samples: list[MbppPlusSample] = []
+    candidates: list[MbppCandidateRecord] = []
+    for row in candidate_rows:
+        if set(row) != _CANDIDATE_ROW_FIELDS:
+            raise MbppExperimentError("MBPP+ candidate row fields are invalid")
+        task_id = row.get("task_id")
+        candidate_id = row.get("candidate_id")
+        code = row.get("code")
+        if not isinstance(task_id, str) or task_id not in selected_set or task_id in seen_tasks:
+            raise MbppExperimentError("MBPP+ candidate task IDs are invalid or duplicated")
+        if not isinstance(candidate_id, str) or not _CANDIDATE_ID_PATTERN.fullmatch(candidate_id):
+            raise MbppExperimentError("MBPP+ candidate_id is invalid")
+        if candidate_id in seen_candidates:
+            raise MbppExperimentError("MBPP+ candidate_id values must be unique")
+        if not isinstance(code, str) or not code.strip():
+            raise MbppExperimentError("MBPP+ candidate code must be non-empty text")
+        code_bytes = code.encode("utf-8")
+        if len(code_bytes) > _MAX_CANDIDATE_CODE_BYTES:
+            raise MbppExperimentError("MBPP+ candidate code exceeds the size limit")
+        seen_tasks.add(task_id)
+        seen_candidates.add(candidate_id)
+        samples.append(MbppPlusSample(task_id=task_id, solution=code))
+        candidates.append(
+            MbppCandidateRecord(
+                task_id=task_id,
+                candidate_id=candidate_id,
+                code_sha256=hashlib.sha256(code_bytes).hexdigest(),
+            )
+        )
+
+    # Order execution inputs by the manifest's numeric task order, not by the
+    # arrival order of candidate rows.
+    samples_by_task = {sample.task_id: sample for sample in samples}
+    candidates_by_task = {record.task_id: record for record in candidates}
+    ordered_samples = tuple(samples_by_task[task_id] for task_id in selected_ids)
+    ordered_candidates = tuple(candidates_by_task[task_id] for task_id in selected_ids)
+
+    problems_by_id = {problem.problem_id: problem for problem in problems}
+    task_metadata = tuple(
+        MbppPlusTaskMetadata(
+            problem_id=task_id,
+            prompt_sha256=hashlib.sha256(
+                problems_by_id[task_id].requirement.encode("utf-8")
+            ).hexdigest(),
+            entry_point=problems_by_id[task_id].function_name or "",
+        )
+        for task_id in selected_ids
+    )
+    if any(not item.entry_point for item in task_metadata):
+        raise MbppExperimentError("MBPP+ public projection is missing an entry point")
+
+    sample_bytes = _serialize_samples_jsonl(ordered_samples)
+    candidate_bytes = _jsonl_bytes([asdict(record) for record in ordered_candidates])
+    return ValidatedMbppInputs(
+        dataset=dataset,
+        samples=ordered_samples,
+        candidates=ordered_candidates,
+        task_metadata=task_metadata,
+        samples_sha256=_sha256_bytes(sample_bytes),
+        candidates_sha256=_sha256_bytes(candidate_bytes),
+    )
+
+
+def _task_metadata_by_id(inputs: ValidatedMbppInputs) -> dict[str, MbppPlusTaskMetadata]:
+    result = {item.problem_id: item for item in inputs.task_metadata}
+    if set(result) != {sample.task_id for sample in inputs.samples}:
+        raise MbppExperimentError("public task metadata differs from validated samples")
     return result
 
 
-def _input_identity(exported: ValidatedSampleExport) -> dict[str, Any]:
+def _input_identity(inputs: ValidatedMbppInputs) -> dict[str, Any]:
     return {
-        "record_count": len(exported.samples),
-        "samples_sha256": exported.samples_sha256,
-        "ordered_problem_ids": [sample.task_id for sample in exported.samples],
-        "public_task_identity": [asdict(metadata) for metadata in exported.task_metadata],
-        "code_sha256": {
-            reference.problem_id: reference.code_sha256
-            for reference in exported.response_references
-        },
-        "phase1_export_selection": asdict(exported.export_selection),
+        "record_count": len(inputs.samples),
+        "samples_sha256": inputs.samples_sha256,
+        "candidates_sha256": inputs.candidates_sha256,
+        "ordered_problem_ids": [sample.task_id for sample in inputs.samples],
+        "public_task_identity": [asdict(item) for item in inputs.task_metadata],
+        "code_sha256": {record.task_id: record.code_sha256 for record in inputs.candidates},
     }
 
 
@@ -653,14 +910,14 @@ def _validate_resume_manifest_schema(
     *,
     run_id: str,
     execution_mode: str,
-    exported: ValidatedSampleExport,
+    inputs: ValidatedMbppInputs,
 ) -> None:
-    expected_label, expected_scope, expected_limitations, _ = _phase2_identity(exported)
+    expected_label, expected_scope, expected_limitations, _ = _phase2_identity(len(inputs.samples))
     if set(manifest) != _MANIFEST_FIELDS:
-        raise EvalPlusExperimentError("resume manifest schema is invalid")
+        raise MbppExperimentError("resume manifest schema is invalid")
     if (
         manifest.get("schema_version") != 1
-        or manifest.get("phase") != "phase2_evalplus_execution"
+        or manifest.get("phase") != "phase2_evalplus_mbpp_execution"
         or manifest.get("experiment_label") != expected_label
         or manifest.get("metrics_scope") != expected_scope
         or manifest.get("run_id") != run_id
@@ -670,16 +927,15 @@ def _validate_resume_manifest_schema(
         or not isinstance(manifest.get("resume_fingerprint"), str)
         or not _SHA256_PATTERN.fullmatch(str(manifest.get("resume_fingerprint")))
     ):
-        raise EvalPlusExperimentError("resume manifest identity is invalid")
-    for field in ("created_at",):
-        value = manifest.get(field)
-        if not isinstance(value, str) or not _ISO_UTC_PATTERN.fullmatch(value):
-            raise EvalPlusExperimentError("resume manifest timestamp is invalid")
+        raise MbppExperimentError("resume manifest identity is invalid")
+    created_at = manifest.get("created_at")
+    if not isinstance(created_at, str) or not _ISO_UTC_PATTERN.fullmatch(created_at):
+        raise MbppExperimentError("resume manifest timestamp is invalid")
     completed_at = manifest.get("completed_at")
     if completed_at is not None and (
         not isinstance(completed_at, str) or not _ISO_UTC_PATTERN.fullmatch(completed_at)
     ):
-        raise EvalPlusExperimentError("resume manifest timestamp is invalid")
+        raise MbppExperimentError("resume manifest timestamp is invalid")
 
     git = manifest.get("git")
     if not isinstance(git, Mapping) or set(git) != {
@@ -689,14 +945,14 @@ def _validate_resume_manifest_schema(
         "dirty",
         "implementation_sha256",
     }:
-        raise EvalPlusExperimentError("resume manifest Git metadata is invalid")
+        raise MbppExperimentError("resume manifest Git metadata is invalid")
     environment = manifest.get("environment")
     if not isinstance(environment, Mapping) or set(environment) != {
         "python",
         "platform",
         "direct_dependencies",
     }:
-        raise EvalPlusExperimentError("resume manifest environment metadata is invalid")
+        raise MbppExperimentError("resume manifest environment metadata is invalid")
     python_identity = environment.get("python")
     platform_identity = environment.get("platform")
     dependencies = environment.get("direct_dependencies")
@@ -708,7 +964,7 @@ def _validate_resume_manifest_schema(
         or not isinstance(dependencies, Mapping)
         or set(dependencies) != set(_DIRECT_DEPENDENCIES)
     ):
-        raise EvalPlusExperimentError("resume manifest environment metadata is invalid")
+        raise MbppExperimentError("resume manifest environment metadata is invalid")
 
     preflight = manifest.get("preflight")
     if not isinstance(preflight, Mapping) or preflight.get("status") not in {
@@ -716,7 +972,7 @@ def _validate_resume_manifest_schema(
         "ready",
         "failed",
     }:
-        raise EvalPlusExperimentError("resume manifest preflight metadata is invalid")
+        raise MbppExperimentError("resume manifest preflight metadata is invalid")
     allowed_preflight_fields = {
         "status",
         "ready",
@@ -725,11 +981,11 @@ def _validate_resume_manifest_schema(
     if preflight.get("status") == "pending" and "prior_status" in preflight:
         allowed_preflight_fields.add("prior_status")
     if set(preflight) != allowed_preflight_fields:
-        raise EvalPlusExperimentError("resume manifest preflight metadata is invalid")
+        raise MbppExperimentError("resume manifest preflight metadata is invalid")
 
     invocations = manifest.get("invocations")
     if not isinstance(invocations, list) or not invocations:
-        raise EvalPlusExperimentError("resume manifest invocation history is invalid")
+        raise MbppExperimentError("resume manifest invocation history is invalid")
     for invocation in invocations:
         if not isinstance(invocation, Mapping) or set(invocation) != {
             "invocation_id",
@@ -738,7 +994,7 @@ def _validate_resume_manifest_schema(
             "completed_at",
             "status",
         }:
-            raise EvalPlusExperimentError("resume manifest invocation history is invalid")
+            raise MbppExperimentError("resume manifest invocation history is invalid")
         invocation_id = invocation.get("invocation_id")
         started_at = invocation.get("started_at")
         invocation_completed_at = invocation.get("completed_at")
@@ -757,13 +1013,13 @@ def _validate_resume_manifest_schema(
                 )
             )
         ):
-            raise EvalPlusExperimentError("resume manifest invocation history is invalid")
+            raise MbppExperimentError("resume manifest invocation history is invalid")
 
 
 def _validate_resume_before_preflight(
     manifest: Mapping[str, Any],
-    exported: ValidatedSampleExport,
-    executor: EvalPlusExecutor,
+    inputs: ValidatedMbppInputs,
+    executor: MbppEvalPlusExecutor,
     *,
     run_id: str,
     max_workers: int,
@@ -776,11 +1032,10 @@ def _validate_resume_before_preflight(
         manifest,
         run_id=run_id,
         execution_mode=executor.mode,
-        exported=exported,
+        inputs=inputs,
     )
 
     recorded_static = {
-        "phase1_source": manifest.get("phase1_source"),
         "dataset": manifest.get("dataset"),
         "input": manifest.get("input"),
         "execution_config": manifest.get("execution_config"),
@@ -788,9 +1043,8 @@ def _validate_resume_before_preflight(
         "environment": manifest.get("environment"),
     }
     expected_static = {
-        "phase1_source": asdict(exported.phase1),
-        "dataset": asdict(exported.dataset),
-        "input": _input_identity(exported),
+        "dataset": asdict(inputs.dataset),
+        "input": _input_identity(inputs),
         "execution_config": _execution_config(
             max_workers=max_workers,
             per_task_timeout_seconds=per_task_timeout_seconds,
@@ -801,19 +1055,19 @@ def _validate_resume_before_preflight(
     }
     if (
         manifest.get("schema_version") != 1
-        or manifest.get("phase") != "phase2_evalplus_execution"
+        or manifest.get("phase") != "phase2_evalplus_mbpp_execution"
         or manifest.get("run_id") != run_id
         or _canonical_fingerprint(recorded_static) != _canonical_fingerprint(expected_static)
     ):
-        raise EvalPlusExperimentError(_RESUME_IDENTITY_ERROR)
+        raise MbppExperimentError(_RESUME_IDENTITY_ERROR)
     recorded_executor = manifest.get("executor")
     if not isinstance(recorded_executor, Mapping) or _canonical_fingerprint(
         _static_executor_identity(recorded_executor)
     ) != _canonical_fingerprint(_static_executor_identity(executor.public_identity())):
-        raise EvalPlusExperimentError(_RESUME_IDENTITY_ERROR)
+        raise MbppExperimentError(_RESUME_IDENTITY_ERROR)
     git = manifest.get("git")
     if not isinstance(git, Mapping) or git.get("implementation_sha256") != _implementation_sha256():
-        raise EvalPlusExperimentError(_RESUME_IDENTITY_ERROR)
+        raise MbppExperimentError(_RESUME_IDENTITY_ERROR)
 
 
 def _validate_completed_output_integrity(
@@ -828,10 +1082,10 @@ def _validate_completed_output_integrity(
     output = manifest.get("output")
     if status == "running":
         if output is not None:
-            raise EvalPlusExperimentError("running resume manifest has final output metadata")
+            raise MbppExperimentError("running resume manifest has final output metadata")
         return
     if status != "completed" or not isinstance(output, Mapping):
-        raise EvalPlusExperimentError("resume manifest status/output metadata is invalid")
+        raise MbppExperimentError("resume manifest status/output metadata is invalid")
     expected_paths = {
         "samples_sha256": paths.samples,
         "raw_results_sha256": paths.raw_results,
@@ -843,7 +1097,7 @@ def _validate_completed_output_integrity(
         set(output) != {*expected_paths, "result_count"}
         or output.get("result_count") != expected_result_count
     ):
-        raise EvalPlusExperimentError("resume manifest status/output metadata is invalid")
+        raise MbppExperimentError("resume manifest status/output metadata is invalid")
     for field, path in expected_paths.items():
         expected_hash = output.get(field)
         if (
@@ -854,22 +1108,21 @@ def _validate_completed_output_integrity(
             or stat.S_IMODE(path.stat().st_mode) != 0o600
             or _sha256_file(path) != expected_hash
         ):
-            raise EvalPlusExperimentError("completed phase-two output hash validation failed")
+            raise MbppExperimentError("completed phase-two output hash validation failed")
 
 
 def _manifest_identity(
-    exported: ValidatedSampleExport,
-    executor: EvalPlusExecutor,
+    inputs: ValidatedMbppInputs,
+    executor: MbppEvalPlusExecutor,
     preflight: ExecutorPreflight,
     *,
     max_workers: int,
     per_task_timeout_seconds: float,
     batch_timeout_seconds: float,
 ) -> dict[str, Any]:
-    identity = {
-        "phase1_source": asdict(exported.phase1),
-        "dataset": asdict(exported.dataset),
-        "input": _input_identity(exported),
+    return {
+        "dataset": asdict(inputs.dataset),
+        "input": _input_identity(inputs),
         "executor": dict(executor.public_identity()),
         "executor_runtime": dict(preflight.runtime),
         "execution_config": _execution_config(
@@ -881,23 +1134,22 @@ def _manifest_identity(
         "environment": _environment_metadata(),
         "implementation_sha256": _implementation_sha256(),
     }
-    return identity
 
 
 def _new_manifest(
     run_id: str,
-    exported: ValidatedSampleExport,
-    executor: EvalPlusExecutor,
+    inputs: ValidatedMbppInputs,
+    executor: MbppEvalPlusExecutor,
     identity: Mapping[str, Any],
     *,
     created_at: str,
     initial_resume: bool = False,
 ) -> dict[str, Any]:
-    experiment_label, metrics_scope, limitations, _ = _phase2_identity(exported)
+    experiment_label, metrics_scope, limitations, _ = _phase2_identity(len(inputs.samples))
     invocation_id = uuid.uuid4().hex
     return {
         "schema_version": 1,
-        "phase": "phase2_evalplus_execution",
+        "phase": "phase2_evalplus_mbpp_execution",
         "experiment_label": experiment_label,
         "metrics_scope": metrics_scope,
         "run_id": run_id,
@@ -905,8 +1157,7 @@ def _new_manifest(
         "created_at": created_at,
         "completed_at": None,
         "execution_mode": executor.mode,
-        "phase1_source": asdict(exported.phase1),
-        "dataset": asdict(exported.dataset),
+        "dataset": asdict(inputs.dataset),
         "input": identity["input"],
         "executor": identity["executor"],
         "executor_runtime": identity["executor_runtime"],
@@ -938,8 +1189,11 @@ def _begin_resume_manifest(
     *,
     started_at: str,
 ) -> dict[str, Any]:
-    if manifest.get("schema_version") != 1 or manifest.get("phase") != "phase2_evalplus_execution":
-        raise EvalPlusExperimentError("resume manifest identity is invalid")
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("phase") != "phase2_evalplus_mbpp_execution"
+    ):
+        raise MbppExperimentError("resume manifest identity is invalid")
     previous_preflight = manifest.get("preflight")
     previous_preflight_status = None
     if isinstance(previous_preflight, Mapping):
@@ -955,7 +1209,7 @@ def _begin_resume_manifest(
             )
     invocations = manifest.get("invocations")
     if not isinstance(invocations, list):
-        raise EvalPlusExperimentError("resume manifest invocation history is invalid")
+        raise MbppExperimentError("resume manifest invocation history is invalid")
     for invocation in invocations:
         if isinstance(invocation, dict) and invocation.get("status") == "running":
             invocation["status"] = "interrupted"
@@ -993,15 +1247,14 @@ def _apply_preflight_to_manifest(
     expected_fingerprint = _canonical_fingerprint(identity)
     preflight_record = manifest.get("preflight")
     if not isinstance(preflight_record, Mapping) or preflight_record.get("status") != "pending":
-        raise EvalPlusExperimentError("phase-two preflight checkpoint is invalid")
+        raise MbppExperimentError("phase-two preflight checkpoint is invalid")
     prior_status = preflight_record.get("prior_status") if resumed else None
     if resumed and prior_status in {"ready", "failed"}:
         if manifest.get("resume_fingerprint") != expected_fingerprint:
-            raise EvalPlusExperimentError(_RESUME_IDENTITY_ERROR)
+            raise MbppExperimentError(_RESUME_IDENTITY_ERROR)
     elif resumed and prior_status not in {None, "pending"}:
-        raise EvalPlusExperimentError("resume preflight checkpoint is invalid")
+        raise MbppExperimentError("resume preflight checkpoint is invalid")
 
-    manifest["phase1_source"] = identity["phase1_source"]
     manifest["dataset"] = identity["dataset"]
     manifest["input"] = identity["input"]
     manifest["executor"] = identity["executor"]
@@ -1108,25 +1361,24 @@ def _validated_existing_events(paths: _RunPaths) -> list[dict[str, Any]]:
             or record.get("event") not in allowed_events
             or any(isinstance(value, Mapping | list) for value in record.values())
         ):
-            raise EvalPlusExperimentError("resume execution log is invalid")
+            raise MbppExperimentError("resume execution log is invalid")
         problem_id = record.get("problem_id")
         if problem_id is not None and (
-            not isinstance(problem_id, str)
-            or not re.fullmatch(r"HumanEval/(?:0|[1-9][0-9]*)", problem_id)
+            not isinstance(problem_id, str) or not _TASK_ID_PATTERN.fullmatch(problem_id)
         ):
-            raise EvalPlusExperimentError("resume execution log is invalid")
+            raise MbppExperimentError("resume execution log is invalid")
         for field in ("stdout_sha256", "stderr_sha256"):
             value = record.get(field)
             if value is not None and (
                 not isinstance(value, str) or not _SHA256_PATTERN.fullmatch(value)
             ):
-                raise EvalPlusExperimentError("resume execution log is invalid")
+                raise MbppExperimentError("resume execution log is invalid")
         infrastructure_error_type = record.get("infrastructure_error_type")
         if (
             infrastructure_error_type is not None
             and infrastructure_error_type not in INFRASTRUCTURE_ERROR_TYPES
         ):
-            raise EvalPlusExperimentError("resume execution log is invalid")
+            raise MbppExperimentError("resume execution log is invalid")
         cleanup_status = record.get("cleanup_status")
         if cleanup_status is not None and cleanup_status not in {
             "not_needed",
@@ -1134,7 +1386,7 @@ def _validated_existing_events(paths: _RunPaths) -> list[dict[str, Any]]:
             "not_found",
             "failed",
         }:
-            raise EvalPlusExperimentError("resume execution log is invalid")
+            raise MbppExperimentError("resume execution log is invalid")
         for field in (
             "duration_seconds",
             "exit_code",
@@ -1150,11 +1402,11 @@ def _validated_existing_events(paths: _RunPaths) -> list[dict[str, Any]]:
                 or not math.isfinite(float(value))
                 or value < 0
             ):
-                raise EvalPlusExperimentError("resume execution log is invalid")
+                raise MbppExperimentError("resume execution log is invalid")
         for field in ("ready", "candidate_execution"):
             value = record.get(field)
             if value is not None and not isinstance(value, bool):
-                raise EvalPlusExperimentError("resume execution log is invalid")
+                raise MbppExperimentError("resume execution log is invalid")
     return records
 
 
@@ -1181,14 +1433,17 @@ def _mock_raw_bundle(expected_ids: Sequence[str]) -> dict[str, Any]:
     }
 
 
+def _source_candidate(inputs: ValidatedMbppInputs, problem_id: str) -> dict[str, Any]:
+    return asdict(inputs.candidate_for(problem_id))
+
+
 def _mock_safe_result(
-    exported: ValidatedSampleExport,
+    inputs: ValidatedMbppInputs,
     problem_id: str,
     *,
     run_id: str,
     timestamp: str,
 ) -> dict[str, Any]:
-    reference = exported.reference_for(problem_id)
     return {
         "schema_version": 1,
         "run_id": run_id,
@@ -1201,19 +1456,19 @@ def _mock_safe_result(
         "passed_plus": False,
         "error_type": "mock_not_executed",
         "infrastructure_status": "mocked",
-        "solution_sha256": reference.code_sha256,
+        "solution_sha256": inputs.candidate_for(problem_id).code_sha256,
         "official_override_hash": None,
         "duration_seconds": 0.0,
         "started_at": timestamp,
         "ended_at": timestamp,
         "failure_count_scope": "not_applicable_mock",
-        "source_response": _source_reference(exported, problem_id),
+        "source_candidate": _source_candidate(inputs, problem_id),
     }
 
 
 def _enrich_safe_result(
     safe_result: Mapping[str, Any],
-    exported: ValidatedSampleExport,
+    inputs: ValidatedMbppInputs,
     outcome: ExecutorTaskOutcome,
     *,
     run_id: str,
@@ -1231,36 +1486,34 @@ def _enrich_safe_result(
             if infrastructure_status == "ok"
             else "not_applicable_infrastructure"
         ),
-        "source_response": _source_reference(exported, outcome.problem_id),
+        "source_candidate": _source_candidate(inputs, outcome.problem_id),
     }
 
 
 def _validated_existing_results(
     paths: _RunPaths,
-    exported: ValidatedSampleExport,
+    inputs: ValidatedMbppInputs,
     *,
     run_id: str,
 ) -> dict[str, dict[str, Any]]:
     if not paths.results.exists():
         return {}
-    expected_ids = {sample.task_id for sample in exported.samples}
+    expected_ids = {sample.task_id for sample in inputs.samples}
     records = _read_jsonl(paths.results, label="phase-two results.jsonl")
     by_problem: dict[str, dict[str, Any]] = {}
     for record in records:
         if set(record) != _RESULT_FIELDS:
-            raise EvalPlusExperimentError("resume result schema is invalid")
+            raise MbppExperimentError("resume result schema is invalid")
         problem_id = record.get("problem_id")
         if (
             not isinstance(problem_id, str)
             or problem_id not in expected_ids
             or problem_id in by_problem
         ):
-            raise EvalPlusExperimentError(
-                "resume results contain an invalid or duplicate problem_id"
-            )
-        source = record.get("source_response")
-        if source != _source_reference(exported, problem_id):
-            raise EvalPlusExperimentError("resume result source reference changed")
+            raise MbppExperimentError("resume results contain an invalid or duplicate problem_id")
+        source = record.get("source_candidate")
+        if source != _source_candidate(inputs, problem_id):
+            raise MbppExperimentError("resume result source candidate changed")
         duration = record.get("duration_seconds")
         if duration is not None and (
             isinstance(duration, bool)
@@ -1268,7 +1521,7 @@ def _validated_existing_results(
             or not math.isfinite(float(duration))
             or duration < 0
         ):
-            raise EvalPlusExperimentError("resume result duration is invalid")
+            raise MbppExperimentError("resume result duration is invalid")
         infrastructure_status = record.get("infrastructure_status")
         expected_failure_scope = {
             "ok": "recorded_by_evalplus_test_details",
@@ -1284,11 +1537,11 @@ def _validated_existing_results(
             or not isinstance(record.get("ended_at"), str)
             or not _ISO_UTC_PATTERN.fullmatch(str(record.get("ended_at")))
         ):
-            raise EvalPlusExperimentError("resume result identity is invalid")
-        expected_code_hash = exported.reference_for(problem_id).code_sha256
+            raise MbppExperimentError("resume result identity is invalid")
+        expected_code_hash = inputs.candidate_for(problem_id).code_sha256
         if infrastructure_status in {"ok", "mocked"}:
             if record.get("solution_sha256") != expected_code_hash:
-                raise EvalPlusExperimentError("resume result solution fingerprint changed")
+                raise MbppExperimentError("resume result solution fingerprint changed")
         elif infrastructure_status == "error":
             error_type = record.get("error_type")
             try:
@@ -1297,12 +1550,12 @@ def _validated_existing_results(
                     error_type=str(error_type),
                 )
             except EvalPlusParseError:
-                raise EvalPlusExperimentError("resume infrastructure result is invalid") from None
+                raise MbppExperimentError("resume infrastructure result is invalid") from None
             for field, expected_value in expected_infrastructure.items():
                 if record.get(field) != expected_value:
-                    raise EvalPlusExperimentError("resume infrastructure result is invalid")
+                    raise MbppExperimentError("resume infrastructure result is invalid")
         else:
-            raise EvalPlusExperimentError("resume result infrastructure status is invalid")
+            raise MbppExperimentError("resume result infrastructure status is invalid")
         by_problem[problem_id] = record
     return by_problem
 
@@ -1310,7 +1563,7 @@ def _validated_existing_results(
 def _validated_existing_raw(
     paths: _RunPaths,
     results_by_problem: dict[str, dict[str, Any]],
-    exported: ValidatedSampleExport,
+    inputs: ValidatedMbppInputs,
 ) -> dict[str, Mapping[str, Any]]:
     if not paths.raw_results.exists():
         for problem_id in list(results_by_problem):
@@ -1319,7 +1572,7 @@ def _validated_existing_raw(
         return {}
     payload = _read_json(paths.raw_results, label="phase-two raw results")
     if payload.get("kind") == RAW_MOCK_BUNDLE_KIND:
-        expected_problem_ids = [sample.task_id for sample in exported.samples]
+        expected_problem_ids = [sample.task_id for sample in inputs.samples]
         if (
             set(payload) != {"schema_version", "kind", "execution_performed", "problem_ids"}
             or payload.get("schema_version") != 1
@@ -1330,7 +1583,7 @@ def _validated_existing_raw(
                 for record in results_by_problem.values()
             )
         ):
-            raise EvalPlusExperimentError("mock raw bundle differs from safe results")
+            raise MbppExperimentError("mock raw bundle differs from safe results")
         return {}
     if (
         set(payload) != {"schema_version", "kind", "raw_results"}
@@ -1338,28 +1591,28 @@ def _validated_existing_raw(
         or payload.get("kind") != RAW_BUNDLE_KIND
         or not isinstance(payload.get("raw_results"), list)
     ):
-        raise EvalPlusExperimentError("resume raw result bundle identity is invalid")
+        raise MbppExperimentError("resume raw result bundle identity is invalid")
     by_problem: dict[str, Mapping[str, Any]] = {}
     for document in payload["raw_results"]:
         if not isinstance(document, Mapping):
-            raise EvalPlusExperimentError("resume raw bundle contains a non-object")
+            raise MbppExperimentError("resume raw bundle contains a non-object")
         evaluations = document.get("eval")
         if not isinstance(evaluations, Mapping) or len(evaluations) != 1:
-            raise EvalPlusExperimentError("resume raw document shape is invalid")
+            raise MbppExperimentError("resume raw document shape is invalid")
         problem_id = next(iter(evaluations))
         if not isinstance(problem_id, str) or problem_id in by_problem:
-            raise EvalPlusExperimentError("resume raw bundle contains duplicate task data")
+            raise MbppExperimentError("resume raw bundle contains duplicate task data")
         safe_record = results_by_problem.get(problem_id)
         if safe_record is None or safe_record.get("infrastructure_status") != "ok":
-            raise EvalPlusExperimentError("resume raw bundle has no matching safe result")
+            raise MbppExperimentError("resume raw bundle has no matching safe result")
         try:
             parsed = parse_official_result(
                 document,
                 expected_problem_id=problem_id,
-                expected_solution_sha256=exported.reference_for(problem_id).code_sha256,
+                expected_solution_sha256=inputs.candidate_for(problem_id).code_sha256,
             )
         except EvalPlusParseError:
-            raise EvalPlusExperimentError("resume raw result failed strict validation") from None
+            raise MbppExperimentError("resume raw result failed strict validation") from None
         for field in (
             "problem_id",
             "base_status",
@@ -1374,9 +1627,7 @@ def _validated_existing_raw(
             "official_override_hash",
         ):
             if safe_record.get(field) != parsed.get(field):
-                raise EvalPlusExperimentError(
-                    "resume safe result differs from its official raw result"
-                )
+                raise MbppExperimentError("resume safe result differs from its official raw result")
         by_problem[problem_id] = document
     # A process can stop after atomically publishing results.jsonl but before
     # the corresponding raw bundle replacement.  Treat raw as authoritative
@@ -1420,7 +1671,7 @@ def _summary_for_run(
     execution_mode: Literal["docker", "mock"],
     completed_at: str,
     reused_problem_ids: Sequence[str],
-    exported: ValidatedSampleExport,
+    inputs: ValidatedMbppInputs,
 ) -> dict[str, Any]:
     core = build_summary(
         results,
@@ -1429,25 +1680,17 @@ def _summary_for_run(
     )
     reused = set(reused_problem_ids)
     current = [result for result in results if result.get("problem_id") not in reused]
-    experiment_label, metrics_scope, limitations, cohort_description = _phase2_identity(exported)
-    selection = exported.export_selection
+    task_count = len(inputs.samples)
+    experiment_label, metrics_scope, limitations, cohort_description = _phase2_identity(task_count)
     summary = {
         **core,
         "run_id": run_id,
         "experiment_label": experiment_label,
         "metrics_scope": metrics_scope if execution_mode == "docker" else "mock_dry_run_only",
         "completed_at": completed_at,
-        "source_problem_count": selection.source_problem_count,
-        "exported_success_count": selection.exported_success_count,
-        "excluded_parse_error_count": selection.excluded_parse_error_count,
-        "excluded_provider_error_count": selection.excluded_provider_error_count,
-        "selection_policy": selection.selection_policy,
-        "min_success_count": selection.min_success_count,
-        "pipeline_coverage_rate": (
-            selection.exported_success_count / selection.source_problem_count
-            if selection.source_problem_count
-            else None
-        ),
+        "cohort_description": cohort_description,
+        "selected_problem_count": task_count,
+        "excluded_problem_count": len(inputs.dataset.excluded_problem_ids),
         "limitations": limitations,
         "resume_skipped_count": len(reused),
         "current_invocation_official_result_count": sum(
@@ -1457,10 +1700,6 @@ def _summary_for_run(
             result.get("infrastructure_status") == "error" for result in current
         ),
     }
-    description_field = (
-        "pilot_description" if exported.dataset.selection_role == "pilot" else "cohort_description"
-    )
-    summary[description_field] = cohort_description
     return summary
 
 
@@ -1489,12 +1728,12 @@ def _finalize_manifest(
 
 
 def _run_one_task(
-    executor: EvalPlusExecutor,
-    sample: EvalPlusSample,
-    task_metadata: HumanEvalPlusTaskMetadata,
+    executor: MbppEvalPlusExecutor,
+    sample: MbppPlusSample,
+    task_metadata: MbppPlusTaskMetadata,
     run_dir: Path,
 ) -> ExecutorTaskOutcome:
-    with tempfile.TemporaryDirectory(prefix=".evalplus-task-", dir=run_dir) as temporary:
+    with tempfile.TemporaryDirectory(prefix=".evalplus-mbpp-task-", dir=run_dir) as temporary:
         workspace = Path(temporary)
         os.chmod(workspace, 0o700)
         return executor.run_task(
@@ -1506,7 +1745,7 @@ def _run_one_task(
 
 def _outcome_from_future(
     future: Future[ExecutorTaskOutcome],
-    sample: EvalPlusSample,
+    sample: MbppPlusSample,
 ) -> ExecutorTaskOutcome:
     try:
         return future.result()
@@ -1525,8 +1764,8 @@ def _outcome_from_future(
 
 def _record_task_outcome(
     outcome: ExecutorTaskOutcome,
-    sample: EvalPlusSample,
-    exported: ValidatedSampleExport,
+    sample: MbppPlusSample,
+    inputs: ValidatedMbppInputs,
     results_by_problem: dict[str, dict[str, Any]],
     raw_by_problem: dict[str, Mapping[str, Any]],
     events: list[dict[str, Any]],
@@ -1535,7 +1774,7 @@ def _record_task_outcome(
     event: str = "task_completed",
 ) -> None:
     if outcome.problem_id != sample.task_id:
-        raise EvalPlusExperimentError("executor returned a mismatched problem_id")
+        raise MbppExperimentError("executor returned a mismatched problem_id")
     if outcome.infrastructure_error_type is not None or outcome.raw_result is None:
         error_type = outcome.infrastructure_error_type or "missing_raw_result"
         safe = infrastructure_error_result(sample.task_id, error_type=error_type)
@@ -1544,7 +1783,7 @@ def _record_task_outcome(
             safe = parse_official_result(
                 outcome.raw_result,
                 expected_problem_id=sample.task_id,
-                expected_solution_sha256=exported.reference_for(sample.task_id).code_sha256,
+                expected_solution_sha256=inputs.candidate_for(sample.task_id).code_sha256,
             )
         except EvalPlusParseError:
             safe = infrastructure_error_result(
@@ -1555,7 +1794,7 @@ def _record_task_outcome(
             raw_by_problem[sample.task_id] = outcome.raw_result
     results_by_problem[sample.task_id] = _enrich_safe_result(
         safe,
-        exported,
+        inputs,
         outcome,
         run_id=run_id,
     )
@@ -1569,7 +1808,7 @@ def _record_task_outcome(
 
 
 def _request_executor_cleanup(
-    executor: EvalPlusExecutor,
+    executor: MbppEvalPlusExecutor,
 ) -> tuple[dict[str, str], bool]:
     """Request cleanup and validate only container-name/status metadata."""
 
@@ -1598,7 +1837,7 @@ def _request_executor_cleanup(
 
 
 def _synthetic_deadline_outcome(
-    sample: EvalPlusSample,
+    sample: MbppPlusSample,
     *,
     timestamp: str,
     error_type: str,
@@ -1624,8 +1863,8 @@ def _aggregate_cleanup_status(statuses: Mapping[str, str]) -> str | None:
 
 
 def _execute_pending(
-    executor: EvalPlusExecutor,
-    exported: ValidatedSampleExport,
+    executor: MbppEvalPlusExecutor,
+    inputs: ValidatedMbppInputs,
     paths: _RunPaths,
     results_by_problem: dict[str, dict[str, Any]],
     raw_by_problem: dict[str, Mapping[str, Any]],
@@ -1635,18 +1874,18 @@ def _execute_pending(
     max_workers: int,
     batch_timeout_seconds: float,
 ) -> None:
-    task_metadata = _task_metadata_by_id(exported)
+    task_metadata = _task_metadata_by_id(inputs)
     pending = [
         sample
-        for sample in exported.samples
+        for sample in inputs.samples
         if results_by_problem.get(sample.task_id, {}).get("infrastructure_status")
         not in {"ok", "mocked"}
     ]
     if not pending:
         return
 
-    executor_pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="evalplus")
-    futures: dict[Future[ExecutorTaskOutcome], EvalPlusSample] = {}
+    executor_pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="evalplus-mbpp")
+    futures: dict[Future[ExecutorTaskOutcome], MbppPlusSample] = {}
     batch_deadline_reached = False
     try:
         for sample in pending:
@@ -1665,7 +1904,7 @@ def _execute_pending(
                 _record_task_outcome(
                     _outcome_from_future(future, sample),
                     sample,
-                    exported,
+                    inputs,
                     results_by_problem,
                     raw_by_problem,
                     events,
@@ -1673,7 +1912,7 @@ def _execute_pending(
                 )
                 _write_checkpoints(
                     paths,
-                    [item.task_id for item in exported.samples],
+                    [item.task_id for item in inputs.samples],
                     results_by_problem,
                     raw_by_problem,
                     events,
@@ -1717,7 +1956,7 @@ def _execute_pending(
                             error_type="batch_deadline_not_started",
                         ),
                         sample,
-                        exported,
+                        inputs,
                         results_by_problem,
                         raw_by_problem,
                         events,
@@ -1729,7 +1968,7 @@ def _execute_pending(
                     _record_task_outcome(
                         _outcome_from_future(future, sample),
                         sample,
-                        exported,
+                        inputs,
                         results_by_problem,
                         raw_by_problem,
                         events,
@@ -1745,7 +1984,7 @@ def _execute_pending(
                 _record_task_outcome(
                     synthetic,
                     sample,
-                    exported,
+                    inputs,
                     results_by_problem,
                     raw_by_problem,
                     events,
@@ -1759,7 +1998,7 @@ def _execute_pending(
             _request_executor_cleanup(executor)
             _write_checkpoints(
                 paths,
-                [item.task_id for item in exported.samples],
+                [item.task_id for item in inputs.samples],
                 results_by_problem,
                 raw_by_problem,
                 events,
@@ -1782,14 +2021,14 @@ def _execute_pending(
         executor_pool.shutdown(wait=not batch_deadline_reached, cancel_futures=True)
 
 
-class MockEvalPlusExecutor:
+class MockMbppEvalPlusExecutor:
     """Deterministic no-execution executor for artifact-path dry runs."""
 
     mode: Literal["mock"] = "mock"
 
     def public_identity(self) -> Mapping[str, Any]:
         return {
-            "name": "tracejudge_evalplus_mock_no_execution",
+            "name": "tracejudge_evalplus_mbpp_mock_no_execution",
             "version": 1,
             "candidate_execution": False,
             "network_access": False,
@@ -1798,7 +2037,7 @@ class MockEvalPlusExecutor:
     def preflight(
         self,
         *,
-        task_metadata: Sequence[HumanEvalPlusTaskMetadata],
+        task_metadata: Sequence[MbppPlusTaskMetadata],
         workspace: Path,
     ) -> ExecutorPreflight:
         del workspace
@@ -1814,8 +2053,8 @@ class MockEvalPlusExecutor:
     def run_task(
         self,
         *,
-        sample: EvalPlusSample,
-        task_metadata: HumanEvalPlusTaskMetadata,
+        sample: MbppPlusSample,
+        task_metadata: MbppPlusTaskMetadata,
         workspace: Path,
     ) -> ExecutorTaskOutcome:
         # Deliberately do not inspect, import, compile, or execute solution.
@@ -1832,41 +2071,27 @@ class MockEvalPlusExecutor:
         )
 
 
-def run_evalplus_experiment(
-    baseline_run_dir: str | Path,
+def run_mbpp_experiment(
     dataset_manifest_path: str | Path,
+    candidates_path: str | Path,
     output_dir: str | Path,
     *,
-    executor: EvalPlusExecutor,
+    executor: MbppEvalPlusExecutor,
     run_id: str | None = None,
     resume: bool = False,
     max_workers: int = 2,
     per_task_timeout_seconds: float = 180.0,
     batch_timeout_seconds: float = 900.0,
-    selection_policy: str = "all",
-    min_success_count: int = 30,
-) -> EvalPlusRunResult:
-    """Validate phase one, then run only the isolated injected executor.
+) -> MbppRunResult:
+    """Validate the MBPP+ inputs, then run only the isolated injected executor.
 
-    All provenance and sample checks happen before ``executor.preflight`` can
-    start Docker.  ``resume=True`` requires the exact same source artifacts,
+    All provenance and candidate checks happen before ``executor.preflight``
+    can start Docker.  ``resume=True`` requires the exact same dataset manifest,
     candidate bytes, implementation, executor/image identity, and limits.
     """
 
-    if selection_policy not in {"all", "phase1-success-only"}:
-        raise EvalPlusExperimentError("selection_policy must be 'all' or 'phase1-success-only'")
-    if (
-        isinstance(min_success_count, bool)
-        or not isinstance(min_success_count, int)
-        or min_success_count < 0
-    ):
-        raise EvalPlusExperimentError("min_success_count must be a non-negative integer")
-    if selection_policy == "phase1-success-only" and min_success_count < 1:
-        raise EvalPlusExperimentError(
-            "phase1-success-only requires min_success_count to be at least one"
-        )
     if max_workers < 1 or max_workers > 16:
-        raise EvalPlusExperimentError("max_workers must be between 1 and 16")
+        raise MbppExperimentError("max_workers must be between 1 and 16")
     for value, label in (
         (per_task_timeout_seconds, "per-task timeout"),
         (batch_timeout_seconds, "batch timeout"),
@@ -1877,76 +2102,54 @@ def run_evalplus_experiment(
             or not math.isfinite(float(value))
             or value <= 0
         ):
-            raise EvalPlusExperimentError(f"{label} must be a positive finite number")
+            raise MbppExperimentError(f"{label} must be a positive finite number")
     if batch_timeout_seconds < per_task_timeout_seconds:
-        raise EvalPlusExperimentError("batch timeout must be at least the per-task timeout")
+        raise MbppExperimentError("batch timeout must be at least the per-task timeout")
 
     # This is the complete static consistency boundary.  It performs no writes
     # and receives no executor object, so it cannot start Docker or run code.
-    exported = load_validated_phase1_export(
-        baseline_run_dir,
-        dataset_manifest_path,
-        selection_policy=cast(SelectionPolicy, selection_policy),
-        min_success_count=min_success_count,
-    )
-    export_selection = exported.export_selection
-    if (
-        export_selection.selection_policy != selection_policy
-        or export_selection.min_success_count != min_success_count
-        or export_selection.source_problem_count != len(exported.dataset.selected_problem_ids)
-        or export_selection.exported_success_count != len(exported.samples)
-        or export_selection.exported_success_count
-        + export_selection.excluded_parse_error_count
-        + export_selection.excluded_provider_error_count
-        != export_selection.source_problem_count
-    ):
-        raise EvalPlusExperimentError("phase-one export selection accounting is inconsistent")
-    if (
-        selection_policy == "phase1-success-only"
-        and export_selection.exported_success_count < min_success_count
-    ):
-        raise EvalPlusExperimentError("phase-one export is below min_success_count")
+    inputs = load_validated_mbpp_inputs(dataset_manifest_path, candidates_path)
 
-    effective_run_id = run_id or new_evalplus_run_id()
+    effective_run_id = run_id or new_mbpp_run_id()
     _validate_run_id(effective_run_id)
     paths = _run_paths(output_dir, effective_run_id)
     _require_non_trackable_run_directory(paths.run_dir)
     bootstrap_resume = False
     if resume:
         if run_id is None:
-            raise EvalPlusExperimentError("resume requires an explicit run_id")
+            raise MbppExperimentError("resume requires an explicit run_id")
         if paths.run_dir.is_symlink() or not paths.run_dir.is_dir():
-            raise EvalPlusExperimentError("resume run directory is missing or unsafe")
+            raise MbppExperimentError("resume run directory is missing or unsafe")
         if not paths.manifest.exists():
             entries = list(paths.run_dir.iterdir())
             if any(
                 entry.name != paths.samples.name or entry.is_symlink() or not entry.is_file()
                 for entry in entries
             ):
-                raise EvalPlusExperimentError(
+                raise MbppExperimentError(
                     "resume bootstrap directory contains unexpected artifacts"
                 )
             bootstrap_resume = True
     else:
         if paths.run_dir.exists() or paths.run_dir.is_symlink():
-            raise EvalPlusExperimentError("phase-two run directory already exists")
+            raise MbppExperimentError("phase-two run directory already exists")
         paths.run_dir.parent.mkdir(parents=True, exist_ok=True)
         paths.run_dir.mkdir(mode=0o700)
     os.chmod(paths.run_dir, 0o700)
 
-    sample_bytes = serialize_samples_jsonl(exported.samples)
-    if _sha256_bytes(sample_bytes) != exported.samples_sha256:
-        raise EvalPlusExperimentError("exported samples changed after static validation")
+    sample_bytes = _serialize_samples_jsonl(inputs.samples)
+    if _sha256_bytes(sample_bytes) != inputs.samples_sha256:
+        raise MbppExperimentError("validated samples changed after static validation")
     if resume and paths.samples.exists():
         if (
             paths.samples.is_symlink()
             or not paths.samples.is_file()
             or stat.S_IMODE(paths.samples.stat().st_mode) != 0o600
-            or _sha256_file(paths.samples) != exported.samples_sha256
+            or _sha256_file(paths.samples) != inputs.samples_sha256
         ):
-            raise EvalPlusExperimentError("resume samples.jsonl differs from validated phase one")
+            raise MbppExperimentError("resume samples.jsonl differs from validated candidates")
     elif resume and not bootstrap_resume:
-        raise EvalPlusExperimentError("resume samples.jsonl differs from validated phase one")
+        raise MbppExperimentError("resume samples.jsonl differs from validated candidates")
     else:
         _atomic_write_bytes(paths.samples, sample_bytes)
 
@@ -1958,7 +2161,7 @@ def run_evalplus_experiment(
         resume_manifest = _read_json(paths.manifest, label="phase-two manifest")
         _validate_resume_before_preflight(
             resume_manifest,
-            exported,
+            inputs,
             executor,
             run_id=effective_run_id,
             max_workers=max_workers,
@@ -1968,14 +2171,14 @@ def run_evalplus_experiment(
         _validate_completed_output_integrity(
             resume_manifest,
             paths,
-            expected_result_count=len(exported.samples),
+            expected_result_count=len(inputs.samples),
         )
         resume_results = _validated_existing_results(
             paths,
-            exported,
+            inputs,
             run_id=effective_run_id,
         )
-        resume_raw = _validated_existing_raw(paths, resume_results, exported)
+        resume_raw = _validated_existing_raw(paths, resume_results, inputs)
         prior_events = _validated_existing_events(paths)
 
     reused_problem_ids = {
@@ -1992,7 +2195,7 @@ def run_evalplus_experiment(
         diagnostics=None,
     )
     pending_identity = _manifest_identity(
-        exported,
+        inputs,
         executor,
         pending_preflight,
         max_workers=max_workers,
@@ -2000,7 +2203,6 @@ def run_evalplus_experiment(
         batch_timeout_seconds=batch_timeout_seconds,
     )
     if resume_manifest is not None:
-        assert resume_manifest is not None
         assert resume_results is not None
         assert resume_raw is not None
         manifest = _begin_resume_manifest(
@@ -2012,7 +2214,7 @@ def run_evalplus_experiment(
     else:
         manifest = _new_manifest(
             effective_run_id,
-            exported,
+            inputs,
             executor,
             pending_identity,
             created_at=preflight_started,
@@ -2036,10 +2238,10 @@ def run_evalplus_experiment(
     events.append({"timestamp": preflight_started, "event": "preflight_started"})
     try:
         with tempfile.TemporaryDirectory(
-            prefix=".evalplus-preflight-", dir=paths.run_dir
+            prefix=".evalplus-mbpp-preflight-", dir=paths.run_dir
         ) as temporary:
             preflight = executor.preflight(
-                task_metadata=exported.task_metadata,
+                task_metadata=inputs.task_metadata,
                 workspace=Path(temporary),
             )
     except Exception:
@@ -2069,7 +2271,7 @@ def run_evalplus_experiment(
         }
     )
     identity = _manifest_identity(
-        exported,
+        inputs,
         executor,
         preflight,
         max_workers=max_workers,
@@ -2085,12 +2287,12 @@ def run_evalplus_experiment(
     )
     _atomic_write_json(paths.manifest, manifest)
 
-    expected_ids = [sample.task_id for sample in exported.samples]
+    expected_ids = [sample.task_id for sample in inputs.samples]
     if executor.mode == "mock":
         timestamp = _iso_utc(_utc_now())
         for problem_id in expected_ids:
             results_by_problem[problem_id] = _mock_safe_result(
-                exported,
+                inputs,
                 problem_id,
                 run_id=effective_run_id,
                 timestamp=timestamp,
@@ -2129,7 +2331,7 @@ def run_evalplus_experiment(
             )
             results_by_problem[problem_id] = _enrich_safe_result(
                 safe,
-                exported,
+                inputs,
                 synthetic,
                 run_id=effective_run_id,
             )
@@ -2144,7 +2346,7 @@ def run_evalplus_experiment(
     else:
         _execute_pending(
             executor,
-            exported,
+            inputs,
             paths,
             results_by_problem,
             raw_by_problem,
@@ -2173,7 +2375,7 @@ def run_evalplus_experiment(
         execution_mode=executor.mode,
         completed_at=completed_at,
         reused_problem_ids=sorted(reused_problem_ids),
-        exported=exported,
+        inputs=inputs,
     )
     _atomic_write_json(paths.summary, summary)
     manifest = _finalize_manifest(
@@ -2183,7 +2385,7 @@ def run_evalplus_experiment(
         completed_at=completed_at,
     )
     _atomic_write_json(paths.manifest, manifest)
-    return EvalPlusRunResult(
+    return MbppRunResult(
         run_id=effective_run_id,
         run_dir=paths.run_dir,
         manifest_path=paths.manifest,
@@ -2198,12 +2400,13 @@ def run_evalplus_experiment(
 
 
 __all__ = [
-    "EvalPlusExecutor",
-    "EvalPlusExperimentError",
-    "EvalPlusRunResult",
     "ExecutorPreflight",
     "ExecutorTaskOutcome",
-    "MockEvalPlusExecutor",
-    "new_evalplus_run_id",
-    "run_evalplus_experiment",
+    "MbppEvalPlusExecutor",
+    "MbppExperimentError",
+    "MbppRunResult",
+    "MockMbppEvalPlusExecutor",
+    "load_validated_mbpp_inputs",
+    "new_mbpp_run_id",
+    "run_mbpp_experiment",
 ]

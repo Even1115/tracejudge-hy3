@@ -18,6 +18,8 @@ from tracejudge_hy3.dataset.humanevalplus import (
     DATASET_ID,
     DATASET_SOURCE,
     EXPECTED_RECORD_COUNT,
+    FULL_EXPERIMENT_LABEL,
+    FULL_SELECTION_ALGORITHM,
     PILOT_EXPERIMENT_LABEL,
     PILOT_LIMITATIONS,
     SELECTION_ALGORITHM,
@@ -207,8 +209,17 @@ def _skipped(problem: ProblemSpec, *, invocation_id: str) -> dict[str, Any]:
     }
 
 
-def _write_fixture(tmp_path: Path, *, with_skipped: bool = False) -> ExportFixture:
-    problems = tuple(_problem(problem_id) for problem_id in EXPECTED_IDS)
+def _write_fixture(
+    tmp_path: Path, *, with_skipped: bool = False, full_snapshot: bool = False
+) -> ExportFixture:
+    problem_ids = (
+        tuple(f"HumanEval/{index}" for index in range(EXPECTED_RECORD_COUNT))
+        if full_snapshot
+        else EXPECTED_IDS
+    )
+    count = len(problem_ids)
+    label = FULL_EXPERIMENT_LABEL if full_snapshot else PILOT_EXPERIMENT_LABEL
+    problems = tuple(_problem(problem_id) for problem_id in problem_ids)
     dataset_dir = tmp_path / "dataset"
     dataset_dir.mkdir()
     problem_bytes = _jsonl_bytes([problem.model_dump(mode="json") for problem in problems])
@@ -218,7 +229,7 @@ def _write_fixture(tmp_path: Path, *, with_skipped: bool = False) -> ExportFixtu
     dataset_payload = {
         "schema_version": 1,
         "kind": "tracejudge_dataset_selection",
-        "experiment_label": PILOT_EXPERIMENT_LABEL,
+        "experiment_label": label,
         "metrics_scope": "generation_and_parsing_only",
         "dataset_id": DATASET_ID,
         "source": DATASET_SOURCE,
@@ -236,25 +247,34 @@ def _write_fixture(tmp_path: Path, *, with_skipped: bool = False) -> ExportFixtu
         "public_projection": {
             "path": "problems.jsonl",
             "sha256": _sha256(problem_bytes),
-            "record_count": 10,
-            "ordered_problem_ids_sha256": ordered_problem_ids_sha256(EXPECTED_IDS),
+            "record_count": count,
+            "ordered_problem_ids_sha256": ordered_problem_ids_sha256(problem_ids),
         },
         "selection": {
             "algorithm": SELECTION_ALGORITHM,
             "seed": 20260824,
-            "count": 10,
-            "selected_problem_ids": list(EXPECTED_IDS),
+            "count": count,
+            "selected_problem_ids": list(problem_ids),
         },
         "withheld_fields": ["canonical_solution", "test"],
         "limitations": list(PILOT_LIMITATIONS),
     }
+    if full_snapshot:
+        dataset_payload["kind"] = "tracejudge_humanevalplus_public_projection"
+        dataset_payload.pop("parent_manifest_sha256")
+        dataset_payload.pop("limitations")
+        dataset_payload["selection"] = {
+            "algorithm": FULL_SELECTION_ALGORITHM,
+            "count": count,
+            "selected_problem_ids": list(problem_ids),
+        }
     dataset_manifest = dataset_dir / "dataset_manifest.json"
     dataset_bytes = _json_bytes(dataset_payload)
     dataset_manifest.write_bytes(dataset_bytes)
 
     expected_provenance = {
         "manifest_sha256": _sha256(dataset_bytes),
-        "kind": "tracejudge_dataset_selection",
+        "kind": dataset_payload["kind"],
         "dataset_id": DATASET_ID,
         "revision": PINNED_HUMANEVALPLUS_REVISION,
         "source": DATASET_SOURCE,
@@ -267,15 +287,17 @@ def _write_fixture(tmp_path: Path, *, with_skipped: bool = False) -> ExportFixtu
         },
         "public_projection": {
             "sha256": _sha256(problem_bytes),
-            "record_count": 10,
-            "ordered_problem_ids_sha256": ordered_problem_ids_sha256(EXPECTED_IDS),
+            "record_count": count,
+            "ordered_problem_ids_sha256": ordered_problem_ids_sha256(problem_ids),
         },
-        "selection": dataset_payload["selection"],
+        "selection": {**dataset_payload["selection"], "seed": None if full_snapshot else 20260824},
         "withheld_fields": ["canonical_solution", "test"],
         "metrics_scope": "generation_and_parsing_only",
         "source_manifest_sha256": source_hash,
         "parent_manifest_sha256": "b" * 64,
     }
+    if full_snapshot:
+        expected_provenance.pop("parent_manifest_sha256")
 
     first_invocation = {
         "invocation_id": "invocation-first",
@@ -308,7 +330,7 @@ def _write_fixture(tmp_path: Path, *, with_skipped: bool = False) -> ExportFixtu
     manifest = {
         "schema_version": 1,
         "phase": "phase1_baseline_generation",
-        "experiment_label": PILOT_EXPERIMENT_LABEL,
+        "experiment_label": label,
         "run_id": "phase1_test_export",
         "created_at": "2026-08-24T00:00:00.000Z",
         "status": "completed",
@@ -316,13 +338,13 @@ def _write_fixture(tmp_path: Path, *, with_skipped: bool = False) -> ExportFixtu
         "dataset": {
             "path": str((dataset_dir / "problems.jsonl").resolve()),
             "sha256": _sha256(problem_bytes),
-            "problem_count": 10,
-            "sources": {DATASET_SOURCE: 10},
-            "difficulties": {"unknown": 10},
+            "problem_count": count,
+            "sources": {DATASET_SOURCE: count},
+            "difficulties": {"unknown": count},
             "visible_tests": {
                 "total_count": 0,
                 "per_problem": {
-                    problem_id: {"count": 0, "case_ids": []} for problem_id in EXPECTED_IDS
+                    problem_id: {"count": 0, "case_ids": []} for problem_id in problem_ids
                 },
             },
             "provenance": expected_provenance,
@@ -377,38 +399,38 @@ def _write_fixture(tmp_path: Path, *, with_skipped: bool = False) -> ExportFixtu
         )
     (run_dir / "responses.jsonl").write_bytes(_jsonl_bytes(responses))
 
-    history_counts = {"success": 10}
-    current_counts = {"success": 10}
+    history_counts = {"success": count}
+    current_counts = {"success": count}
     current_invocation = first_invocation
     skipped_count = 0
     if with_skipped:
-        history_counts = {"skipped": 10, "success": 10}
-        current_counts = {"skipped": 10}
+        history_counts = {"skipped": count, "success": count}
+        current_counts = {"skipped": count}
         current_invocation = invocations[-1]
-        skipped_count = 10
+        skipped_count = count
     summary = {
         "run_id": "phase1_test_export",
-        "experiment_label": PILOT_EXPERIMENT_LABEL,
+        "experiment_label": label,
         "updated_at": completed_at,
         "completed_at": completed_at,
-        "total_problem_count": 10,
-        "dataset_problem_count": 10,
+        "total_problem_count": count,
+        "dataset_problem_count": count,
         "final_outcome_counts": {
-            "success": 10,
+            "success": count,
             "parse_error": 0,
             "provider_error": 0,
             "failure": 0,
         },
-        "success_count": 10,
+        "success_count": count,
         "parse_error_count": 0,
         "provider_error_count": 0,
         "failure_count": 0,
         "pending_count": 0,
-        "parse_attempted_count": 10,
-        "parse_success_count": 10,
+        "parse_attempted_count": count,
+        "parse_success_count": count,
         "parse_failure_count": 0,
         "parse_success_rate": 1.0,
-        "average_duration_seconds": 5.5,
+        "average_duration_seconds": (count + 1) / 2,
         "record_count": len(responses),
         "record_status_counts": history_counts,
         "status_counts": history_counts,

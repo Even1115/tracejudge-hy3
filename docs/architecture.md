@@ -62,6 +62,7 @@ Gate F 的 `phase3/report.py` 只消费 E4 聚合 report、E3 结构化账本中
 
 | 模块 | 职责 | 不负责 |
 |---|---|---|
+| `benchmark/` | 跨数据集 v1 冻结契约、公开任务适配与脱敏结果归一化 | 原始隐藏测试、官方执行器实现、数据集私有 payload |
 | `schemas/` | 数据契约 | 业务逻辑 |
 | `providers/` | 生成解答 + LLM 过程判断 | 静态分析、执行、聚合 |
 | `static_analysis/` | AST 结构化证据 | 语义正确性判断 |

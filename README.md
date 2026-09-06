@@ -368,6 +368,9 @@ tracejudge baseline \
 
 ### HumanEval+ 固定 10 题阶段二 EvalPlus Pilot
 
+已完成全量 164 题生成时，可直接复用现有阶段一产物进入官方执行；全量 manifest
+支持、验证记录和命令见 [HumanEval+ 164 题阶段二执行](docs/humanevalplus_full_execution.md)。
+
 阶段二不调用 Provider、Hy3、LLM Judge 或现有全链路 pipeline，也不在宿主机导入或执行候选代码。它固定使用下面的官方 Linux/amd64 镜像；该 digest 内实测 EvalPlus package 版本为 `0.4.0.dev2`，镜像源码 commit 为 `f11cfb92c1d52896a87f988cbebbd74727d56c7e`，并固定 HumanEval+ release `v0.1.10` 与 Python `3.11.10`：
 
 ```text

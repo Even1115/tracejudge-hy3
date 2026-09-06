@@ -26,6 +26,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from tracejudge_hy3.dataset import mbppplus as mbppplus_dataset
 from tracejudge_hy3.dataset.humanevalplus import (
     ADAPTER_NAME as HUMANEVALPLUS_ADAPTER_NAME,
 )
@@ -434,6 +435,16 @@ def _load_dataset_provenance(
             "dataset manifest metrics_scope must be 'generation_and_parsing_only'"
         )
     kind = _manifest_text(payload, "kind")
+    if kind in {
+        mbppplus_dataset.FULL_PROJECTION_KIND,
+        mbppplus_dataset.SELECTION_MANIFEST_KIND,
+    }:
+        return _load_mbppplus_provenance(
+            payload,
+            manifest_bytes=manifest_bytes,
+            dataset_hash=dataset_hash,
+            problems=problems,
+        )
     if kind not in {
         "tracejudge_humanevalplus_public_projection",
         "tracejudge_dataset_selection",
@@ -740,6 +751,306 @@ def _load_dataset_provenance(
         identity["parent_manifest_sha256"] = parent_manifest_hash
     if schema_version == HUMANEVALPLUS_RESEARCH_NATURAL_SCHEMA:
         identity["selection_role"] = selection_role
+        identity["excluded_manifests"] = excluded_manifests
+    return experiment_label, identity
+
+
+def _load_mbppplus_provenance(
+    payload: Mapping[str, Any],
+    *,
+    manifest_bytes: bytes,
+    dataset_hash: str,
+    problems: Sequence[ProblemSpec],
+) -> tuple[str, dict[str, Any]]:
+    """Validate an MBPP+ projection/selection manifest for phase one.
+
+    Mirrors the HumanEval+ provenance checks against the MBPP+ pinned schemas
+    without re-deriving the sampling universe: the bundle's internal hashes
+    already bind the parent projection, and the convert/sample pipeline
+    verified the deterministic selection when publishing it.
+    """
+
+    kind = _manifest_text(payload, "kind")
+    common_fields = {
+        "schema_version",
+        "kind",
+        "experiment_label",
+        "metrics_scope",
+        "dataset_id",
+        "source",
+        "revision",
+        "release_tag",
+        "license",
+        "adapter",
+        "source_manifest_sha256",
+        "raw_snapshot",
+        "public_projection",
+        "selection",
+        "withheld_fields",
+    }
+    if kind == mbppplus_dataset.FULL_PROJECTION_KIND:
+        expected_fields = common_fields
+    else:
+        expected_fields = common_fields | {
+            "parent_manifest_sha256",
+            "limitations",
+            "excluded_manifests",
+        }
+    if set(payload) != expected_fields:
+        raise BaselineExperimentError("dataset manifest contains fields outside its schema")
+
+    projection = payload.get("public_projection")
+    selection = payload.get("selection")
+    adapter = payload.get("adapter")
+    raw_snapshot = payload.get("raw_snapshot")
+    if not all(
+        isinstance(item, Mapping) for item in (projection, selection, adapter, raw_snapshot)
+    ):
+        raise BaselineExperimentError("dataset manifest is missing structured provenance fields")
+    assert isinstance(projection, Mapping)
+    assert isinstance(selection, Mapping)
+    assert isinstance(adapter, Mapping)
+    assert isinstance(raw_snapshot, Mapping)
+    if set(projection) != {
+        "path",
+        "sha256",
+        "record_count",
+        "ordered_problem_ids_sha256",
+    }:
+        raise BaselineExperimentError("dataset manifest projection fields are invalid")
+    if set(raw_snapshot) != {
+        "aggregate_sha256",
+        "jsonl_sha256",
+        "official_dataset_md5",
+        "record_count",
+    }:
+        raise BaselineExperimentError("dataset manifest raw snapshot fields are invalid")
+    if kind == mbppplus_dataset.FULL_PROJECTION_KIND:
+        expected_selection_fields: set[str] = {"algorithm", "count", "selected_problem_ids"}
+    else:
+        expected_selection_fields = {
+            "algorithm",
+            "seed",
+            "count",
+            "selected_problem_ids",
+            "selected_problem_ids_sha256",
+            "excluded_problem_ids",
+            "excluded_problem_ids_sha256",
+            "excluded_manifests_count",
+            "excluded_manifests_sha256",
+        }
+    if set(selection) != expected_selection_fields:
+        raise BaselineExperimentError("dataset manifest selection fields are invalid")
+
+    selected_ids_value = selection.get("selected_problem_ids")
+    if not isinstance(selected_ids_value, list) or not all(
+        isinstance(problem_id, str) for problem_id in selected_ids_value
+    ):
+        raise BaselineExperimentError("dataset manifest selected problem IDs are invalid")
+    selected_ids = list(selected_ids_value)
+    try:
+        mbppplus_dataset.validate_mbppplus_public_problems(
+            problems,
+            require_complete_snapshot=(kind == mbppplus_dataset.FULL_PROJECTION_KIND),
+            expected_ids=selected_ids if kind == mbppplus_dataset.FULL_PROJECTION_KIND else None,
+        )
+    except DatasetError as exc:
+        raise BaselineExperimentError(str(exc)) from None
+
+    if _manifest_sha256(projection, "sha256") != dataset_hash:
+        raise BaselineExperimentError(
+            "dataset manifest public projection SHA256 differs from --dataset"
+        )
+    if projection.get("record_count") != len(problems):
+        raise BaselineExperimentError(
+            "dataset manifest public projection count differs from --dataset"
+        )
+    if projection.get("path") != "problems.jsonl":
+        raise BaselineExperimentError("dataset manifest public projection path is invalid")
+    problem_ids = [problem.problem_id for problem in problems]
+    expected_order_hash = mbppplus_dataset.ordered_problem_ids_sha256(problem_ids)
+    if _manifest_sha256(projection, "ordered_problem_ids_sha256") != expected_order_hash:
+        raise BaselineExperimentError(
+            "dataset manifest ordered problem ID hash differs from --dataset"
+        )
+    if selected_ids != problem_ids or selection.get("count") != len(problems):
+        raise BaselineExperimentError(
+            "dataset manifest selected problem IDs differ from --dataset order"
+        )
+
+    dataset_id = _manifest_text(payload, "dataset_id")
+    revision = _manifest_text(payload, "revision")
+    source = _manifest_text(payload, "source")
+    license_name = _manifest_text(payload, "license")
+    release_tag = _manifest_text(payload, "release_tag")
+    adapter_name = _manifest_text(adapter, "name")
+    adapter_version = adapter.get("version")
+    if dataset_id != mbppplus_dataset.DATASET_ID or source != mbppplus_dataset.DATASET_SOURCE:
+        raise BaselineExperimentError("dataset manifest MBPP+ identity is invalid")
+    if revision != mbppplus_dataset.PINNED_MBPPPLUS_REVISION:
+        raise BaselineExperimentError("dataset manifest MBPP+ revision is invalid")
+    if release_tag != mbppplus_dataset.MBPP_PLUS_VERSION or license_name != "apache-2.0":
+        raise BaselineExperimentError("dataset manifest MBPP+ release/license is invalid")
+    if (
+        adapter_name != mbppplus_dataset.ADAPTER_NAME
+        or adapter_version != mbppplus_dataset.ADAPTER_VERSION
+    ):
+        raise BaselineExperimentError("dataset manifest MBPP+ adapter identity is invalid")
+    raw_aggregate = _manifest_sha256(raw_snapshot, "aggregate_sha256")
+    raw_jsonl = _manifest_sha256(raw_snapshot, "jsonl_sha256")
+    official_md5 = _manifest_text(raw_snapshot, "official_dataset_md5")
+    if re.fullmatch(r"[0-9a-f]{32}", official_md5) is None:
+        raise BaselineExperimentError("dataset manifest MBPP+ official dataset MD5 is invalid")
+    if raw_snapshot.get("record_count") != mbppplus_dataset.EXPECTED_RECORD_COUNT:
+        raise BaselineExperimentError("MBPP+ raw snapshot must record 378 tasks")
+
+    algorithm = _manifest_text(selection, "algorithm")
+    seed = selection.get("seed")
+    if kind == mbppplus_dataset.FULL_PROJECTION_KIND:
+        expected_label = mbppplus_dataset.FULL_EXPERIMENT_LABEL
+        if len(problems) != mbppplus_dataset.EXPECTED_RECORD_COUNT:
+            raise BaselineExperimentError("full MBPP+ projection must contain 378 tasks")
+        if algorithm != mbppplus_dataset.FULL_SELECTION_ALGORITHM or seed is not None:
+            raise BaselineExperimentError("full MBPP+ selection identity is invalid")
+        excluded_problem_ids: list[str] = []
+        excluded_manifests: list[dict[str, Any]] = []
+    else:
+        expected_label = f"mbppplus_{len(problems)}_public_prompt_generation_pilot"
+        if (
+            algorithm != mbppplus_dataset.SELECTION_ALGORITHM
+            or isinstance(seed, bool)
+            or not isinstance(seed, int)
+            or seed < 0
+        ):
+            raise BaselineExperimentError("MBPP+ selection identity is invalid")
+        if payload.get("limitations") != list(mbppplus_dataset.SELECTION_LIMITATIONS):
+            raise BaselineExperimentError("dataset manifest limitations are invalid")
+
+        raw_excluded = payload.get("excluded_manifests")
+        if not isinstance(raw_excluded, list):
+            raise BaselineExperimentError("excluded_manifests must be a list")
+        seen_excluded: set[str] = set()
+        excluded_problem_ids = []
+        excluded_manifests = []
+        for entry in raw_excluded:
+            if not isinstance(entry, Mapping):
+                raise BaselineExperimentError("excluded_manifests entry must be an object")
+            if set(entry) != {
+                "manifest_sha256",
+                "kind",
+                "experiment_label",
+                "selected_problem_ids",
+            }:
+                raise BaselineExperimentError("excluded_manifests entry fields are invalid")
+            entry_hash = _manifest_sha256(entry, "manifest_sha256")
+            if entry.get("kind") != mbppplus_dataset.SELECTION_MANIFEST_KIND:
+                raise BaselineExperimentError("excluded_manifests entry kind is invalid")
+            entry_label = _manifest_text(entry, "experiment_label")
+            entry_ids = entry.get("selected_problem_ids")
+            if not isinstance(entry_ids, list) or not all(
+                isinstance(problem_id, str) for problem_id in entry_ids
+            ):
+                raise BaselineExperimentError(
+                    "excluded_manifests entry selected_problem_ids are invalid"
+                )
+            for problem_id in entry_ids:
+                if problem_id in seen_excluded:
+                    raise BaselineExperimentError(
+                        f"duplicate excluded problem ID {problem_id} across exclusion manifests"
+                    )
+                seen_excluded.add(problem_id)
+                excluded_problem_ids.append(problem_id)
+            excluded_manifests.append(
+                {
+                    "manifest_sha256": entry_hash,
+                    "kind": mbppplus_dataset.SELECTION_MANIFEST_KIND,
+                    "experiment_label": entry_label,
+                    "selected_problem_ids": list(entry_ids),
+                }
+            )
+
+        sorted_excluded = sorted(excluded_problem_ids, key=mbppplus_dataset._safe_task_id_number)
+        if selection.get("excluded_problem_ids") != sorted_excluded:
+            raise BaselineExperimentError(
+                "excluded_problem_ids do not match the union of excluded manifests"
+            )
+        if set(sorted_excluded) & set(problem_ids):
+            raise BaselineExperimentError("excluded problem IDs overlap the selected cohort")
+        if selection.get("excluded_manifests_count") != len(excluded_manifests):
+            raise BaselineExperimentError("excluded_manifests_count is inconsistent")
+        recorded_excluded_hash = selection.get("excluded_problem_ids_sha256")
+        expected_excluded_hash = (
+            mbppplus_dataset.ordered_problem_ids_sha256(sorted_excluded)
+            if sorted_excluded
+            else None
+        )
+        if recorded_excluded_hash != expected_excluded_hash:
+            raise BaselineExperimentError("excluded_problem_ids_sha256 is inconsistent")
+        expected_manifests_hash = hashlib.sha256(
+            _json_bytes(
+                [{"manifest_sha256": record["manifest_sha256"]} for record in excluded_manifests]
+            )
+        ).hexdigest()
+        if _manifest_sha256(selection, "excluded_manifests_sha256") != expected_manifests_hash:
+            raise BaselineExperimentError("excluded_manifests_sha256 is inconsistent")
+        if _manifest_sha256(selection, "selected_problem_ids_sha256") != expected_order_hash:
+            raise BaselineExperimentError("selected_problem_ids_sha256 is inconsistent")
+
+    experiment_label = _manifest_text(payload, "experiment_label")
+    if experiment_label != expected_label:
+        raise BaselineExperimentError(
+            "dataset manifest experiment label does not match its selection"
+        )
+
+    withheld_fields = payload.get("withheld_fields")
+    if (
+        not isinstance(withheld_fields, list)
+        or not all(isinstance(field, str) and field for field in withheld_fields)
+        or not {"canonical_solution", "base_input", "plus_input"} <= set(withheld_fields)
+        or not set(withheld_fields) <= set(mbppplus_dataset.KNOWN_WITHHELD_FIELDS)
+    ):
+        raise BaselineExperimentError("dataset manifest withheld_fields must be a string list")
+
+    source_manifest_hash = _manifest_sha256(payload, "source_manifest_sha256")
+    parent_manifest_hash = (
+        _manifest_sha256(payload, "parent_manifest_sha256")
+        if kind == mbppplus_dataset.SELECTION_MANIFEST_KIND
+        else None
+    )
+
+    identity: dict[str, Any] = {
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "kind": kind,
+        "dataset_id": dataset_id,
+        "revision": revision,
+        "source": source,
+        "license": license_name,
+        "release_tag": release_tag,
+        "adapter": {"name": adapter_name, "version": adapter_version},
+        "raw_snapshot": {
+            "aggregate_sha256": raw_aggregate,
+            "jsonl_sha256": raw_jsonl,
+            "official_dataset_md5": official_md5,
+            "record_count": raw_snapshot.get("record_count"),
+        },
+        "public_projection": {
+            "sha256": dataset_hash,
+            "record_count": len(problems),
+            "ordered_problem_ids_sha256": expected_order_hash,
+        },
+        "selection": {
+            "algorithm": algorithm,
+            "seed": seed,
+            "count": len(problems),
+            "selected_problem_ids": [_redact_text(problem_id) for problem_id in problem_ids],
+        },
+        "withheld_fields": sorted(_redact_text(field) for field in withheld_fields),
+        "metrics_scope": "generation_and_parsing_only",
+        "source_manifest_sha256": source_manifest_hash,
+    }
+    if parent_manifest_hash is not None:
+        identity["parent_manifest_sha256"] = parent_manifest_hash
+    if kind == mbppplus_dataset.SELECTION_MANIFEST_KIND:
         identity["excluded_manifests"] = excluded_manifests
     return experiment_label, identity
 
@@ -1611,6 +1922,13 @@ async def _run_baseline_experiment_open_provider(
     if contains_humanevalplus and dataset_manifest_path is None:
         raise BaselineExperimentError(
             "HumanEval+ public projections require --dataset-manifest before provider calls"
+        )
+    contains_mbppplus = any(
+        problem.source == mbppplus_dataset.DATASET_SOURCE for problem in problems
+    )
+    if contains_mbppplus and dataset_manifest_path is None:
+        raise BaselineExperimentError(
+            "MBPP+ public projections require --dataset-manifest before provider calls"
         )
     if dataset_manifest_path is None:
         experiment_label = _experiment_label(problems)

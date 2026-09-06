@@ -29,6 +29,7 @@ from tracejudge_hy3.dataset.humanevalplus import (
     validate_problem_dataset,
 )
 from tracejudge_hy3.dataset.loader import load_problem_by_id, load_problems
+from tracejudge_hy3.dataset.mbppplus import convert_mbppplus, sample_mbppplus
 from tracejudge_hy3.evalplus import (
     DockerLimits,
     EvalPlusDockerRunner,
@@ -38,6 +39,16 @@ from tracejudge_hy3.evalplus import (
     new_evalplus_run_id,
     run_evalplus_experiment,
 )
+from tracejudge_hy3.evalplus_mbpp import (
+    MbppCandidateExportError,
+    MbppExperimentError,
+    MbppPlusDockerRunner,
+    MockMbppEvalPlusExecutor,
+    export_mbpp_candidates,
+    new_mbpp_run_id,
+    run_mbpp_experiment,
+)
+from tracejudge_hy3.evalplus_mbpp.docker_runner import DockerLimits as MbppDockerLimits
 from tracejudge_hy3.exceptions import DatasetError, TraceJudgeError
 from tracejudge_hy3.phase3 import (
     ANNOTATION_GUIDE_RELATIVE_PATH,
@@ -396,6 +407,47 @@ def dataset_convert_humanevalplus(
     console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
 
 
+@dataset_app.command("convert-mbppplus")
+def dataset_convert_mbppplus(
+    input_path: str = typer.Option(
+        "artifacts/datasets/raw/mbppplus/MbppPlus.jsonl",
+        "--input",
+        help="固定 MBPP+ 官方 release JSONL 快照（MbppPlus.jsonl）",
+    ),
+    revision: str = typer.Option(..., "--revision", help="固定的完整 Git commit SHA"),
+    source_manifest: str = typer.Option(
+        ...,
+        "--manifest",
+        help="记录官方 revision、许可证和原始文件 SHA256 的受控 manifest",
+    ),
+    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的公共投影目录"),
+) -> None:
+    """将完整 MBPP+ 快照转换为公开投影；不执行或复制答案/测试。"""
+
+    try:
+        result = convert_mbppplus(
+            input_path=input_path,
+            revision=revision,
+            source_manifest_path=source_manifest,
+            output_dir=output_dir,
+        )
+    except (TraceJudgeError, OSError) as exc:
+        console.print(f"[red]MBPP+ 转换失败：{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="MBPP+ 公开投影")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("原始题目", str(result.record_count))
+    table.add_row("公开投影 SHA256", result.dataset_sha256)
+    table.add_row("Bundle manifest SHA256", result.manifest_sha256)
+    table.add_row("执行数据集代码", "否")
+    table.add_row("复制 canonical_solution/测试输入", "否")
+    console.print(table)
+    console.print(f"[dim]dataset: {result.dataset_path}[/dim]")
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+
+
 @dataset_app.command("sample")
 def dataset_sample(
     dataset: str = typer.Option(..., "--dataset", help="完整的 ProblemSpec JSONL 公共投影"),
@@ -454,6 +506,90 @@ def dataset_sample(
         )
     else:
         console.print("[yellow]该子集仅用于生成与解析 Pilot，不代表 HumanEval+ 功能分数。[/yellow]")
+
+
+@dataset_app.command("sample-mbppplus")
+def dataset_sample_mbppplus(
+    dataset: str = typer.Option(..., "--dataset", help="完整的 ProblemSpec JSONL 公开投影"),
+    source_manifest: str = typer.Option(
+        ..., "--manifest", help="完整公开投影的 dataset_manifest.json"
+    ),
+    count: int = typer.Option(120, "--count", min=1, help="确定性抽样题数"),
+    seed: int = typer.Option(20260905, "--seed", help="只与公开 problem_id 组合使用的固定种子"),
+    output_dir: str = typer.Option(..., "--output-dir", help="原子发布的 dataset bundle 目录"),
+    exclude_manifest: list[str] | None = typer.Option(  # noqa: B008
+        None,
+        "--exclude-manifest",
+        help="要排除的 MBPP+ 选择 manifest（可重复），用于生成互斥队列",
+    ),
+) -> None:
+    """仅依据公开 problem_id 生成确定性的 MBPP+ 子集（如 120 题抽样）。"""
+
+    try:
+        result = sample_mbppplus(
+            dataset_path=dataset,
+            source_manifest_path=source_manifest,
+            count=count,
+            seed=seed,
+            output_dir=output_dir,
+            exclude_manifests=exclude_manifest,
+        )
+    except (TraceJudgeError, OSError) as exc:
+        console.print(f"[red]MBPP+ 数据集抽样失败：{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title=f"MBPP+ 确定性 {len(result.selected_problem_ids)} 题子集")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("题目数", str(len(result.selected_problem_ids)))
+    table.add_row("公开投影 SHA256", result.dataset_sha256)
+    table.add_row("Bundle manifest SHA256", result.manifest_sha256)
+    table.add_row("题号集合", ", ".join(result.selected_problem_ids))
+    console.print(table)
+    console.print(f"[dim]dataset: {result.dataset_path}[/dim]")
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print("[yellow]该子集仅用于生成与解析，不代表完整 MBPP+ 功能分数。[/yellow]")
+
+
+@dataset_app.command("export-mbpp-candidates")
+def dataset_export_mbpp_candidates(
+    phase1_run: str = typer.Option(
+        ...,
+        "--phase1-run",
+        help="已完成（全部成功）的阶段一 MBPP+ run 目录",
+    ),
+    dataset_manifest: str = typer.Option(
+        ...,
+        "--manifest",
+        help="与阶段一绑定的 MBPP+ 选择 bundle dataset_manifest.json",
+    ),
+    output: str = typer.Option(
+        ...,
+        "--output",
+        help="输出的 candidates.jsonl 路径（原子写入，权限 0600）",
+    ),
+) -> None:
+    """把阶段一成功记录导出为 evalplus-mbpp 的 candidates.jsonl；不执行候选代码。"""
+
+    try:
+        result = export_mbpp_candidates(
+            phase1_run_dir=phase1_run,
+            dataset_manifest_path=dataset_manifest,
+            output_path=output,
+        )
+    except (MbppCandidateExportError, TraceJudgeError, OSError) as exc:
+        console.print(f"[red]MBPP+ 候选导出失败：{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+    table = Table(title="MBPP+ 阶段一候选导出")
+    table.add_column("项目")
+    table.add_column("结果")
+    table.add_row("阶段一 run_id", result.phase1_run_id)
+    table.add_row("候选数", str(result.candidate_count))
+    table.add_row("candidates SHA256", result.candidates_sha256)
+    table.add_row("执行候选代码", "否")
+    console.print(table)
+    console.print(f"[dim]candidates: {result.output_path}[/dim]")
 
 
 @dataset_app.command("validate")
@@ -701,9 +837,157 @@ def evalplus_command(
     console.print(f"[dim]samples: {result.samples_path}[/dim]")
     console.print(f"[dim]safe results: {result.results_path}[/dim]")
     console.print(f"[dim]summary: {result.summary_path}[/dim]")
+    if (
+        executor == "docker"
+        and source_problem_count == exported_success_count == actual == 164
+        and summary.get("evaluation_complete") is True
+        and not summary["infrastructure_error_count"]
+    ):
+        console.print(
+            "[cyan]完整 HumanEval+ 164 题单候选功能评测已完成；"
+            "结果绑定本次生成配置与固定 EvalPlus 版本，不代表官方排行榜认证。[/cyan]"
+        )
+    else:
+        console.print(
+            f"[yellow]本次来源 {source_problem_count} 题，成功导出 {exported_success_count} 题并进入"
+            "单样本阶段二结果；不是完整 HumanEval+ 成绩或正式 benchmark 排名。[/yellow]"
+        )
+    if executor == "mock":
+        console.print("[yellow]Mock dry run 未执行任何候选代码或官方测试。[/yellow]")
+    if summary["infrastructure_error_count"]:
+        raise typer.Exit(code=1)
+
+
+@app.command("evalplus-mbpp")
+def evalplus_mbpp_command(
+    dataset_manifest: str = typer.Option(
+        ...,
+        "--dataset-manifest",
+        help="MBPP+ 选择 bundle 的 dataset_manifest.json",
+    ),
+    candidates: str = typer.Option(
+        ...,
+        "--candidates",
+        help="候选代码 JSONL，每行 {task_id, candidate_id, code}，恰好覆盖选题集合",
+    ),
+    output_dir: str = typer.Option(
+        "artifacts/experiments/phase2-mbpp",
+        "--output-dir",
+        help="仓库内且被 .gitignore 覆盖的 MBPP+ 阶段二运行目录父目录",
+    ),
+    executor: str = typer.Option(
+        "docker",
+        "--executor",
+        help="'docker' 执行官方 EvalPlus，'mock' 仅验证产物链路且不执行候选代码",
+    ),
+    resume_run_id: str | None = typer.Option(
+        None,
+        "--resume-run-id",
+        help="续跑既有 run_id；输入、provenance、镜像或限制变化时会拒绝",
+    ),
+    parallel: int = typer.Option(
+        2,
+        "--parallel",
+        min=1,
+        max=16,
+        help="宿主同时运行的单题容器数（官方容器内 parallel 固定为 1）",
+    ),
+    per_task_timeout: float = typer.Option(
+        180.0,
+        "--per-task-timeout",
+        min=1.0,
+        help="每题容器的外层超时秒数",
+    ),
+    batch_timeout: float = typer.Option(
+        900.0,
+        "--batch-timeout",
+        min=1.0,
+        help="整批调度超时秒数",
+    ),
+) -> None:
+    """MBPP+ 阶段二：使用隔离的官方 EvalPlus 执行器评测已供给候选。"""
+
+    if executor not in {"docker", "mock"}:
+        raise typer.BadParameter("--executor 必须是 'docker' 或 'mock'")
+    if batch_timeout < per_task_timeout:
+        raise typer.BadParameter("--batch-timeout 不能小于 --per-task-timeout")
+    if resume_run_id is not None and not resume_run_id.strip():
+        raise typer.BadParameter("--resume-run-id 不能为空")
+
+    effective_run_id = resume_run_id or new_mbpp_run_id()
+    run_path = Path(output_dir).expanduser().resolve() / effective_run_id
+    action = "续跑" if resume_run_id is not None else "新建"
+    console.print(f"[cyan]MBPP+ 阶段二 {action} run_id: {effective_run_id}[/cyan]")
+    console.print(f"[dim]产物目录: {run_path}[/dim]")
+
+    selected_executor = (
+        MockMbppEvalPlusExecutor()
+        if executor == "mock"
+        else MbppPlusDockerRunner(
+            limits=MbppDockerLimits(per_task_timeout_seconds=per_task_timeout)
+        )
+    )
+    try:
+        result = run_mbpp_experiment(
+            dataset_manifest_path=dataset_manifest,
+            candidates_path=candidates,
+            output_dir=output_dir,
+            executor=selected_executor,
+            run_id=effective_run_id,
+            resume=resume_run_id is not None,
+            max_workers=parallel,
+            per_task_timeout_seconds=per_task_timeout,
+            batch_timeout_seconds=batch_timeout,
+        )
+    except (MbppExperimentError, OSError, ValueError) as exc:
+        # Never echo exception text: candidates or hidden evaluation content
+        # could otherwise leak to the terminal.
+        console.print(
+            "[red]MBPP+ 阶段二运行失败；为避免泄露候选或隐藏测试，未输出原始异常详情。[/red]"
+        )
+        raise typer.Exit(code=1) from exc
+
+    summary = result.summary
+    actual = int(summary["actual_execution_count"])
+    base_rate = summary.get("base_pass_rate")
+    plus_rate = summary.get("base_plus_pass_rate")
+    average_duration = summary.get("average_duration_seconds")
+
+    def rate(value: object) -> str:
+        return "N/A" if value is None else f"{float(value):.2%}"
+
+    duration = "N/A" if average_duration is None else f"{float(average_duration):.3f}s"
+
+    table = Table(title=f"MBPP+ 阶段二 EvalPlus：{result.run_id}")
+    table.add_column("统计")
+    table.add_column("结果")
+    table.add_row("选题题数", str(summary["total_problem_count"]))
+    table.add_row("实际执行数", str(actual))
+    table.add_row("Mock 未执行数", str(summary["mock_not_executed_count"]))
+    table.add_row(
+        "Base 通过",
+        f"{summary['base_pass_count']}/{actual} ({rate(base_rate)})" if actual else "N/A",
+    )
+    table.add_row(
+        "Base+Extra 通过",
+        f"{summary['base_plus_pass_count']}/{actual} ({rate(plus_rate)})" if actual else "N/A",
+    )
+    table.add_row("Timeout", str(summary["timeout_count"]))
+    table.add_row(
+        "错误答案/候选异常（官方状态不可细分）",
+        str(summary["wrong_answer_or_candidate_exception_count"]),
+    )
+    table.add_row("可单独观测的 execution error", "N/A（固定 EvalPlus raw schema 不提供）")
+    table.add_row("基础设施错误", str(summary["infrastructure_error_count"]))
+    table.add_row("平均逐题容器耗时", duration)
+    console.print(table)
+    console.print(f"[dim]manifest: {result.manifest_path}[/dim]")
+    console.print(f"[dim]samples: {result.samples_path}[/dim]")
+    console.print(f"[dim]safe results: {result.results_path}[/dim]")
+    console.print(f"[dim]summary: {result.summary_path}[/dim]")
     console.print(
-        f"[yellow]本次来源 {source_problem_count} 题，成功导出 {exported_success_count} 题并进入"
-        "单样本阶段二结果；不是完整 HumanEval+ 成绩或正式 benchmark 排名。[/yellow]"
+        f"[yellow]本次为固定 {summary['total_problem_count']} 题子集的单样本执行结果；"
+        "不是完整 MBPP+ 成绩或正式 benchmark 排名。[/yellow]"
     )
     if executor == "mock":
         console.print("[yellow]Mock dry run 未执行任何候选代码或官方测试。[/yellow]")

@@ -68,7 +68,7 @@ class Phase1SourceIdentity:
 
 @dataclass(frozen=True, slots=True)
 class HumanEvalPlusDatasetIdentity:
-    """Allowlisted identity fields from a validated Pilot or research bundle."""
+    """Allowlisted identity fields from a validated full, Pilot or research bundle."""
 
     manifest_sha256: str
     dataset_id: str
@@ -78,13 +78,13 @@ class HumanEvalPlusDatasetIdentity:
     adapter_name: str
     adapter_version: int
     source_manifest_sha256: str
-    parent_manifest_sha256: str
+    parent_manifest_sha256: str | None
     raw_snapshot_aggregate_sha256: str
     raw_test_jsonl_sha256: str
     problems_sha256: str
     ordered_problem_ids_sha256: str
     selection_algorithm: str
-    selection_seed: int
+    selection_seed: int | None
     selected_problem_ids: tuple[str, ...]
     selection_role: str = "pilot"
     excluded_manifests: tuple[dict[str, Any], ...] = ()

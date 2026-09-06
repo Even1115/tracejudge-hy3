@@ -8,8 +8,8 @@
 - MBPP+：378 题完整公开投影、固定 120 题子集均已落盘并通过身份校验；固定 EvalPlus 镜像已拉取。
 - LiveCodeBench：release_v6 全量源文件校验通过，60 题选择锁已生成，easy/medium/hard 各 20 题；有序题号 SHA-256 为 `01a4b6bbf91d8337530f005e34b3caf8b9f19fecb46510f98329dbc958d4017e`。
 - LCB 的真实官方 checker 容器曾通过 pass / WA / TLE / RE / CE 五项冒烟。新增源码身份门禁后，需要重新生成与最终冻结代码匹配的 receipt。
-- MBPP+ 真实容器预检发现了 native set/tuple 与非有限浮点数的序列化兼容问题，已修复并有回归测试；最终三项真实容器冒烟仍待资源空闲后验证，不能把离线测试当作通过凭证。
-- 当前主机 8 GB RAM，另一窗口正在运行 HumanEval+ 容器评测。不要同时启动新的容器评测，不要删除旧结果，不要通过增大超时掩盖资源争抢。
+- MBPP+ 的 native set/tuple、非有限浮点数兼容问题已修复。冒烟 v2 区分函数调用内超时（官方可记为 `fail`）与评测子进程超时（`timeout`），不修改官方判分；必须通过下述四项真实冒烟，不能把离线测试当作通过凭证。
+- HumanEval+ 的全量执行及恢复已完成。当前主机 8 GB RAM，仍不要同时启动多个容器评测，不要删除旧结果，不要通过增大超时掩盖资源争抢。
 - 本轮没有运行这两个数据集的正式付费模型实验。下面的一键准备命令不会调用模型 API，任何门禁失败即停止。
 
 ## 1. 先等另一窗口的评测完整结束
@@ -27,9 +27,18 @@ cd "/Users/even/Desktop/犀牛鸟/实战阶段/tracejudge-hy3"
 .venv/bin/python scripts/prepare_external_benchmarks.py
 ```
 
-该命令依次：检查无其他评测容器 → 冻结独立运行代码 → 确定性验证/写入 LCB60 选择锁 → MBPP 三项真实冒烟 → LCB 五项真实冒烟 → 120/60 题预检。
+该命令检查无其他评测容器、冻结独立运行代码，随后依次完成 MBPP 四项真实冒烟和 120 题预检、LCB60 选择锁验证和五项真实冒烟及预检。
 仅全部成功后打印 `[ready] Both cohorts passed real container gates` 和正式运行命令。
 看到 `[blocked]` 时先解决报告的问题，不要跳过门禁或手工修改 `ready`。
+
+只准备 MBPP+（不运行或改写 LCB 的选择/预检记录）：
+
+```bash
+.venv/bin/python scripts/prepare_external_benchmarks.py --dataset mbpp
+```
+
+该路径成功标志为 `[ready] MBPP passed real container gates`。四项冒烟为正确答案、错误答案、函数调用内无限循环、顶层无限循环；同时核对 Base/Extra 状态，基础设施错误不能算冒烟通过。函数调用内无限循环在 `Mbpp/2` 的 Base 预期为 `fail`，Extra 允许官方 `fail` 或 `timeout`，但绝不允许 `pass`；顶层无限循环两组均须为 `timeout`。
+当前凭证是 `artifacts/benchmark-readiness/mbpp.json`；旧凭证原始字节保存在相邻 `history/` 中。120 题的容器核验凭证位于 `<runtime>/artifacts/benchmark-preflight/mbpp/receipt.json`，包含数据、冒烟、执行代码哈希和资源限制。预检只检查 HY3 配置是否存在，不请求远端，因此不证明密钥、余额或网络可用。
 
 独立快照位于 `artifacts/benchmark-runtime/<freeze_id>/`，拥有自己的 clean Git commit。
 源文件逐字节绑定，**不会暂存或提交主工作树**，不复制 `.env`、原始数据或实验输出。
@@ -65,6 +74,7 @@ TJ_RUNTIME=$("$TJ_PY" -c 'import json; print(json.load(open("artifacts/benchmark
 
 也可先单独 `--phase generate`，之后同一 run ID 加 `--phase execute --resume` 执行；执行阶段不需要 `--confirm-real-provider`。
 虽然生成阶段不运行候选容器，入口仍会先验证容器条件，以免付费生成后才发现无法评测。
+正式入口要求 v2 四项冒烟凭证，并重新核对每项实际状态、固定镜像和执行源码（包括共享解析器与冒烟脚本）；单独修改 `ready` 或复用旧版三项凭证不能放行。
 
 ## 4. 断网 / 中断后的恢复
 

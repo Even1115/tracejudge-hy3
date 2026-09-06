@@ -87,7 +87,9 @@ _RESULT_FIELDS = frozenset(
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _TASK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,199}$")
 
-_MAX_REQUEST_BYTES = 64 * 1024 * 1024
+# The pinned LCB60 selection includes a 69,014,330-byte serialized request.
+# Keep a finite transport bound while admitting the selected opaque payloads.
+_MAX_REQUEST_BYTES = 128 * 1024 * 1024
 _MAX_CANDIDATE_BYTES = 1024 * 1024
 _OFFICIAL_WRONG_ANSWER = -2
 _OFFICIAL_TIMEOUT = -3

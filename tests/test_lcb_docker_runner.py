@@ -460,6 +460,42 @@ def test_entrypoint_load_request_validation(tmp_path: Path) -> None:
             entrypoint.load_request(path)
 
 
+def test_entrypoint_accepts_request_as_large_as_pinned_lcb60(tmp_path: Path) -> None:
+    # The fixed selection's largest request is 69,014,330 bytes. Exercise the
+    # actual JSON read/validation boundary with self-authored opaque text only.
+    request = {
+        "schema_version": 1,
+        "question_id": "large-request-fixture",
+        "candidate_sha256": "a" * 64,
+        "public_test_cases": "[]",
+        "private_test_cases": "",
+        "public_test_count": 0,
+        "per_test_timeout_seconds": 6,
+    }
+    target_bytes = 69_014_330
+    overhead = len(json.dumps(request, separators=(",", ":")).encode())
+    request["private_test_cases"] = "A" * (target_bytes - overhead)
+    path = tmp_path / "request.json"
+    path.write_text(json.dumps(request, separators=(",", ":")), encoding="utf-8")
+    assert path.stat().st_size == target_bytes
+    loaded = entrypoint.load_request(path)
+    assert loaded["question_id"] == request["question_id"]
+    assert len(loaded["private_test_cases"]) == target_bytes - overhead
+
+
+def test_entrypoint_rejects_request_over_128_mib_before_reading(tmp_path: Path, monkeypatch) -> None:
+    path = tmp_path / "oversized.json"
+    with path.open("wb") as stream:
+        stream.truncate(128 * 1024 * 1024 + 1)
+
+    def forbidden_read(*args, **kwargs):
+        raise AssertionError("oversized request must be rejected before opening")
+
+    monkeypatch.setattr(Path, "open", forbidden_read)
+    with pytest.raises(entrypoint._EntrypointError, match="control file exceeds its size limit"):
+        entrypoint.load_request(path)
+
+
 def test_entrypoint_official_private_decode_chain() -> None:
     cases = [{"input": "7\n", "output": "49\n", "testtype": "stdin"}]
     official_blob = base64.b64encode(zlib.compress(pickle.dumps(json.dumps(cases)))).decode("ascii")

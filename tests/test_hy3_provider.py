@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import socket
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import openai
 import pytest
+from openai import _base_client
 
 from tracejudge_hy3.config import Settings
 from tracejudge_hy3.dataset.loader import load_problem_by_id
@@ -42,6 +46,187 @@ class _FakeClient:
 
     async def close(self) -> None:
         self.closed = True
+
+
+@pytest.fixture
+async def sdk_mock_provider(monkeypatch):
+    """Exercise the installed SDK's HTTP decoding with no real network access."""
+
+    def deny_network(*_args, **_kwargs):
+        raise AssertionError("real network access is forbidden in this test")
+
+    monkeypatch.setattr(socket.socket, "connect", deny_network)
+    monkeypatch.setattr(socket.socket, "connect_ex", deny_network)
+    # OpenAI 3.x uses httpx2; earlier supported SDK versions use httpx.
+    sdk_httpx = getattr(_base_client, "httpx2", None) or _base_client.httpx
+    real_client_factory = openai.AsyncOpenAI
+    providers = []
+
+    def make_provider(response_bodies: list[bytes], **overrides):
+        requests = []
+
+        def handler(request):
+            assert request.url.host == "hy3.invalid"
+            assert request.method == "POST"
+            requests.append(json.loads(request.content))
+            assert len(requests) <= len(response_bodies), "unexpected extra SDK request"
+            return sdk_httpx.Response(
+                200,
+                content=response_bodies[len(requests) - 1],
+                headers={"content-type": "application/json"},
+            )
+
+        def client_factory(**kwargs):
+            return real_client_factory(
+                **kwargs,
+                http_client=sdk_httpx.AsyncClient(transport=sdk_httpx.MockTransport(handler)),
+            )
+
+        monkeypatch.setattr(openai, "AsyncOpenAI", client_factory)
+        settings = {
+            "hy3_timeout_seconds": 120,
+            "hy3_max_retries": 2,
+            "hy3_max_parse_repairs": 1,
+            "hy3_enable_reasoning_effort": False,
+            **overrides,
+        }
+        provider = Hy3OpenAIProvider(_settings(**settings))
+        providers.append(provider)
+        return provider, requests
+
+    yield make_provider
+    for provider in providers:
+        await provider.aclose()
+
+
+def _sdk_completion_body(content: str) -> bytes:
+    return json.dumps(
+        {
+            "id": "offline-completion",
+            "object": "chat.completion",
+            "created": 1,
+            "model": "test-model",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
+        }
+    ).encode()
+
+
+@pytest.mark.parametrize(
+    "invalid_body",
+    [b"", b'{"RESPONSE_BODY_CANARY":'],
+    ids=["empty", "truncated"],
+)
+async def test_hy3_sdk_http_json_failure_retries_then_succeeds(sdk_mock_provider, invalid_body):
+    problem = load_problem_by_id(DATASET, "safe_mean")
+    valid_solution = await MockProvider(case="correct").generate_solution(problem)
+    provider, requests = sdk_mock_provider(
+        [invalid_body, _sdk_completion_body(valid_solution.model_dump_json())]
+    )
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "success"
+    assert generation.solution == valid_solution
+    assert generation.attempt_outcomes == ("provider_error", "success")
+    assert generation.attempt_count == len(requests) == 2
+    assert generation.retry_count == 1
+    assert generation.raw_output_attempt == 2
+    assert requests[0]["messages"] == requests[1]["messages"]
+
+
+@pytest.mark.parametrize(
+    "invalid_body",
+    [b"", b'{"RESPONSE_BODY_CANARY":'],
+    ids=["empty", "truncated"],
+)
+async def test_hy3_sdk_http_json_exhaustion_is_bounded_and_safe(
+    sdk_mock_provider, invalid_body, caplog
+):
+    provider, requests = sdk_mock_provider([invalid_body] * 3)
+    problem = load_problem_by_id(DATASET, "safe_mean")
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "provider_error"
+    assert generation.attempt_outcomes == ("provider_error",) * 3
+    assert generation.attempt_count == len(requests) == 3
+    assert generation.retry_count == 2
+    assert generation.raw_output is None
+    assert generation.raw_output_attempt is None
+    assert generation.parse_attempted is False
+    assert isinstance(generation.error, ProviderResponseError)
+    assert str(generation.error) == (
+        "Hy3 API request failed after 3 attempt(s): Hy3 API returned invalid JSON"
+    )
+    assert "RESPONSE_BODY_CANARY" not in caplog.text
+    assert "test-secret-not-real" not in caplog.text
+    assert all(request["messages"] == requests[0]["messages"] for request in requests)
+
+
+@pytest.mark.parametrize("repair_budget", [0, 1])
+async def test_hy3_sdk_model_json_error_keeps_parse_repair_budget(sdk_mock_provider, repair_budget):
+    invalid_content = "synthetic non-JSON model content"
+    provider, requests = sdk_mock_provider(
+        [_sdk_completion_body(invalid_content)] * (repair_budget + 1),
+        hy3_max_parse_repairs=repair_budget,
+    )
+    problem = load_problem_by_id(DATASET, "safe_mean")
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "parse_error"
+    assert isinstance(generation.error, ProviderParseError)
+    assert generation.attempt_outcomes == ("parse_error",) * (repair_budget + 1)
+    assert generation.attempt_count == len(requests) == repair_budget + 1
+    assert generation.raw_output == invalid_content
+    assert generation.parse_attempted is True
+    assert len(requests[0]["messages"]) == 2
+    if repair_budget:
+        assert len(requests[1]["messages"]) == 4
+
+
+async def test_hy3_sdk_http_json_error_does_not_consume_parse_repair(sdk_mock_provider):
+    problem = load_problem_by_id(DATASET, "safe_mean")
+    valid_solution = await MockProvider(case="correct").generate_solution(problem)
+    provider, requests = sdk_mock_provider(
+        [
+            b"",
+            _sdk_completion_body("synthetic non-JSON model content"),
+            _sdk_completion_body(valid_solution.model_dump_json()),
+        ]
+    )
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "success"
+    assert generation.attempt_outcomes == ("provider_error", "parse_error", "success")
+    assert generation.attempt_count == len(requests) == 3
+    assert [len(request["messages"]) for request in requests] == [2, 2, 4]
+
+
+async def test_hy3_sdk_http_json_error_does_not_reset_parse_repair(sdk_mock_provider):
+    invalid_content = "synthetic non-JSON model content"
+    provider, requests = sdk_mock_provider(
+        [_sdk_completion_body(invalid_content), b"", _sdk_completion_body(invalid_content)],
+        hy3_max_retries=3,
+    )
+    problem = load_problem_by_id(DATASET, "safe_mean")
+
+    generation = await provider.generate_solution_with_details(problem)
+
+    assert generation.status == "parse_error"
+    assert generation.attempt_outcomes == ("parse_error", "provider_error", "parse_error")
+    assert generation.attempt_count == len(requests) == 3
+    assert generation.raw_output_attempt == 3
+    assert isinstance(generation.error, ProviderParseError)
+    assert [len(request["messages"]) for request in requests] == [2, 4, 4]
+    assert requests[1]["messages"] == requests[2]["messages"]
 
 
 @pytest.mark.parametrize(

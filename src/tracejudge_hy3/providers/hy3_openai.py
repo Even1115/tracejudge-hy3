@@ -142,6 +142,10 @@ class Hy3OpenAIProvider(LLMProvider):
             raise ProviderTimeoutError(f"Hy3 call timed out ({type(exc).__name__})") from exc
         except (openai.APIConnectionError, openai.RateLimitError, openai.APIStatusError) as exc:
             raise ProviderResponseError(f"Hy3 API request failed ({type(exc).__name__})") from exc
+        except json.JSONDecodeError:
+            # The SDK can fail while decoding an HTTP 200 response body.
+            # Keep it within the existing retry budget without exposing that body.
+            raise ProviderResponseError("Hy3 API returned invalid JSON") from None
         finally:
             elapsed = time.perf_counter() - start
             logger.info("Hy3 call took %.2fs", elapsed)

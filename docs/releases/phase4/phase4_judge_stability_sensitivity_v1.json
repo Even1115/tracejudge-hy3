@@ -1,0 +1,450 @@
+{
+  "analysis_id": "phase4_judge_stability_identifier_sensitivity_v1",
+  "analysis_scope": "post_hoc_identifier_normalization_sensitivity",
+  "cases": [
+    {
+      "case_id": "normal_correct",
+      "fields": [
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "has_error",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "false": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "false": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "first_faulty_step",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "error_type",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "joint_label",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[false,null,null]": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[false,null,null]": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        }
+      ],
+      "valid_judgment_count": 5
+    },
+    {
+      "case_id": "reasoning_swap",
+      "fields": [
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "has_error",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "true": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "true": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 40.0,
+          "field_name": "first_faulty_step",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "requirement_understanding": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 6,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "requirement_understanding": 4,
+              "solution_trace.requirement_understanding": 1
+            },
+            "pairwise_agreement": 0.6
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "error_type",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "R01_REQUIREMENT_MISREAD": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "R01_REQUIREMENT_MISREAD": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 40.0,
+          "field_name": "joint_label",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[true,\"requirement_understanding\",\"R01_REQUIREMENT_MISREAD\"]": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 6,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[true,\"requirement_understanding\",\"R01_REQUIREMENT_MISREAD\"]": 4,
+              "[true,\"solution_trace.requirement_understanding\",\"R01_REQUIREMENT_MISREAD\"]": 1
+            },
+            "pairwise_agreement": 0.6
+          }
+        }
+      ],
+      "valid_judgment_count": 5
+    },
+    {
+      "case_id": "boundary_error",
+      "fields": [
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "has_error",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "true": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "true": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "first_faulty_step",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "S1": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "S1": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "error_type",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "A01_PLAN_CODE_MISMATCH": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "A01_PLAN_CODE_MISMATCH": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "joint_label",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[true,\"S1\",\"A01_PLAN_CODE_MISMATCH\"]": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[true,\"S1\",\"A01_PLAN_CODE_MISMATCH\"]": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        }
+      ],
+      "valid_judgment_count": 5
+    },
+    {
+      "case_id": "equivalent_implementation",
+      "fields": [
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "has_error",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "false": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "false": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "first_faulty_step",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "error_type",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "<none>": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        },
+        {
+          "absolute_change_percentage_points": 0.0,
+          "field_name": "joint_label",
+          "normalized": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[false,null,null]": 5
+            },
+            "pairwise_agreement": 1.0
+          },
+          "raw": {
+            "agreeing_pair_count": 10,
+            "comparable_pair_count": 10,
+            "distribution": {
+              "[false,null,null]": 5
+            },
+            "pairwise_agreement": 1.0
+          }
+        }
+      ],
+      "valid_judgment_count": 5
+    }
+  ],
+  "conclusion_boundary": "规范化结果是读取既有 20 次判断后进行的事后敏感性分析，仅说明一个已观察到的路径前缀别名如何影响字符串精确一致率。预注册的原始 90.0% 首错步骤成对一致率保持主结果；规范化后的 100.0% 不得替代主结果、并入冻结的 57×5 主实验，或外推到其他任务、模型、Prompt 与未来服务版本。",
+  "contains_provider_raw": false,
+  "contains_trial_level_text": false,
+  "fallacy_scan_coverage": 11,
+  "kind": "tracejudge_phase4_stability_identifier_sensitivity",
+  "main_experiment_merge_allowed": false,
+  "normalization_policy_id": "first_faulty_step_exact_alias_allowlist_v1",
+  "normalization_rules": [
+    {
+      "canonical_value": "requirement_understanding",
+      "match_policy": "exact",
+      "source_value": "solution_trace.requirement_understanding"
+    }
+  ],
+  "normalized_result_is_post_hoc": true,
+  "overall_confidence": "CAUTION",
+  "overall_fields": [
+    {
+      "absolute_change_percentage_points": 0.0,
+      "field_name": "has_error",
+      "normalized": {
+        "agreeing_pair_count": 40,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 1.0
+      },
+      "raw": {
+        "agreeing_pair_count": 40,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 1.0
+      }
+    },
+    {
+      "absolute_change_percentage_points": 10.0,
+      "field_name": "first_faulty_step",
+      "normalized": {
+        "agreeing_pair_count": 40,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 1.0
+      },
+      "raw": {
+        "agreeing_pair_count": 36,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 0.9
+      }
+    },
+    {
+      "absolute_change_percentage_points": 0.0,
+      "field_name": "error_type",
+      "normalized": {
+        "agreeing_pair_count": 40,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 1.0
+      },
+      "raw": {
+        "agreeing_pair_count": 40,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 1.0
+      }
+    },
+    {
+      "absolute_change_percentage_points": 10.0,
+      "field_name": "joint_label",
+      "normalized": {
+        "agreeing_pair_count": 40,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 1.0
+      },
+      "raw": {
+        "agreeing_pair_count": 36,
+        "comparable_pair_count": 40,
+        "distribution": {},
+        "pairwise_agreement": 0.9
+      }
+    }
+  ],
+  "provider_call_count_for_sensitivity_analysis": 0,
+  "raw_primary_result_preserved": true,
+  "scheduled_evaluation_count": 20,
+  "schema_version": 1,
+  "source_git_commit": "236c58912cd42be12a85a04c15593288b8c2b272",
+  "source_manifest_sha256": "7ed17ffa65db5a7997cbef0eb718220c7c03ab356bd19d1879b5be616685fbe8",
+  "source_model": "tencent/hy3",
+  "source_protocol_sha256": "703d246afe819b78c861d70bca7ca2413fc86a7dbe8bcdf94c1a95fa31062c84",
+  "source_provider": "hy3",
+  "source_raw_report_agreement_verified": true,
+  "source_report_json_sha256": "6852d884b140ef3f0e4de7372b2a96d917190e429ad04e4f429f7baa9515df09",
+  "source_report_markdown_sha256": "9531a70cec034b615e5f7c39ed334c83cb42af84a03ab5eb45d106869964c09e",
+  "source_results_sha256": "95875439f210cbc7430871fdb43c8fff831a5ddfed16d31706584adb9ee4e16e",
+  "source_run_id": "phase4_stability_hy3_public4x5_v1",
+  "valid_judgment_count": 20,
+  "verification_status": "ANALYZED"
+}

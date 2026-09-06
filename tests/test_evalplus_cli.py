@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from typer.testing import CliRunner
 
 import tracejudge_hy3.cli as cli_module
@@ -271,3 +272,42 @@ def test_evalplus_cli_never_echoes_exception_or_summary_canaries(tmp_path, monke
     assert result.exit_code == 1
     assert "未输出原始异常详情" in result.output
     assert all(canary not in result.output for canary in canaries)
+
+
+@pytest.mark.parametrize("mode,infrastructure_errors", [("docker", 0), ("docker", 1), ("mock", 0)])
+def test_full_completion_message_requires_all_164_official_results(
+    tmp_path, monkeypatch, mode, infrastructure_errors
+):
+    def fake_run(**kwargs):
+        result = _fake_run_result(kwargs["output_dir"], kwargs["run_id"], mode=mode)
+        result.summary.update(
+            source_problem_count=164,
+            exported_success_count=164,
+            total_problem_count=164,
+            actual_execution_count=164 - infrastructure_errors if mode == "docker" else 0,
+            infrastructure_error_count=infrastructure_errors,
+            evaluation_complete=mode == "docker" and not infrastructure_errors,
+        )
+        return result
+
+    monkeypatch.setattr(cli_module, "run_evalplus_experiment", fake_run)
+    result = CliRunner().invoke(
+        app,
+        [
+            "evalplus",
+            "--baseline-run",
+            "phase1-full",
+            "--dataset-manifest",
+            "full.json",
+            "--output-dir",
+            str(tmp_path),
+            "--executor",
+            mode,
+        ],
+    )
+    assert result.exit_code == (1 if infrastructure_errors else 0)
+    if mode == "docker" and not infrastructure_errors:
+        assert "完整 HumanEval+ 164 题单候选功能评测已完成" in result.output
+        assert "不是完整 HumanEval+ 成绩" not in result.output
+    else:
+        assert "完整 HumanEval+ 164 题单候选功能评测已完成" not in result.output

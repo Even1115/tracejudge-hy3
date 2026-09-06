@@ -29,6 +29,8 @@ from tracejudge_hy3.dataset.humanevalplus import (
     DATASET_MANIFEST_SCHEMA_VERSION,
     DATASET_SOURCE,
     EXPECTED_RECORD_COUNT,
+    FULL_EXPERIMENT_LABEL,
+    FULL_SELECTION_ALGORITHM,
     KNOWN_WITHHELD_FIELDS,
     PILOT_EXPERIMENT_LABEL,
     PILOT_LIMITATIONS,
@@ -394,10 +396,21 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         "limitations",
     }
     schema_version = payload.get("schema_version")
-    if schema_version == DATASET_MANIFEST_SCHEMA_VERSION:
+    is_full = payload.get("kind") == "tracejudge_humanevalplus_public_projection"
+    if is_full:
+        if type(schema_version) is not int or schema_version != DATASET_MANIFEST_SCHEMA_VERSION:
+            raise EvalPlusExportError("full dataset manifest schema_version must be 1")
+        _exact_keys(
+            payload,
+            expected_top_level_v1 - {"parent_manifest_sha256", "limitations"},
+            label="full dataset manifest",
+        )
+        selection_role = "full"
+        excluded_manifests: list[dict[str, Any]] = []
+    elif schema_version == DATASET_MANIFEST_SCHEMA_VERSION:
         _exact_keys(payload, expected_top_level_v1, label="dataset manifest")
         selection_role = "pilot"
-        excluded_manifests: list[dict[str, Any]] = []
+        excluded_manifests = []
     elif schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
         _exact_keys(
             payload,
@@ -440,7 +453,7 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
     else:
         raise EvalPlusExportError("dataset manifest schema_version must be 1 or 2")
 
-    if payload.get("kind") != "tracejudge_dataset_selection":
+    if not is_full and payload.get("kind") != "tracejudge_dataset_selection":
         raise EvalPlusExportError("dataset manifest is not a pinned selection bundle")
     if payload.get("metrics_scope") != "generation_and_parsing_only":
         raise EvalPlusExportError("dataset manifest source metrics scope is invalid")
@@ -463,9 +476,13 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
     )
     if source_manifest_hash != controlled_source_hash:
         raise EvalPlusExportError("dataset manifest does not match the controlled source manifest")
-    parent_manifest_hash = _sha256_text(
-        payload.get("parent_manifest_sha256"),
-        label="dataset manifest parent_manifest_sha256",
+    parent_manifest_hash = (
+        None
+        if is_full
+        else _sha256_text(
+            payload.get("parent_manifest_sha256"),
+            label="dataset manifest parent_manifest_sha256",
+        )
     )
 
     raw_snapshot = _mapping(payload.get("raw_snapshot"), label="dataset raw_snapshot")
@@ -516,7 +533,13 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
     )
 
     selection = _mapping(payload.get("selection"), label="dataset selection")
-    if schema_version == DATASET_MANIFEST_SCHEMA_VERSION:
+    if is_full:
+        _exact_keys(
+            selection,
+            {"algorithm", "count", "selected_problem_ids"},
+            label="full dataset selection",
+        )
+    elif schema_version == DATASET_MANIFEST_SCHEMA_VERSION:
         _exact_keys(
             selection,
             {"algorithm", "seed", "count", "selected_problem_ids"},
@@ -538,10 +561,13 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
             },
             label="dataset selection",
         )
-    if selection.get("algorithm") != SELECTION_ALGORITHM:
+    selection_algorithm = FULL_SELECTION_ALGORITHM if is_full else SELECTION_ALGORITHM
+    if selection.get("algorithm") != selection_algorithm:
         raise EvalPlusExportError("dataset selection algorithm is invalid")
     count = _integer(selection.get("count"), label="dataset selection count", minimum=1)
-    seed = _integer(selection.get("seed"), label="dataset selection seed")
+    seed = None if is_full else _integer(selection.get("seed"), label="dataset selection seed")
+    if is_full and count != EXPECTED_RECORD_COUNT:
+        raise EvalPlusExportError("full dataset selection must contain exactly 164 tasks")
     selected_ids = selection.get("selected_problem_ids")
     if not isinstance(selected_ids, list) or not all(
         isinstance(problem_id, str) for problem_id in selected_ids
@@ -583,9 +609,13 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         if selection.get("excluded_manifests_sha256") != expected_manifests_hash:
             raise EvalPlusExportError("dataset excluded manifests hash is invalid")
 
-    expected_ids = list(
-        select_humanevalplus_problem_ids(count=count, seed=seed, exclude_ids=exclude_ids)
-    )
+    if is_full:
+        expected_ids = [f"HumanEval/{index}" for index in range(EXPECTED_RECORD_COUNT)]
+    else:
+        assert seed is not None
+        expected_ids = list(
+            select_humanevalplus_problem_ids(count=count, seed=seed, exclude_ids=exclude_ids)
+        )
     if selected_ids != expected_ids:
         raise EvalPlusExportError("dataset selected problem IDs are invalid")
     assert isinstance(selected_ids, list)
@@ -598,7 +628,10 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         if selection.get("selected_problem_ids_sha256") != ordered_problem_ids_sha256(selected_ids):
             raise EvalPlusExportError("dataset selected problem IDs hash is invalid")
 
-    if selection_role == "pilot":
+    if is_full:
+        if payload.get("experiment_label") != FULL_EXPERIMENT_LABEL:
+            raise EvalPlusExportError("full dataset manifest experiment label is invalid")
+    elif selection_role == "pilot":
         allowed_labels = {
             PILOT_EXPERIMENT_LABEL,
             f"humanevalplus_{count}_public_prompt_generation_pilot",
@@ -630,7 +663,7 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         raise EvalPlusExportError("adjacent problems.jsonl SHA256 differs from dataset manifest")
     try:
         problems = load_problems(problems_path)
-        validate_humanevalplus_public_problems(problems)
+        validate_humanevalplus_public_problems(problems, require_complete_snapshot=is_full)
     except DatasetError:
         raise EvalPlusExportError(
             "adjacent problems.jsonl failed public projection validation"
@@ -661,15 +694,18 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         },
         "selection": {
             "algorithm": selection["algorithm"],
-            "seed": selection["seed"],
+            "seed": seed,
             "count": selection["count"],
             "selected_problem_ids": list(selected_ids),
         },
         "withheld_fields": sorted(withheld_fields),
         "metrics_scope": payload["metrics_scope"],
         "source_manifest_sha256": source_manifest_hash,
-        "parent_manifest_sha256": parent_manifest_hash,
     }
+    # Phase one omits the parent key for full projections but normalizes the
+    # absent seed to None. Match that recorded identity without rewriting input.
+    if not is_full:
+        expected_provenance["parent_manifest_sha256"] = parent_manifest_hash
     if schema_version == RESEARCH_NATURAL_DATASET_MANIFEST_SCHEMA_VERSION:
         expected_provenance["selection_role"] = selection_role
         expected_provenance["excluded_manifests"] = excluded_manifests
@@ -687,7 +723,7 @@ def _validate_dataset_manifest(path: Path) -> _DatasetValidation:
         raw_test_jsonl_sha256=raw_test_hash,
         problems_sha256=problems_hash,
         ordered_problem_ids_sha256=ordered_ids_hash,
-        selection_algorithm=SELECTION_ALGORITHM,
+        selection_algorithm=selection_algorithm,
         selection_seed=seed,
         selected_problem_ids=problem_ids,
         selection_role=selection_role,
@@ -739,9 +775,11 @@ def _validate_phase1_manifest(
     run_id = _text(payload.get("run_id"), label="phase-one run_id")
     if run_dir.name != run_id:
         raise EvalPlusExportError("phase-one run directory does not match manifest run_id")
-    selection_role = dataset.expected_provenance.get("selection_role", "pilot")
+    selection_role = dataset.identity.selection_role
     problem_count = len(dataset.problem_ids)
-    if selection_role == "research_natural":
+    if selection_role == "full":
+        expected_label = FULL_EXPERIMENT_LABEL
+    elif selection_role == "research_natural":
         expected_label = RESEARCH_NATURAL_EXPERIMENT_LABEL
     else:
         expected_label = (

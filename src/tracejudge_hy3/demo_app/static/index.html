@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TraceJudge-Hy3 · 过程评估工作台</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="mark" aria-hidden="true"></div>
+        <div class="brand-copy">
+          <strong>TRACEJUDGE-HY3</strong>
+          <span>基于四层对齐与可执行错误证书的代码生成过程评估系统</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <nav class="view-switch" aria-label="页面切换">
+          <button class="view-button active" data-view="demo" aria-pressed="true">评估演示</button>
+          <button class="view-button" data-view="cases" aria-pressed="false">典型案例</button>
+        </nav>
+        <div class="mode-badge" id="mode-badge">待开始</div>
+      </div>
+    </header>
+
+    <section class="page-view" id="page-demo">
+    <nav class="captions" id="captions" aria-label="演示阶段字幕">
+      <span class="caption" data-stage="1">输入待解决任务</span>
+      <span class="caption" data-stage="2" id="caption-generate">生成结构化解答</span>
+      <span class="caption" data-stage="3">对齐需求、推理、代码与执行证据</span>
+      <span class="caption" data-stage="4">执行测试并检查边界条件</span>
+      <span class="caption" data-stage="5">定位首个错误步骤</span>
+      <span class="caption" data-stage="6">生成最小反例与可重放错误证书</span>
+    </nav>
+
+    <section class="research-lens" aria-labelledby="research-lens-title">
+      <div class="section-heading">
+        <span class="eyebrow">WHY PROCESS EVALUATION</span>
+        <h1 id="research-lens-title">通过测试，仍可能在解释中犯错</h1>
+        <p>以下均来自冻结的公开自建反事实，只用来说明过程评估为何必要。</p>
+      </div>
+      <div class="lens-grid">
+        <figure class="insight-figure">
+          <img src="/showcase/reasoning-swap.svg" alt="reasoning_swap 中 Test-only 为 0/3，四种 Judge 方法均为 3/3" />
+          <figcaption>n = 3 · exploratory only · 不作为总体性能或显著性结论</figcaption>
+        </figure>
+        <div class="matrix-wrap">
+          <div class="matrix-title"><b>答案 × 过程</b><span>点击“典型案例”查看证据链</span></div>
+          <div class="matrix" aria-label="答案正确性与过程正确性的二乘二矩阵">
+            <div class="matrix-corner"></div>
+            <div class="matrix-axis">过程正确</div>
+            <div class="matrix-axis">过程错误</div>
+            <div class="matrix-axis row">答案正确</div>
+            <button class="matrix-cell good" data-case="equivalent_implementation"><b>正常正确</b><span>等价实现</span></button>
+            <button class="matrix-cell focus" data-case="reasoning_swap"><b>重点：伪正确</b><span>reasoning swap</span></button>
+            <div class="matrix-axis row">答案错误</div>
+            <div class="matrix-cell muted"><b>推理可能合理</b><span>但实现失败</span></div>
+            <button class="matrix-cell bad" data-case="boundary_deletion"><b>常规失败</b><span>边界删除</span></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <main>
+      <section class="flow" id="flow">
+        <article class="card" id="card-problem">
+          <div class="card-head"><span class="card-index">01</span><h2>题目与需求</h2><em class="card-tag">输入</em></div>
+          <div class="card-body" id="problem-body"><p class="placeholder">正在加载题目…</p></div>
+        </article>
+
+        <article class="card pending" id="card-solution">
+          <div class="card-head"><span class="card-index">02</span><h2>结构化解答</h2><em class="card-tag" id="solution-tag">生成</em></div>
+          <div class="card-body" id="solution-body"><p class="placeholder">等待运行。</p></div>
+        </article>
+
+        <article class="card pending" id="card-alignment">
+          <div class="card-head"><span class="card-index">03</span><h2>四层对齐与静态证据</h2><em class="card-tag">需求 · 推理 · 代码 · 执行</em></div>
+          <div class="card-body" id="alignment-body"><p class="placeholder">等待运行。</p></div>
+        </article>
+
+        <article class="card pending" id="card-execution">
+          <div class="card-head"><span class="card-index">04</span><h2>沙盒测试执行</h2><em class="card-tag">可见 / 边界 / 挑战</em></div>
+          <div class="card-body" id="execution-body"><p class="placeholder">等待运行。</p></div>
+        </article>
+
+        <article class="card pending" id="card-assessment">
+          <div class="card-head"><span class="card-index">05</span><h2>首个错误步骤定位</h2><em class="card-tag">过程评估结论</em></div>
+          <div class="card-body" id="assessment-body"><p class="placeholder">等待运行。</p></div>
+        </article>
+
+        <article class="card pending" id="card-certificate">
+          <div class="card-head"><span class="card-index">06</span><h2>最小反例与错误证书</h2><em class="card-tag">可执行 · 可重放</em></div>
+          <div class="card-body" id="certificate-body"><p class="placeholder">等待运行。</p></div>
+        </article>
+      </section>
+
+      <aside class="sidebar">
+        <div class="panel" id="control-panel">
+          <h3>运行模式</h3>
+          <label class="mode-option" id="option-fixture">
+            <input type="radio" name="mode" value="fixture" checked />
+            <span>
+              <b>公开可复现 Fixture</b>
+              <small>safe_mean 自建公开题目 · Mock 生成 + 真实评估链路</small>
+              <small class="honest-note">公开 Fixture；未调用真实 Hy3</small>
+            </span>
+          </label>
+          <label class="mode-option" id="option-hy3">
+            <input type="radio" name="mode" value="hy3" />
+            <span>
+              <b>真实 Hy3</b>
+              <small>完整 pipeline · Docker 沙盒 · 结果未经预设</small>
+              <small class="honest-note" id="hy3-availability">检查配置中…</small>
+            </span>
+          </label>
+          <div class="actions">
+            <button id="btn-start" class="primary">开始评估</button>
+            <button id="btn-reset">重置演示</button>
+          </div>
+          <div class="export-actions" id="export-actions" hidden>
+            <a id="export-json" class="download-link" href="#">结果 JSON</a>
+            <a id="export-html" class="download-link" href="#">HTML 报告</a>
+            <a id="export-certificate" class="download-link" href="#">错误证书</a>
+          </div>
+          <p class="hint" id="hint">按钮会真实触发项目评估流水线，页面展示的是当次真实执行结果。</p>
+        </div>
+
+        <div class="panel" id="status-panel">
+          <h3>执行状态</h3>
+          <ol class="stages" id="stages">
+            <li data-stage="1"><i></i>题目载入</li>
+            <li data-stage="2"><i></i>生成结构化解答</li>
+            <li data-stage="3"><i></i>四层对齐与静态分析</li>
+            <li data-stage="4"><i></i>沙盒执行测试</li>
+            <li data-stage="5"><i></i>定位首个错误步骤</li>
+            <li data-stage="6"><i></i>反例、证书与重放</li>
+          </ol>
+          <div class="run-meta" id="run-meta"></div>
+        </div>
+      </aside>
+    </main>
+
+    <section class="overview" id="overview" hidden>
+      <div class="overview-head">
+        <h2>已发布结果总览</h2>
+        <span id="overview-source"></span>
+      </div>
+      <div class="overview-grid" id="overview-grid"></div>
+      <div class="overview-extra" id="overview-extra"></div>
+      <p class="disclaimer" id="overview-disclaimer"></p>
+    </section>
+    </section>
+
+    <section class="page-view cases-page" id="page-cases" hidden>
+      <div class="cases-hero">
+        <div>
+          <span class="eyebrow">PUBLIC CASE EXPLORER</span>
+          <h1>从题目到证书，查看三种典型判断</h1>
+          <p>案例正文只读取 SHA256 绑定的公开自建 Fixture；不读取私有标注、逐条正式方法预测或隐藏测试。</p>
+        </div>
+        <div class="source-chip" id="case-source">正在校验公开源…</div>
+      </div>
+      <div class="cases-layout">
+        <aside class="case-list" id="case-list" aria-label="典型案例列表"></aside>
+        <article class="case-detail" id="case-detail"><p class="placeholder">正在载入案例…</p></article>
+      </div>
+      <section class="regression-section" aria-labelledby="regression-title">
+        <div class="overview-head">
+          <div>
+            <span class="eyebrow">VERSIONED REGRESSION CARD</span>
+            <h2 id="regression-title">公开 Fixture 回归基线</h2>
+          </div>
+          <button class="compact-button" id="download-regression">下载卡片 JSON</button>
+        </div>
+        <div class="regression-grid" id="regression-grid"><p class="placeholder">正在生成回归卡片…</p></div>
+        <p class="disclaimer" id="regression-boundary"></p>
+      </section>
+      <p class="disclaimer cases-disclaimer" id="cases-disclaimer"></p>
+    </section>
+
+    <footer>
+      <span>TraceJudge-Hy3 · 本地过程评估工作台 · 仅监听 127.0.0.1</span>
+      <span id="foot-status">就绪</span>
+    </footer>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

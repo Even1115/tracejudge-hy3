@@ -1,0 +1,333 @@
+{
+  "actual_method_level_deltas_computed": false,
+  "analysis_id": "phase4_p1_post_adjudication_sensitivity_v1",
+  "analysis_scope": "post_hoc_aggregate_only_impact_envelope",
+  "both_error_item_count": 6,
+  "conclusion_boundary": "原始两标注者完整七字段一致率保持 19/20，has_error 一致率保持 20/20；唯一过程细节分歧随后以记录在案的人类共识解决。该解决状态是 1/1 分歧已裁决，不是新的 20/20 标注者一致率。由于本分析未读取逐条原标签或方法预测，只有has_error、process_correct、reasoning_correct 的零影响可以确定；计划—代码对齐与定位类下游分数仅报告固定分母下最多一个条目的影响上界。任何精确方法分数变化都必须在另行版本化、预先声明口径的下游分析中计算，不得覆盖 57×5 主结果。",
+  "consolidated_reference_label_set_created": false,
+  "contains_adjudication_rationale": false,
+  "contains_adjudication_values": false,
+  "contains_item_identity": false,
+  "contains_method_predictions": false,
+  "contains_per_item_original_labels": false,
+  "docker_call_count": 0,
+  "fallacy_scan": [
+    {
+      "fallacy": "simpsons_paradox",
+      "finding": "未合并相互冲突的分层趋势；本报告分别保留全 20 条与双方判错 6 条分母。",
+      "severity": "NOTE"
+    },
+    {
+      "fallacy": "ecological_fallacy",
+      "finding": "不从聚合变化上界推断任一标注者的个人能力或判断动机。",
+      "severity": "NOTE"
+    },
+    {
+      "fallacy": "berksons_paradox",
+      "finding": "20 条是预先冻结的确定性子集，不能外推到全部任务。",
+      "severity": "CAUTION"
+    },
+    {
+      "fallacy": "collider_bias",
+      "finding": "未按裁决结果筛选条目或进行条件回归。",
+      "severity": "NOTE"
+    },
+    {
+      "fallacy": "base_rate_neglect",
+      "finding": "同时保留 6 条双方判错与 14 条双方无错的基率背景。",
+      "severity": "NOTE"
+    },
+    {
+      "fallacy": "regression_to_the_mean",
+      "finding": "没有按极端得分选择前后测样本。",
+      "severity": "NOTE"
+    },
+    {
+      "fallacy": "survivorship_bias",
+      "finding": "正式 20/20 条均进入原始一致性分析，没有排除未完成条目。",
+      "severity": "NOTE"
+    },
+    {
+      "fallacy": "look_elsewhere_effect",
+      "finding": "仅分析预先观测到分歧的固定字段，不搜索额外终点。",
+      "severity": "CAUTION"
+    },
+    {
+      "fallacy": "garden_of_forking_paths",
+      "finding": "裁决后分析明确标为 post-hoc，原始 19/20 与 20/20 指标保持主读数。",
+      "severity": "CAUTION"
+    },
+    {
+      "fallacy": "correlation_not_causation",
+      "finding": "只给出描述性影响上界，不声称裁决导致模型性能变化。",
+      "severity": "NOTE"
+    },
+    {
+      "fallacy": "reverse_causality",
+      "finding": "未使用方法预测决定裁决，也不建立时间方向因果模型。",
+      "severity": "NOTE"
+    }
+  ],
+  "fallacy_scan_coverage": 11,
+  "impact_envelopes": [
+    {
+      "conditional_both_error_denominator": null,
+      "exact_method_score_delta_status": "exact_zero",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "guaranteed_unchanged",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 0.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": null,
+      "maximum_changed_reference_items": 0,
+      "metric_name": "has_error_detection",
+      "rationale": "双方原始 has_error 无分歧，裁决不触及该字段，因此固定 P1 子集上的检测标签不变。"
+    },
+    {
+      "conditional_both_error_denominator": null,
+      "exact_method_score_delta_status": "exact_zero",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "guaranteed_unchanged",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 0.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": null,
+      "maximum_changed_reference_items": 0,
+      "metric_name": "process_correct",
+      "rationale": "process_correct 是 has_error 的 Schema 强制补集，裁决未改变 has_error。"
+    },
+    {
+      "conditional_both_error_denominator": null,
+      "exact_method_score_delta_status": "exact_zero",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "guaranteed_unchanged",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 0.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": null,
+      "maximum_changed_reference_items": 0,
+      "metric_name": "reasoning_correct",
+      "rationale": "双方原始 reasoning_correct 无分歧，裁决不触及该字段。"
+    },
+    {
+      "conditional_both_error_denominator": null,
+      "exact_method_score_delta_status": "not_computed_without_versioned_downstream_target_and_predictions",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "eligible_to_change_by_at_most_one_item",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 5.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": null,
+      "maximum_changed_reference_items": 1,
+      "metric_name": "plan_code_aligned",
+      "rationale": "该字段属于唯一分歧；若构建另行版本化的共识参考集，固定 20 条分母中最多改变 1 条。"
+    },
+    {
+      "conditional_both_error_denominator": 6,
+      "exact_method_score_delta_status": "not_computed_without_versioned_downstream_target_and_predictions",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "eligible_to_change_by_at_most_one_item",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 5.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": 16.666666666667,
+      "maximum_changed_reference_items": 1,
+      "metric_name": "first_faulty_layer",
+      "rationale": "该定位字段属于唯一分歧；全 20 条最多改变 1 条，双方判错的 6 条条件分母中也最多改变 1 条。"
+    },
+    {
+      "conditional_both_error_denominator": 6,
+      "exact_method_score_delta_status": "not_computed_without_versioned_downstream_target_and_predictions",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "eligible_to_change_by_at_most_one_item",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 5.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": 16.666666666667,
+      "maximum_changed_reference_items": 1,
+      "metric_name": "first_faulty_step",
+      "rationale": "该定位字段属于唯一分歧；全 20 条最多改变 1 条，双方判错的 6 条条件分母中也最多改变 1 条。"
+    },
+    {
+      "conditional_both_error_denominator": 6,
+      "exact_method_score_delta_status": "not_computed_without_versioned_downstream_target_and_predictions",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "eligible_to_change_by_at_most_one_item",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 5.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": 16.666666666667,
+      "maximum_changed_reference_items": 1,
+      "metric_name": "error_type",
+      "rationale": "该定位字段属于唯一分歧；全 20 条最多改变 1 条，双方判错的 6 条条件分母中也最多改变 1 条。"
+    },
+    {
+      "conditional_both_error_denominator": 6,
+      "exact_method_score_delta_status": "not_computed_without_versioned_downstream_target_and_predictions",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "eligible_to_change_by_at_most_one_item",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 5.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": 16.666666666667,
+      "maximum_changed_reference_items": 1,
+      "metric_name": "joint_fault_label",
+      "rationale": "联合标签由三个均存在分歧的定位字段组成；全 20 条和双方判错的 6 条中最多各影响 1 条。"
+    },
+    {
+      "conditional_both_error_denominator": null,
+      "exact_method_score_delta_status": "not_computed_without_versioned_downstream_target_and_predictions",
+      "fixed_all_item_denominator": 20,
+      "impact_status": "eligible_to_change_by_at_most_one_item",
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_20": 5.0,
+      "maximum_absolute_change_percentage_points_if_fixed_denominator_6": null,
+      "maximum_changed_reference_items": 1,
+      "metric_name": "full_seven_field_reference_record",
+      "rationale": "七字段完整记录的唯一分歧已解决，但这表示 1/1 分歧完成裁决，不产生新的标注者一致率。"
+    }
+  ],
+  "item_count": 20,
+  "kind": "tracejudge_phase4_p1_post_adjudication_sensitivity",
+  "main_57x5_results_unchanged": true,
+  "method_level_delta_limitation": "method_predictions_and_per_item_original_labels_not_accessed",
+  "network_call_count": 0,
+  "original_full_record_disagreement_count": 1,
+  "original_primary_labels_unchanged": true,
+  "original_secondary_labels_unchanged": true,
+  "overall_confidence": "CAUTION",
+  "post_adjudication_inter_rater_agreement_created": false,
+  "provider_call_count": 0,
+  "raw_agreement_result_unchanged": true,
+  "raw_binary_fields": [
+    {
+      "cohen_kappa": 1.0,
+      "field_name": "has_error",
+      "raw_agreement": {
+        "agreeing_count": 20,
+        "denominator": 20,
+        "estimate": 1.0,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.838874841947,
+        "interval_upper": 1.0
+      }
+    },
+    {
+      "cohen_kappa": 1.0,
+      "field_name": "process_correct",
+      "raw_agreement": {
+        "agreeing_count": 20,
+        "denominator": 20,
+        "estimate": 1.0,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.838874841947,
+        "interval_upper": 1.0
+      }
+    },
+    {
+      "cohen_kappa": 1.0,
+      "field_name": "reasoning_correct",
+      "raw_agreement": {
+        "agreeing_count": 20,
+        "denominator": 20,
+        "estimate": 1.0,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.838874841947,
+        "interval_upper": 1.0
+      }
+    },
+    {
+      "cohen_kappa": 0.875,
+      "field_name": "plan_code_aligned",
+      "raw_agreement": {
+        "agreeing_count": 19,
+        "denominator": 20,
+        "estimate": 0.95,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.763868806553,
+        "interval_upper": 0.991118551199
+      }
+    }
+  ],
+  "raw_full_record_exact_agreement": {
+    "agreeing_count": 19,
+    "denominator": 20,
+    "estimate": 0.95,
+    "interval_kind": "wilson_95",
+    "interval_lower": 0.763868806553,
+    "interval_upper": 0.991118551199
+  },
+  "raw_inter_rater_metrics_preserved": true,
+  "raw_localization_fields": [
+    {
+      "all_items_including_no_error_null": {
+        "agreeing_count": 19,
+        "denominator": 20,
+        "estimate": 0.95,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.763868806553,
+        "interval_upper": 0.991118551199
+      },
+      "both_error_items": {
+        "agreeing_count": 5,
+        "denominator": 6,
+        "estimate": 0.833333333333,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.436497177814,
+        "interval_upper": 0.969946630252
+      },
+      "field_name": "first_faulty_layer"
+    },
+    {
+      "all_items_including_no_error_null": {
+        "agreeing_count": 19,
+        "denominator": 20,
+        "estimate": 0.95,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.763868806553,
+        "interval_upper": 0.991118551199
+      },
+      "both_error_items": {
+        "agreeing_count": 5,
+        "denominator": 6,
+        "estimate": 0.833333333333,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.436497177814,
+        "interval_upper": 0.969946630252
+      },
+      "field_name": "first_faulty_step"
+    },
+    {
+      "all_items_including_no_error_null": {
+        "agreeing_count": 19,
+        "denominator": 20,
+        "estimate": 0.95,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.763868806553,
+        "interval_upper": 0.991118551199
+      },
+      "both_error_items": {
+        "agreeing_count": 5,
+        "denominator": 6,
+        "estimate": 0.833333333333,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.436497177814,
+        "interval_upper": 0.969946630252
+      },
+      "field_name": "error_type"
+    },
+    {
+      "all_items_including_no_error_null": {
+        "agreeing_count": 19,
+        "denominator": 20,
+        "estimate": 0.95,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.763868806553,
+        "interval_upper": 0.991118551199
+      },
+      "both_error_items": {
+        "agreeing_count": 5,
+        "denominator": 6,
+        "estimate": 0.833333333333,
+        "interval_kind": "wilson_95",
+        "interval_lower": 0.436497177814,
+        "interval_upper": 0.969946630252
+      },
+      "field_name": "joint_fault_label"
+    }
+  ],
+  "raw_participant_label_data_accessed": false,
+  "resolved_disagreement_count": 1,
+  "schema_version": 1,
+  "source_adjudication_mode": "documented_consensus",
+  "source_agreement_analysis_sha256": "fe9c66d505c0ce472deb652676ac38ea4d6849547323a1e3061ad1d9deea2135",
+  "source_agreement_manifest_sha256": "20d11548ed638c34bb9054d12893e28bd5c18e3028091dc5186e914182471c76",
+  "source_completed_adjudication_decision_sha256": "f3f32476283a5c5e4b65af8a6250352b3b2ca60592929feef671fd52ac3f442a",
+  "source_completed_adjudication_manifest_sha256": "6e48963ee7cfe6cda2f113271286612af1640ca1abaf0eaeacedb62de2639287",
+  "source_pending_adjudication_manifest_sha256": "5dc8e34b1e6842b41db294b035e374afc2df77899433362b8af80b74c0da9009",
+  "unresolved_disagreement_count": 0,
+  "verification_status": "ANALYZED"
+}

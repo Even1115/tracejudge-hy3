@@ -1,0 +1,46 @@
+{
+  "boundary": "这是已冻结公开结果的版本化回归基线，不是代码修改后的自动重跑结果；未来版本必须使用预先冻结的公开 fixture 输出新卡片，不得在正式 57 条 cohort 上边调边测。",
+  "card_id": "tracejudge_public_regression_v0_1_0",
+  "confidence": "CAUTION",
+  "evaluator_version": "v0.1.0",
+  "fixture_count": 15,
+  "fixture_scope": "3 个公开父题 × 5 种单因素反事实；仅作版本回归基线",
+  "metrics": {
+    "abstention_count": {
+      "reason": "冻结方法输出 schema 未单列 abstention；不以缺失数据伪造 0",
+      "status": "not_recorded"
+    },
+    "counterexample_replay_pass": {
+      "denominator": 1,
+      "numerator": 1,
+      "scope": "公开 boundary_deletion confirmed_bug receipt"
+    },
+    "error_detection": {
+      "denominator": 12,
+      "numerator": 12,
+      "scope": "Full TraceJudge 在 12 条公开有错反事实上的冻结结果"
+    },
+    "exact_first_step_localization": {
+      "reason": "公开聚合未暴露逐条方法预测，不能从汇总表重建该子集的精确定位率",
+      "status": "not_computable"
+    },
+    "false_positive_count": {
+      "count": 1,
+      "denominator": 3,
+      "scope": "3 条 equivalent_implementation 负例"
+    },
+    "provider_failure_count": {
+      "count": 0,
+      "scope": "Full TraceJudge 冻结 57 条运行；公开报告记录 judgment availability=57/57"
+    }
+  },
+  "schema_version": 1,
+  "source": {
+    "chart_manifest": "docs/releases/phase4/charts/phase4_public_charts_v1/manifest.json",
+    "public_counterfactual_sha256": "a6195fb0867c69607bfa7a346b8112c49dfbe4d9d85700e2238d5bb1e22731df",
+    "replay_receipt": "docs/releases/phase4/phase4_public_replay_receipt_v1.json",
+    "replay_receipt_id": "phase4_public_replay_receipt_v1",
+    "report": "docs/releases/phase4/phase3_research_report_public_v1.md"
+  },
+  "verification_status": "ANALYZED"
+}

@@ -3,6 +3,8 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+.workbuddy/
+.claude/
 .env
 *.egg-info/
 build/
@@ -18,3 +20,8 @@ artifacts/*
 !artifacts/.gitkeep
 
 .DS_Store
+
+# CodeJudge-Eval runs: raw provider responses may echo prompts/candidate code
+data/codejudge_eval/runs/*/provider_raw.jsonl
+data/codejudge_eval/CodeJudge_Eval_0shot_*.json
+data/codejudge_eval/runs/

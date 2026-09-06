@@ -1,0 +1,26 @@
+{
+  "easy/4123 (two-gram, gold=NotAC judge=AC)": {
+    "total": 88569,
+    "ok": 88569,
+    "mismatch": 0,
+    "timeout": 0,
+    "error": 0,
+    "examples": []
+  },
+  "medium/83 (division, gold=WA judge=AC)": {
+    "total": 5210,
+    "ok": 5210,
+    "mismatch": 0,
+    "timeout": 0,
+    "error": 0,
+    "examples": []
+  },
+  "hard/171 (password, gold=WA judge=AC)": {
+    "total": 89380,
+    "ok": 89380,
+    "mismatch": 0,
+    "timeout": 0,
+    "error": 0,
+    "examples": []
+  }
+}

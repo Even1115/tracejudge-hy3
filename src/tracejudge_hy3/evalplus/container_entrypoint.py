@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import gzip
 import hashlib
 import importlib
 import importlib.metadata
@@ -512,11 +513,53 @@ def _official_parent_open(
         raise _EntrypointError("result_integrity_failed") from None
 
 
+@contextlib.contextmanager
+def _gzip_reference_cache(path: Path, mode: str):
+    """Stream only private oracle cache bytes; never lift RLIMIT_FSIZE.
+
+    Pickle sees the same logical stream. Gzip bounds the on-disk cache while
+    the existing tmpfs, cgroup, file-size and parent-result protections remain.
+    """
+    if mode not in {"rb", "wb"}:
+        raise _EntrypointError("executor_setup_failed")
+    flags = os.O_NOFOLLOW | (os.O_RDONLY if mode == "rb" else os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+    descriptor = os.open(path, flags, 0o600)
+    with os.fdopen(descriptor, mode) as raw:
+        if not stat.S_ISREG(os.fstat(raw.fileno()).st_mode):
+            raise _EntrypointError("executor_setup_failed")
+        with gzip.GzipFile(filename="", mode=mode, fileobj=raw, compresslevel=1, mtime=0) as stream:
+            yield stream
+
+
+def _cache_aware_parent_open(
+    cache_root: Path,
+    parent_open: Any,
+    value: Any,
+    mode: str = "r",
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    try:
+        candidate = Path(os.path.abspath(os.fspath(value)))
+    except (OSError, TypeError, ValueError):
+        candidate = None
+    if (
+        candidate is not None
+        and candidate.parent == cache_root
+        and re.fullmatch(r"[0-9a-f]{32}\.pkl", candidate.name)
+    ):
+        if args or kwargs or cache_root.is_symlink() or cache_root.resolve() != cache_root:
+            raise _EntrypointError("executor_setup_failed")
+        return _gzip_reference_cache(candidate, mode)
+    return parent_open(value, mode, *args, **kwargs)
+
+
 def _guarded_official_evaluate(
     sample_path: Path,
     private_root: Path,
     _control_root: Path,
     _output_root: Path,
+    reference_cache_compression: str = "none",
 ) -> int:
     """Run pinned EvalPlus with a forced, no-follow official-parent result write.
 
@@ -556,13 +599,24 @@ def _guarded_official_evaluate(
         ):
             raise _EntrypointError("runtime_identity_mismatch")
         evaluator_globals["os"] = _PinnedResultOsProxy(target)
-        evaluator_globals["open"] = lambda *args, **kwargs: _official_parent_open(
-            target,
-            state,
-            directory_descriptor,
-            *args,
-            **kwargs,
-        )
+
+        def parent_open(*args, **kwargs):
+            return _official_parent_open(target, state, directory_descriptor, *args, **kwargs)
+
+        if reference_cache_compression == "gzip":
+            cache_root = Path(evaluator_globals["CACHE_DIR"]).absolute()
+            if (
+                not cache_root.is_relative_to(private_root / "cache")
+                or cache_root.resolve() != cache_root
+            ):
+                raise _EntrypointError("executor_setup_failed")
+            evaluator_globals["open"] = lambda *args, **kwargs: _cache_aware_parent_open(
+                cache_root, parent_open, *args, **kwargs
+            )
+        elif reference_cache_compression == "none":
+            evaluator_globals["open"] = parent_open
+        else:
+            raise _EntrypointError("invalid_request")
         official_evaluate(
             dataset="humaneval",
             samples=str(sample_path),
@@ -943,6 +997,7 @@ def _run(
     result_path: Path,
     *,
     result_identity: tuple[int, int],
+    reference_cache_compression: str = "none",
 ) -> dict[str, Any]:
     tasks = _request(request_path, mode="run")
     expected = tasks[0]
@@ -1004,6 +1059,8 @@ def _run(
                 str(request_path.parent),
                 str(result_path.parent),
             ]
+            if reference_cache_compression != "none":
+                command.append(reference_cache_compression)
             completed = subprocess.run(
                 command,
                 stdin=subprocess.DEVNULL,
@@ -1056,6 +1113,7 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("sample", nargs="?")
     parser.add_argument("result", nargs="?")
     parser.add_argument("control", nargs="?")
+    parser.add_argument("--reference-cache-compression", choices=("none", "gzip"), default="none")
     return parser.parse_args(argv)
 
 
@@ -1085,10 +1143,13 @@ def _publish_control(
 def main(argv: list[str] | None = None) -> int:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     if raw_argv[:1] == [_INTERNAL_EVALUATE_MODE]:
-        if len(raw_argv) != 5:
+        if len(raw_argv) not in {5, 6} or (len(raw_argv) == 6 and raw_argv[5] != "gzip"):
             return 73
         try:
-            return _guarded_official_evaluate(*(Path(value) for value in raw_argv[1:]))
+            return _guarded_official_evaluate(
+                *(Path(value) for value in raw_argv[1:5]),
+                **({"reference_cache_compression": "gzip"} if len(raw_argv) == 6 else {}),
+            )
         except BaseException:
             return 73
     args: argparse.Namespace | None = None
@@ -1120,6 +1181,7 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.sample),
                 result_path,
                 result_identity=result_identity,
+                reference_cache_compression=args.reference_cache_compression,
             )
         exit_code = 0
     except _EntrypointError as exc:

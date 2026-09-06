@@ -128,6 +128,24 @@ def _phase2_identity(
         "phase1_parse_success_is_not_phase2_functional_success",
         "pinned_evalplus_fail_combines_wrong_answers_and_candidate_exceptions",
     ]
+    if dataset_identity.selection_role == "full":
+        if source_count != 164:
+            raise EvalPlusExperimentError("full HumanEval+ source must contain exactly 164 tasks")
+        limitations = ["single_sample_per_exported_phase1_success", *shared_limitations]
+        if exported_count == source_count:
+            return (
+                "humanevalplus_164_evalplus_execution_full",
+                "full_164_task_single_sample_generation_to_execution",
+                limitations,
+                "full_164_task_single_sample_generation_to_execution",
+            )
+        limitations.append("phase2_conditioned_on_phase1_success")
+        return (
+            f"humanevalplus_{exported_count}_of_164_evalplus_execution_full",
+            f"full_{exported_count}_of_164_phase1_success_conditioned_execution",
+            limitations,
+            f"full_{exported_count}_of_164_phase1_successful_tasks_execution",
+        )
     if dataset_identity.selection_role == "pilot":
         limitations = [
             f"fixed_{source_count}_problem_subset_not_full_humanevalplus",

@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from tracejudge_hy3.benchmark.mbpp_readiness import MBPP_SMOKE_EXPECTATIONS, MBPP_SMOKE_SCHEMA
+
 
 def load_script(name):
     path = Path(__file__).resolve().parents[1] / "scripts" / f"{name}.py"
@@ -48,11 +50,35 @@ def mbpp_cli(tmp_path, monkeypatch):
     module = load_script("run_mbppplus")
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "require_idle_benchmark_containers", lambda: None)
+    monkeypatch.setattr(module, "execution_identity", lambda *_: {})
+    monkeypatch.setattr(module, "source_identity", lambda _: {"python": "test", "dependencies": {}})
+    monkeypatch.setattr(
+        module, "get_settings", lambda: SimpleNamespace(hy3_configured=lambda: True)
+    )
+    bundle = tmp_path / "artifacts/datasets/mbppplus/sample120"
+    bundle.mkdir(parents=True)
+    (bundle / "dataset_manifest.json").write_text("{}")
+    (bundle / "problems.jsonl").write_text("public fixture\n")
     folder = tmp_path / "artifacts/benchmark-readiness"
     folder.mkdir(parents=True)
     (folder / "mbpp.json").write_text(
         json.dumps(
-            {"ready": True, "image": module.DEFAULT_EVALPLUS_IMAGE, "execution_source_sha256": {}}
+            {
+                "schema": MBPP_SMOKE_SCHEMA,
+                "ready": True,
+                "uses_model_api": False,
+                "image": module.DEFAULT_EVALPLUS_IMAGE,
+                "execution_source_sha256": {},
+                "cases": {
+                    name: {
+                        "expected": expected,
+                        "actual": {key: values[0] for key, values in expected.items()},
+                        "infrastructure_error_type": None,
+                        "ok": True,
+                    }
+                    for name, expected in MBPP_SMOKE_EXPECTATIONS.items()
+                },
+            }
         )
     )
     monkeypatch.setattr(
@@ -69,11 +95,11 @@ def mbpp_cli(tmp_path, monkeypatch):
 
     class Executor:
         def __init__(self, **kwargs):
-            pass
+            self.limits = kwargs["limits"]
 
         def preflight(self, *, task_metadata, workspace):
             assert len(task_metadata) == 120
-            return SimpleNamespace(ready=True)
+            return SimpleNamespace(ready=True, runtime={"verified_task_count": 120})
 
     monkeypatch.setattr(module, "MbppPlusDockerRunner", Executor)
     return module
@@ -156,6 +182,7 @@ def test_prepare_stops_on_smoke_failure_without_any_paid_api(tmp_path, monkeypat
     module = load_script("prepare_external_benchmarks")
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "require_idle_benchmark_containers", lambda: None)
+    monkeypatch.setattr("sys.argv", ["prepare_external_benchmarks.py"])
     pointer = tmp_path / "artifacts/benchmark-runtime/current.json"
     pointer.parent.mkdir(parents=True)
     pointer.write_text(json.dumps({"runtime_root": str(tmp_path / "runtime")}))
@@ -173,7 +200,7 @@ def test_prepare_stops_on_smoke_failure_without_any_paid_api(tmp_path, monkeypat
     monkeypatch.setattr(subprocess, "run", invoke)
     with pytest.raises(subprocess.CalledProcessError):
         module.main()
-    assert len(commands) == 3
+    assert len(commands) == 2
     assert commands[-1][-2:] == ["--dataset", "mbpp"]
 
 

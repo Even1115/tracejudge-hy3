@@ -1,0 +1,1322 @@
+{
+  "schema": "tracejudge-public-four-dataset-summary-v1",
+  "version": "four-dataset-interim-v1",
+  "as_of": "2026-09-06 21:40:09+08:00",
+  "status": "INTERIM_FOUR_DATASETS_LCB_INCOMPLETE",
+  "disclosure": "Aggregate report: no credentials, full prompts, candidate code, hidden tests or original model responses. Four datasets are represented; LCB has two unresolved provider failures.",
+  "humanevalplus": {
+    "source_ids": [
+      "he.generation.summary",
+      "he.recovery.summary",
+      "he.recovery.verification"
+    ],
+    "generation": {
+      "run_id": "phase1_20260905T085110677252Z_65d2a9ad3f12",
+      "total_problem_count": 164,
+      "success_count": 164,
+      "parse_error_count": 0,
+      "provider_error_count": 0
+    },
+    "execution": {
+      "run_id": "full-164-recovery-20260906-v1",
+      "total_problem_count": 164,
+      "result_count": 164,
+      "actual_execution_count": 164,
+      "base_pass_count": 163,
+      "base_pass_rate": 0.9939024390243902,
+      "base_plus_pass_count": 157,
+      "base_plus_pass_rate": 0.9573170731707317,
+      "infrastructure_error_count": 0,
+      "timeout_count": 0,
+      "wrong_answer_or_candidate_exception_count": 7,
+      "preserved_result_count": 161,
+      "imported_diagnostic_count": 2,
+      "new_execution_count": 1,
+      "model_api_calls": 0,
+      "evaluation_complete": true
+    },
+    "local_verification": {
+      "unique_task_count": 164,
+      "original_161_records_unchanged": true,
+      "source_hashes_unchanged": true,
+      "raw_safe_summary_agreement": true,
+      "provenance_counts": {
+        "cache_recovery_execution": 1,
+        "diagnostic_import": 2,
+        "original_valid": 161
+      },
+      "base_pass_count": 163,
+      "base_plus_pass_count": 157,
+      "verified_at": "2026-09-06T03:47:29.269990+00:00"
+    },
+    "limitations": [
+      "Single fixed candidate per task; no repeated-generation variance estimate.",
+      "Cross-batch recovery preserves 161 original outcomes, imports two diagnostic outcomes, and executes only task 15 with compressed reference cache.",
+      "Diagnostic raw hashes were first bound at recovery; not a historical tamper-proof guarantee.",
+      "Not official leaderboard certification or process-localization evaluation."
+    ]
+  },
+  "mbppplus": {
+    "source_ids": [
+      "mbpp.combined_report",
+      "mbpp.generation.summary",
+      "mbpp.execution.summary",
+      "mbpp.selection.manifest"
+    ],
+    "run_id": "mbpp120-v1",
+    "metrics": {
+      "planned_n": 120,
+      "actual_execution_n": 120,
+      "complete": true,
+      "generation_coverage": {
+        "denominator": 120,
+        "numerator": 120,
+        "value": 1,
+        "wilson_95": [
+          0.9689808335812966,
+          1
+        ]
+      },
+      "provider_failure_n": 0,
+      "parse_failure_n": 0,
+      "base_pass_full_denominator": {
+        "denominator": 120,
+        "numerator": 117,
+        "value": 0.975,
+        "wilson_95": [
+          0.9290699666721339,
+          0.9914618252300978
+        ]
+      },
+      "base_plus_pass_full_denominator": {
+        "denominator": 120,
+        "numerator": 95,
+        "value": 0.7916666666666666,
+        "wilson_95": [
+          0.7105232156701865,
+          0.8547156039189031
+        ]
+      },
+      "base_pass_conditional_on_execution": {
+        "denominator": 120,
+        "numerator": 117,
+        "value": 0.975,
+        "wilson_95": [
+          0.9290699666721339,
+          0.9914618252300978
+        ]
+      },
+      "base_plus_pass_conditional_on_execution": {
+        "denominator": 120,
+        "numerator": 95,
+        "value": 0.7916666666666666,
+        "wilson_95": [
+          0.7105232156701865,
+          0.8547156039189031
+        ]
+      },
+      "updated_at": "2026-09-06T08:07:46.867167+00:00"
+    },
+    "generation_audit": {
+      "final_success_count": 120,
+      "recorded_attempts": 123,
+      "recovered_provider_failures": 3,
+      "repair_attempted_count": 0
+    },
+    "execution": {
+      "actual_execution_count": 120,
+      "result_count": 120,
+      "infrastructure_error_count": 0,
+      "timeout_count": 2,
+      "wrong_answer_or_candidate_exception_count": 23,
+      "batch_deadline_not_started_count": 0,
+      "container_cleanup_failed_count": 0,
+      "completed_at": "2026-09-06T08:07:46.828Z"
+    },
+    "base_extra_status_counts": {
+      "pass_pass": 95,
+      "pass_fail": 20,
+      "pass_timeout": 2,
+      "fail_fail": 3
+    },
+    "limitations": [
+      "Fixed preselected 120 of 378 tasks, not the full MBPP+ score.",
+      "Two official timeouts are valid non-passing outcomes, not infrastructure failures.",
+      "Single candidate per task; intervals do not estimate repeated-generation variability.",
+      "No process-localization evaluation."
+    ]
+  },
+  "codejudge_eval": {
+    "task": "judge_only",
+    "positive_class": "incorrect_code",
+    "experiments": {
+      "v3a_interrupted": {
+        "source_ids": [
+          "codejudge.v3a_interrupted.report",
+          "codejudge.v3a_interrupted.manifest",
+          "codejudge.v3a_interrupted.receipt"
+        ],
+        "schema": "codejudge-eval-v3a-report-v1",
+        "run_id": "v3a-20260905T083333Z",
+        "experiment_id": "codejudge-eval-v3a-functional",
+        "analysis_population": {
+          "gold_correct_n": 60,
+          "gold_incorrect_n": 60,
+          "planned_n": 120,
+          "status_counts": {
+            "parse_error": 0,
+            "provider_error": 4,
+            "skipped": 0,
+            "unsupported": 0,
+            "valid_judgment": 116
+          },
+          "valid_n": 116
+        },
+        "started_at": "2026-09-05T08:33:34.153175+00:00",
+        "completed_at": "2026-09-05T10:11:09.386505+00:00",
+        "primary": {
+          "balanced_accuracy_full_denominator": 0.8833333333333333,
+          "bootstrap_resamples": 10000,
+          "bootstrap_seed": 20260907,
+          "stratified_candidate_bootstrap_95": [
+            0.825,
+            0.9333333333333333
+          ]
+        },
+        "binary_metrics": {
+          "accuracy_full_denominator": {
+            "denominator": 120,
+            "numerator": 106,
+            "value": 0.8833333333333333,
+            "wilson_95": [
+              0.8136664838239611,
+              0.9292188219216995
+            ]
+          },
+          "f1_valid_predictions": 0.9166666666666665,
+          "failures_by_gold_class": {
+            "gold_correct": 0,
+            "gold_incorrect": 4
+          },
+          "fnr_full_gold_incorrect_denominator": {
+            "denominator": 60,
+            "numerator": 1,
+            "value": 0.016666666666666666,
+            "wilson_95": [
+              0.0029481597947862495,
+              0.08855129727590061
+            ]
+          },
+          "fpr_full_gold_correct_denominator": {
+            "denominator": 60,
+            "numerator": 9,
+            "value": 0.15,
+            "wilson_95": [
+              0.08097440580167739,
+              0.2611458906977855
+            ]
+          },
+          "mcc_valid_predictions": 0.8361339728801812,
+          "precision_valid_predictions": 0.859375,
+          "recall_valid_predictions": 0.9821428571428571,
+          "sensitivity_full_gold_incorrect_denominator": {
+            "denominator": 60,
+            "numerator": 55,
+            "value": 0.9166666666666666,
+            "wilson_95": [
+              0.8193105798166558,
+              0.9638795433982692
+            ]
+          },
+          "specificity_full_gold_correct_denominator": {
+            "denominator": 60,
+            "numerator": 51,
+            "value": 0.85,
+            "wilson_95": [
+              0.7388541093022145,
+              0.9190255941983225
+            ]
+          },
+          "valid_confusion": {
+            "fn": 1,
+            "fp": 9,
+            "tn": 51,
+            "tp": 55
+          }
+        },
+        "majority_baseline": {
+          "accuracy": 0.5,
+          "balanced_accuracy": 0.5,
+          "note": "the frozen gold classes are exactly balanced 60/60"
+        },
+        "per_gold_source_error_type": {
+          "AC": {
+            "denominator": 60,
+            "numerator": 51,
+            "value": 0.85,
+            "wilson_95": [
+              0.7388541093022145,
+              0.9190255941983225
+            ]
+          },
+          "CE": {
+            "denominator": 12,
+            "numerator": 12,
+            "value": 1,
+            "wilson_95": [
+              0.7575059933447592,
+              1
+            ]
+          },
+          "MIXED": {
+            "denominator": 12,
+            "numerator": 12,
+            "value": 1,
+            "wilson_95": [
+              0.7575059933447592,
+              1
+            ]
+          },
+          "RE": {
+            "denominator": 12,
+            "numerator": 12,
+            "value": 1,
+            "wilson_95": [
+              0.7575059933447592,
+              1
+            ]
+          },
+          "TLE": {
+            "denominator": 12,
+            "numerator": 8,
+            "value": 0.6666666666666666,
+            "wilson_95": [
+              0.39062208887279953,
+              0.8618799089087867
+            ]
+          },
+          "WA": {
+            "denominator": 12,
+            "numerator": 11,
+            "value": 0.9166666666666666,
+            "wilson_95": [
+              0.646120088858883,
+              0.9851349055950829
+            ]
+          }
+        }
+      },
+      "v3a_complete": {
+        "source_ids": [
+          "codejudge.v3a_complete.report",
+          "codejudge.v3a_complete.manifest",
+          "codejudge.v3a_complete.receipt"
+        ],
+        "schema": "codejudge-eval-v3a-report-v1",
+        "run_id": "v3a-20260905T103721Z",
+        "experiment_id": "codejudge-eval-v3a-functional",
+        "analysis_population": {
+          "gold_correct_n": 60,
+          "gold_incorrect_n": 60,
+          "planned_n": 120,
+          "status_counts": {
+            "parse_error": 0,
+            "provider_error": 0,
+            "skipped": 0,
+            "unsupported": 0,
+            "valid_judgment": 120
+          },
+          "valid_n": 120
+        },
+        "started_at": "2026-09-05T10:37:22.469559+00:00",
+        "completed_at": "2026-09-05T12:01:06.345546+00:00",
+        "primary": {
+          "balanced_accuracy_full_denominator": 0.8999999999999999,
+          "bootstrap_resamples": 10000,
+          "bootstrap_seed": 20260907,
+          "stratified_candidate_bootstrap_95": [
+            0.85,
+            0.95
+          ]
+        },
+        "binary_metrics": {
+          "accuracy_full_denominator": {
+            "denominator": 120,
+            "numerator": 108,
+            "value": 0.9,
+            "wilson_95": [
+              0.833318258891048,
+              0.9418664079739892
+            ]
+          },
+          "f1_valid_predictions": 0.9076923076923077,
+          "failures_by_gold_class": {
+            "gold_correct": 0,
+            "gold_incorrect": 0
+          },
+          "fnr_full_gold_incorrect_denominator": {
+            "denominator": 60,
+            "numerator": 1,
+            "value": 0.016666666666666666,
+            "wilson_95": [
+              0.0029481597947862495,
+              0.08855129727590061
+            ]
+          },
+          "fpr_full_gold_correct_denominator": {
+            "denominator": 60,
+            "numerator": 11,
+            "value": 0.18333333333333332,
+            "wilson_95": [
+              0.10557796889197638,
+              0.2991975374646805
+            ]
+          },
+          "mcc_valid_predictions": 0.8113480845393759,
+          "precision_valid_predictions": 0.8428571428571429,
+          "recall_valid_predictions": 0.9833333333333333,
+          "sensitivity_full_gold_incorrect_denominator": {
+            "denominator": 60,
+            "numerator": 59,
+            "value": 0.9833333333333333,
+            "wilson_95": [
+              0.9114487027240993,
+              0.9970518402052136
+            ]
+          },
+          "specificity_full_gold_correct_denominator": {
+            "denominator": 60,
+            "numerator": 49,
+            "value": 0.8166666666666667,
+            "wilson_95": [
+              0.7008024625353194,
+              0.8944220311080237
+            ]
+          },
+          "valid_confusion": {
+            "fn": 1,
+            "fp": 11,
+            "tn": 49,
+            "tp": 59
+          }
+        },
+        "majority_baseline": {
+          "accuracy": 0.5,
+          "balanced_accuracy": 0.5,
+          "note": "the frozen gold classes are exactly balanced 60/60"
+        },
+        "per_gold_source_error_type": {
+          "AC": {
+            "denominator": 60,
+            "numerator": 49,
+            "value": 0.8166666666666667,
+            "wilson_95": [
+              0.7008024625353194,
+              0.8944220311080237
+            ]
+          },
+          "CE": {
+            "denominator": 12,
+            "numerator": 12,
+            "value": 1,
+            "wilson_95": [
+              0.7575059933447592,
+              1
+            ]
+          },
+          "MIXED": {
+            "denominator": 12,
+            "numerator": 12,
+            "value": 1,
+            "wilson_95": [
+              0.7575059933447592,
+              1
+            ]
+          },
+          "RE": {
+            "denominator": 12,
+            "numerator": 12,
+            "value": 1,
+            "wilson_95": [
+              0.7575059933447592,
+              1
+            ]
+          },
+          "TLE": {
+            "denominator": 12,
+            "numerator": 12,
+            "value": 1,
+            "wilson_95": [
+              0.7575059933447592,
+              1
+            ]
+          },
+          "WA": {
+            "denominator": 12,
+            "numerator": 11,
+            "value": 0.9166666666666666,
+            "wilson_95": [
+              0.646120088858883,
+              0.9851349055950829
+            ]
+          }
+        }
+      },
+      "v3b": {
+        "source_ids": [
+          "codejudge.v3b.report",
+          "codejudge.v3b.manifest",
+          "codejudge.v3b.receipt"
+        ],
+        "schema": "codejudge-eval-v3b-report-v1",
+        "run_id": "v3b-20260905T120255Z",
+        "experiment_id": "codejudge-eval-v3b-granularity",
+        "analysis_population": {
+          "candidate_n": 50,
+          "complete_triplet_n": 50,
+          "planned_call_n": 150
+        },
+        "started_at": "2026-09-05T12:02:56.301716+00:00",
+        "completed_at": "2026-09-05T13:46:49.855034+00:00",
+        "per_condition": {
+          "easy": {
+            "failure_rate": 0,
+            "functional_accuracy_full_denominator": {
+              "denominator": 50,
+              "numerator": 49,
+              "value": 0.98,
+              "wilson_95": [
+                0.8950455641036219,
+                0.9964607407283539
+              ]
+            },
+            "native_label_exact_match_full_denominator": {
+              "denominator": 50,
+              "numerator": 48,
+              "value": 0.96,
+              "wilson_95": [
+                0.8653990931249297,
+                0.9889611156723802
+              ]
+            },
+            "planned_n": 50,
+            "status_counts": {
+              "parse_error": 0,
+              "provider_error": 0,
+              "skipped": 0,
+              "unsupported": 0,
+              "valid_judgment": 50
+            }
+          },
+          "hard": {
+            "failure_rate": 0,
+            "functional_accuracy_full_denominator": {
+              "denominator": 50,
+              "numerator": 49,
+              "value": 0.98,
+              "wilson_95": [
+                0.8950455641036219,
+                0.9964607407283539
+              ]
+            },
+            "native_label_exact_match_full_denominator": {
+              "denominator": 50,
+              "numerator": 36,
+              "value": 0.72,
+              "wilson_95": [
+                0.5833487630404344,
+                0.8252582933408878
+              ]
+            },
+            "planned_n": 50,
+            "status_counts": {
+              "parse_error": 0,
+              "provider_error": 0,
+              "skipped": 0,
+              "unsupported": 0,
+              "valid_judgment": 50
+            }
+          },
+          "middle": {
+            "failure_rate": 0,
+            "functional_accuracy_full_denominator": {
+              "denominator": 50,
+              "numerator": 49,
+              "value": 0.98,
+              "wilson_95": [
+                0.8950455641036219,
+                0.9964607407283539
+              ]
+            },
+            "native_label_exact_match_full_denominator": {
+              "denominator": 50,
+              "numerator": 42,
+              "value": 0.84,
+              "wilson_95": [
+                0.7148578393696501,
+                0.916625793219666
+              ]
+            },
+            "planned_n": 50,
+            "status_counts": {
+              "parse_error": 0,
+              "provider_error": 0,
+              "skipped": 0,
+              "unsupported": 0,
+              "valid_judgment": 50
+            }
+          }
+        },
+        "primary_pairwise_functional_correctness": [
+          {
+            "available": true,
+            "b_first_correct_second_incorrect": 0,
+            "c_first_incorrect_second_correct": 0,
+            "candidate_bootstrap_difference_95": [
+              0,
+              0
+            ],
+            "complete_pairs": 50,
+            "exact_two_sided_mcnemar_p_value": 1,
+            "first": "easy",
+            "functional_accuracy_difference_first_minus_second": 0,
+            "holm_adjusted_p_value": 1,
+            "incomplete_pairs": 0,
+            "native_label_candidate_bootstrap_difference_95": [
+              0.04,
+              0.22
+            ],
+            "native_label_exact_match_difference_first_minus_second": 0.12,
+            "normalized_ce_agreement": {
+              "denominator": 50,
+              "numerator": 50,
+              "value": 1,
+              "wilson_95": [
+                0.9286524008666414,
+                1
+              ]
+            },
+            "normalized_functional_output_agreement": {
+              "denominator": 50,
+              "numerator": 50,
+              "value": 1,
+              "wilson_95": [
+                0.9286524008666414,
+                1
+              ]
+            },
+            "normalized_outcome_agreement_when_both_expressible": {
+              "denominator": 11,
+              "numerator": 11,
+              "value": 1,
+              "wilson_95": [
+                0.7411670330319684,
+                1
+              ]
+            },
+            "planned_pairs": 50,
+            "second": "middle",
+            "unavailable_reason": null
+          },
+          {
+            "available": true,
+            "b_first_correct_second_incorrect": 0,
+            "c_first_incorrect_second_correct": 0,
+            "candidate_bootstrap_difference_95": [
+              0,
+              0
+            ],
+            "complete_pairs": 50,
+            "exact_two_sided_mcnemar_p_value": 1,
+            "first": "easy",
+            "functional_accuracy_difference_first_minus_second": 0,
+            "holm_adjusted_p_value": 1,
+            "incomplete_pairs": 0,
+            "native_label_candidate_bootstrap_difference_95": [
+              0.12,
+              0.36
+            ],
+            "native_label_exact_match_difference_first_minus_second": 0.24,
+            "normalized_ce_agreement": {
+              "denominator": 50,
+              "numerator": 49,
+              "value": 0.98,
+              "wilson_95": [
+                0.8950455641036219,
+                0.9964607407283539
+              ]
+            },
+            "normalized_functional_output_agreement": {
+              "denominator": 50,
+              "numerator": 50,
+              "value": 1,
+              "wilson_95": [
+                0.9286524008666414,
+                1
+              ]
+            },
+            "normalized_outcome_agreement_when_both_expressible": {
+              "denominator": 11,
+              "numerator": 11,
+              "value": 1,
+              "wilson_95": [
+                0.7411670330319684,
+                1
+              ]
+            },
+            "planned_pairs": 50,
+            "second": "hard",
+            "unavailable_reason": null
+          },
+          {
+            "available": true,
+            "b_first_correct_second_incorrect": 0,
+            "c_first_incorrect_second_correct": 0,
+            "candidate_bootstrap_difference_95": [
+              0,
+              0
+            ],
+            "complete_pairs": 50,
+            "exact_two_sided_mcnemar_p_value": 1,
+            "first": "middle",
+            "functional_accuracy_difference_first_minus_second": 0,
+            "holm_adjusted_p_value": 1,
+            "incomplete_pairs": 0,
+            "native_label_candidate_bootstrap_difference_95": [
+              0.04,
+              0.22
+            ],
+            "native_label_exact_match_difference_first_minus_second": 0.12,
+            "normalized_ce_agreement": {
+              "denominator": 50,
+              "numerator": 49,
+              "value": 0.98,
+              "wilson_95": [
+                0.8950455641036219,
+                0.9964607407283539
+              ]
+            },
+            "normalized_functional_output_agreement": {
+              "denominator": 50,
+              "numerator": 50,
+              "value": 1,
+              "wilson_95": [
+                0.9286524008666414,
+                1
+              ]
+            },
+            "normalized_outcome_agreement_when_both_expressible": {
+              "denominator": 30,
+              "numerator": 28,
+              "value": 0.9333333333333333,
+              "wilson_95": [
+                0.7867654163738308,
+                0.9815229762087295
+              ]
+            },
+            "planned_pairs": 50,
+            "second": "hard",
+            "unavailable_reason": null
+          }
+        ],
+        "paired_difference_interval": {
+          "base_seed": 20260908,
+          "method": "candidate-level nonparametric percentile bootstrap",
+          "native_label_seed_offset": 100,
+          "resamples": 10000
+        },
+        "hard_execution_outcome_exact_match_non_ce": {
+          "denominator": 45,
+          "numerator": 33,
+          "value": 0.7333333333333333,
+          "wilson_95": [
+            0.5896116224686505,
+            0.8403509647893348
+          ]
+        },
+        "multiple_comparison_policy": {
+          "family_size": 3,
+          "method": "Holm step-down across the fixed family of three pairwise comparisons",
+          "unavailable_comparison_placeholder_p": 1
+        }
+      },
+      "full_v1_corrected": {
+        "source_ids": [
+          "codejudge.full_v1.recomputed"
+        ],
+        "run_id": "full-v1",
+        "n_samples": 90,
+        "status_counts": {
+          "valid_judgment": 90,
+          "provider_error": 0,
+          "parse_error": 0,
+          "unsupported": 0,
+          "skipped": 0
+        },
+        "functional_correctness": {
+          "n_valid": 90,
+          "positive_class": "incorrect-code",
+          "tp": 83,
+          "fp": 1,
+          "fn": 3,
+          "tn": 3,
+          "precision_recall_f1": {
+            "tp": 83,
+            "fp": 1,
+            "fn": 3,
+            "precision": 0.9880952380952381,
+            "recall": 0.9651162790697675,
+            "f1": 0.9764705882352942
+          },
+          "sensitivity": {
+            "numerator": 83,
+            "denominator": 86,
+            "estimate": 0.9651162790697675,
+            "wilson_95_lower": 0.9023912889743924,
+            "wilson_95_upper": 0.9880662019225916
+          },
+          "specificity": {
+            "numerator": 3,
+            "denominator": 4,
+            "estimate": 0.75,
+            "wilson_95_lower": 0.30064184258240184,
+            "wilson_95_upper": 0.9544127391902995
+          },
+          "balanced_accuracy": {
+            "estimate": 0.8575581395348837,
+            "note": "mean of sensitivity and specificity; see component Wilson intervals"
+          },
+          "mcc": {
+            "estimate": 0.5908001781468408
+          },
+          "correct_code_fpr": {
+            "numerator": 1,
+            "denominator": 4,
+            "estimate": 0.25,
+            "wilson_95_lower": 0.04558726080970055,
+            "wilson_95_upper": 0.6993581574175981
+          }
+        },
+        "correctness_accuracy_full_denominator": {
+          "numerator": 86,
+          "denominator": 90,
+          "estimate": 0.9555555555555556,
+          "wilson_95_lower": 0.8912314496718777,
+          "wilson_95_upper": 0.9825827581472913
+        },
+        "majority_class_baseline_accuracy": {
+          "numerator": 86,
+          "denominator": 90,
+          "estimate": 0.9555555555555556,
+          "wilson_95_lower": 0.8912314496718777,
+          "wilson_95_upper": 0.9825827581472913
+        },
+        "execution_outcome": {
+          "semantics": "execution-outcome agreement derived from the judge verdict (WA→E03, RE→E01, TLE→E02); computed on gold-mapped samples only",
+          "judge_verdict_crosswalk": {
+            "RE": "E01_RUNTIME_EXCEPTION",
+            "TLE": "E02_TIMEOUT_OR_RESOURCE_ERROR",
+            "WA": "E03_WRONG_OUTPUT"
+          },
+          "agreement_on_mapped": {
+            "numerator": 37,
+            "denominator": 47,
+            "estimate": 0.7872340425531915,
+            "wilson_95_lower": 0.6509597329080159,
+            "wilson_95_upper": 0.88010292001905
+          }
+        },
+        "coarse_verdict": {
+          "label_semantics": "coarse execution-outcome classes; the judge output space is AC/CE/WA/RE/TLE/MIXED and cannot express gold-only labels",
+          "judge_output_labels": [
+            "AC",
+            "CE",
+            "MIXED",
+            "RE",
+            "TLE",
+            "WA"
+          ],
+          "macro_f1_full_gold_space": {
+            "zero_division": 0,
+            "classes": [
+              "AC",
+              "CE",
+              "MIXED",
+              "NOT_AC_UNSPECIFIED",
+              "RE",
+              "TLE",
+              "WA"
+            ],
+            "n_classes_averaged": 7,
+            "per_class": {
+              "AC": {
+                "tp": 3,
+                "fp": 3,
+                "fn": 1,
+                "support": 4,
+                "precision": 0.5,
+                "recall": 0.75,
+                "f1": 0.6
+              },
+              "CE": {
+                "tp": 4,
+                "fp": 0,
+                "fn": 0,
+                "support": 4,
+                "precision": 1,
+                "recall": 1,
+                "f1": 1
+              },
+              "MIXED": {
+                "tp": 7,
+                "fp": 15,
+                "fn": 2,
+                "support": 9,
+                "precision": 0.3181818181818182,
+                "recall": 0.7777777777777778,
+                "f1": 0.45161290322580644
+              },
+              "NOT_AC_UNSPECIFIED": {
+                "tp": 0,
+                "fp": 0,
+                "fn": 26,
+                "support": 26,
+                "precision": 0,
+                "recall": 0,
+                "f1": 0
+              },
+              "RE": {
+                "tp": 10,
+                "fp": 4,
+                "fn": 0,
+                "support": 10,
+                "precision": 0.7142857142857143,
+                "recall": 1,
+                "f1": 0.8333333333333333
+              },
+              "TLE": {
+                "tp": 2,
+                "fp": 3,
+                "fn": 0,
+                "support": 2,
+                "precision": 0.4,
+                "recall": 1,
+                "f1": 0.5714285714285715
+              },
+              "WA": {
+                "tp": 25,
+                "fp": 14,
+                "fn": 10,
+                "support": 35,
+                "precision": 0.6410256410256411,
+                "recall": 0.7142857142857143,
+                "f1": 0.6756756756756757
+              }
+            },
+            "macro_f1": 0.5902929262376267,
+            "diagnostic_only": true,
+            "caveat": "full gold label space includes labels the judge cannot emit (NOT_AC_UNSPECIFIED; per-combination MIXED folds of the hard file); this is a mechanical diagnostic, not a native-label capability metric"
+          },
+          "macro_f1_compatible_subset": {
+            "zero_division": 0,
+            "classes": [
+              "AC",
+              "CE",
+              "MIXED",
+              "RE",
+              "TLE",
+              "WA"
+            ],
+            "n_classes_averaged": 6,
+            "per_class": {
+              "AC": {
+                "tp": 3,
+                "fp": 2,
+                "fn": 1,
+                "support": 4,
+                "precision": 0.6,
+                "recall": 0.75,
+                "f1": 0.6666666666666665
+              },
+              "CE": {
+                "tp": 4,
+                "fp": 0,
+                "fn": 0,
+                "support": 4,
+                "precision": 1,
+                "recall": 1,
+                "f1": 1
+              },
+              "MIXED": {
+                "tp": 7,
+                "fp": 8,
+                "fn": 2,
+                "support": 9,
+                "precision": 0.4666666666666667,
+                "recall": 0.7777777777777778,
+                "f1": 0.5833333333333334
+              },
+              "RE": {
+                "tp": 10,
+                "fp": 0,
+                "fn": 0,
+                "support": 10,
+                "precision": 1,
+                "recall": 1,
+                "f1": 1
+              },
+              "TLE": {
+                "tp": 2,
+                "fp": 1,
+                "fn": 0,
+                "support": 2,
+                "precision": 0.6666666666666666,
+                "recall": 1,
+                "f1": 0.8
+              },
+              "WA": {
+                "tp": 25,
+                "fp": 2,
+                "fn": 10,
+                "support": 35,
+                "precision": 0.9259259259259259,
+                "recall": 0.7142857142857143,
+                "f1": 0.8064516129032259
+              }
+            },
+            "macro_f1": 0.8094086021505377,
+            "included_n": 64,
+            "excluded_n": 26,
+            "excluded_gold_labels": {
+              "NOT_AC_UNSPECIFIED": 26
+            },
+            "exclusion_reason": "gold labels outside the judge output space are excluded; no label is ever force-mapped to a judge-emittable class"
+          }
+        },
+        "limitation": "Only four gold-correct programs; accuracy equals the majority baseline. Corrected metrics are retrospective offline recomputation, not a new model run."
+      }
+    },
+    "limitations": [
+      "Keep interrupted v3-A and its complete recovery run; do not select the better result silently.",
+      "Balanced v3-A does not estimate real-world error prevalence.",
+      "v3-B null functional difference is not equivalence; label-granularity metrics are secondary.",
+      "No native solution traces; no process-localization or certificate-replay evaluation."
+    ]
+  },
+  "derived_humaneval_metrics": {
+    "base_pass_full_denominator": {
+      "numerator": 163,
+      "denominator": 164,
+      "value": 0.9939024390243902,
+      "wilson_95": [
+        0.9662737492602963,
+        0.9989228186095372
+      ]
+    },
+    "base_plus_pass_full_denominator": {
+      "numerator": 157,
+      "denominator": 164,
+      "value": 0.9573170731707317,
+      "wilson_95": [
+        0.9145275253974305,
+        0.9791730004079708
+      ]
+    }
+  },
+  "derived_humaneval_metrics_note": "Wilson intervals computed in this report from the published counts; existing HumanEval result fields are unchanged.",
+  "livecodebench": {
+    "source_ids": [
+      "lcb.manifest",
+      "lcb.report",
+      "lcb.completion_receipt",
+      "lcb.current_audit"
+    ],
+    "run_id": "lcb60-windows-20260906-v2",
+    "metrics": {
+      "actual_execution_n": 58,
+      "complete": false,
+      "execution_events": 58,
+      "execution_pending_n": 0,
+      "execution_status_counts": {
+        "compile_error": 1,
+        "failed": 3,
+        "passed": 53,
+        "timeout": 1
+      },
+      "generation_coverage": {
+        "denominator": 60,
+        "numerator": 58,
+        "value": 0.9666666666666667,
+        "wilson_95": [
+          0.886362257256914,
+          0.9908106807438021
+        ]
+      },
+      "generation_events": 62,
+      "generation_status_counts": {
+        "provider_error": 2,
+        "success": 58
+      },
+      "limitations": [
+        "not_full_livecodebench",
+        "difficulty_balanced_not_natural_prevalence",
+        "no_training_contamination_guarantee",
+        "process_judge_not_run"
+      ],
+      "metrics_scope": "fixed_stratified_stdio_subset_single_sample",
+      "pass_conditional_on_execution": {
+        "denominator": 58,
+        "numerator": 53,
+        "value": 0.9137931034482759,
+        "wilson_95": [
+          0.8135637093712647,
+          0.962614616873809
+        ]
+      },
+      "pass_full_denominator": {
+        "denominator": 60,
+        "numerator": 53,
+        "value": 0.8833333333333333,
+        "wilson_95": [
+          0.7782121197582914,
+          0.9423227935994396
+        ]
+      },
+      "per_difficulty": {
+        "easy": {
+          "actual_execution_n": 20,
+          "execution_pending_n": 0,
+          "execution_status_counts": {
+            "passed": 20
+          },
+          "generation_coverage": {
+            "denominator": 20,
+            "numerator": 20,
+            "value": 1.0,
+            "wilson_95": [
+              0.8388748419471806,
+              1.0
+            ]
+          },
+          "generation_status_counts": {
+            "success": 20
+          },
+          "pass_conditional_on_execution": {
+            "denominator": 20,
+            "numerator": 20,
+            "value": 1.0,
+            "wilson_95": [
+              0.8388748419471806,
+              1.0
+            ]
+          },
+          "pass_full_denominator": {
+            "denominator": 20,
+            "numerator": 20,
+            "value": 1.0,
+            "wilson_95": [
+              0.8388748419471806,
+              1.0
+            ]
+          },
+          "planned_n": 20
+        },
+        "hard": {
+          "actual_execution_n": 18,
+          "execution_pending_n": 0,
+          "execution_status_counts": {
+            "compile_error": 1,
+            "failed": 2,
+            "passed": 14,
+            "timeout": 1
+          },
+          "generation_coverage": {
+            "denominator": 20,
+            "numerator": 18,
+            "value": 0.9,
+            "wilson_95": [
+              0.6989663547715128,
+              0.9721335187862319
+            ]
+          },
+          "generation_status_counts": {
+            "provider_error": 2,
+            "success": 18
+          },
+          "pass_conditional_on_execution": {
+            "denominator": 18,
+            "numerator": 14,
+            "value": 0.7777777777777778,
+            "wilson_95": [
+              0.5478541568378739,
+              0.9099907189139831
+            ]
+          },
+          "pass_full_denominator": {
+            "denominator": 20,
+            "numerator": 14,
+            "value": 0.7,
+            "wilson_95": [
+              0.4810271816464765,
+              0.8545227551323956
+            ]
+          },
+          "planned_n": 20
+        },
+        "medium": {
+          "actual_execution_n": 20,
+          "execution_pending_n": 0,
+          "execution_status_counts": {
+            "failed": 1,
+            "passed": 19
+          },
+          "generation_coverage": {
+            "denominator": 20,
+            "numerator": 20,
+            "value": 1.0,
+            "wilson_95": [
+              0.8388748419471806,
+              1.0
+            ]
+          },
+          "generation_status_counts": {
+            "success": 20
+          },
+          "pass_conditional_on_execution": {
+            "denominator": 20,
+            "numerator": 19,
+            "value": 0.95,
+            "wilson_95": [
+              0.763868806553258,
+              0.9911185511992047
+            ]
+          },
+          "pass_full_denominator": {
+            "denominator": 20,
+            "numerator": 19,
+            "value": 0.95,
+            "wilson_95": [
+              0.763868806553258,
+              0.9911185511992047
+            ]
+          },
+          "planned_n": 20
+        }
+      },
+      "planned_n": 60,
+      "provider_attempts": 74,
+      "schema": "lcb60-generation-execution-report-v1"
+    },
+    "provider_attempt_outcomes": {
+      "success": 58,
+      "provider_error": 16
+    },
+    "timeline": {
+      "initial_started_at": "2026-09-06T07:01:07.475415+00:00",
+      "initial_finished_at": "2026-09-06T09:29:16.006925+00:00",
+      "initial_elapsed_seconds": 8888.53151,
+      "resume_started_at": "2026-09-06T10:15:12.652104+00:00",
+      "resume_last_event_completed_at": "2026-09-06T10:45:32.157361+00:00",
+      "resume_elapsed_seconds": 1819.505257,
+      "latest_receipt_updated_at": "2026-09-06T10:45:32.177095+00:00",
+      "initial_provider_attempts": 68,
+      "resume_provider_attempts": 6
+    },
+    "non_pass_tasks": [
+      {
+        "index": 27,
+        "task_id": "abc374_d",
+        "difficulty": "medium",
+        "generation_status": "success",
+        "generation_event_count": 1,
+        "provider_attempt_count_total": 1,
+        "execution_status": "failed",
+        "failure_kind": "wrong_answer",
+        "execution_duration_seconds": 0.5343785660006688
+      },
+      {
+        "index": 41,
+        "task_id": "arc189_d",
+        "difficulty": "hard",
+        "generation_status": "provider_error",
+        "generation_event_count": 2,
+        "provider_attempt_count_total": 6,
+        "execution_status": "not_run",
+        "failure_kind": null,
+        "execution_duration_seconds": null
+      },
+      {
+        "index": 44,
+        "task_id": "arc186_e",
+        "difficulty": "hard",
+        "generation_status": "provider_error",
+        "generation_event_count": 2,
+        "provider_attempt_count_total": 6,
+        "execution_status": "not_run",
+        "failure_kind": null,
+        "execution_duration_seconds": null
+      },
+      {
+        "index": 49,
+        "task_id": "arc183_b",
+        "difficulty": "hard",
+        "generation_status": "success",
+        "generation_event_count": 1,
+        "provider_attempt_count_total": 3,
+        "execution_status": "failed",
+        "failure_kind": "wrong_answer",
+        "execution_duration_seconds": 0.6353520579978067
+      },
+      {
+        "index": 54,
+        "task_id": "abc363_f",
+        "difficulty": "hard",
+        "generation_status": "success",
+        "generation_event_count": 1,
+        "provider_attempt_count_total": 1,
+        "execution_status": "failed",
+        "failure_kind": "wrong_answer",
+        "execution_duration_seconds": 0.6597966160006763
+      },
+      {
+        "index": 55,
+        "task_id": "arc182_c",
+        "difficulty": "hard",
+        "generation_status": "success",
+        "generation_event_count": 1,
+        "provider_attempt_count_total": 1,
+        "execution_status": "compile_error",
+        "failure_kind": "compile_error",
+        "execution_duration_seconds": null
+      },
+      {
+        "index": 58,
+        "task_id": "abc389_g",
+        "difficulty": "hard",
+        "generation_status": "success",
+        "generation_event_count": 1,
+        "provider_attempt_count_total": 2,
+        "execution_status": "timeout",
+        "failure_kind": "time_limit_exceeded",
+        "execution_duration_seconds": 6.719764834000671
+      }
+    ],
+    "local_verification": {
+      "event_chain_valid": true,
+      "recomputed_report_matches": true,
+      "receipt_matches": true,
+      "source_selection_tasks_prompt_and_smoke_match": true,
+      "runtime_git_clean": true,
+      "result_file_count": 124,
+      "results_unchanged_during_audit": true,
+      "unchanged_since_previous_audit": true,
+      "provider_and_execution_source_match_pre_run_validation": true
+    },
+    "limitations": [
+      "Fixed balanced stdio subset, not full LiveCodeBench.",
+      "Two Hard tasks lack valid candidates after provider errors.",
+      "Single retained candidate with existing service retry and parse repair policy.",
+      "No process-judge or contamination-free claim."
+    ]
+  }
+}

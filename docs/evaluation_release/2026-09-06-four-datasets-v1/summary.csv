@@ -1,0 +1,5 @@
+dataset,task_type,planned_n,valid_n,primary_metric,numerator,denominator,primary_value,status,unresolved_provider_failures
+HumanEval+,function_generation,164,164,base_plus_pass_full_denominator,157,164,0.9573170731707317,COMPLETE,0
+MBPP+,function_generation,120,120,base_plus_pass_full_denominator,95,120,0.7916666666666666,COMPLETE_FIXED_SUBSET,0
+LiveCodeBench,stdio_generation,60,58,pass_full_denominator,53,60,0.8833333333333333,INCOMPLETE_PROVIDER_FAILURES,2
+CodeJudge-Eval v3-A,judge_only,120,120,balanced_accuracy_full_denominator,,,0.9,COMPLETE_WITHIN_PROTOCOL,0

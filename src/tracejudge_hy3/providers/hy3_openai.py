@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -44,6 +45,7 @@ from tracejudge_hy3.providers.base import (
     SolutionGeneration,
     validate_solution_for_problem,
 )
+from tracejudge_hy3.providers.telemetry import observe_request
 from tracejudge_hy3.redaction import redact_sensitive_text
 from tracejudge_hy3.schemas.evaluation import ProcessAssessment
 from tracejudge_hy3.schemas.execution import ExecutionSummary, StaticEvidence
@@ -129,6 +131,7 @@ class Hy3OpenAIProvider(LLMProvider):
             extra_body["reasoning_effort"] = self.settings.hy3_reasoning_effort
 
         start = time.perf_counter()
+        response = None
         try:
             response = await self._client.chat.completions.create(
                 model=self.settings.hy3_model,  # type: ignore[arg-type]
@@ -149,6 +152,8 @@ class Hy3OpenAIProvider(LLMProvider):
         finally:
             elapsed = time.perf_counter() - start
             logger.info("Hy3 call took %.2fs", elapsed)
+            error_type = sys.exc_info()[0]
+            observe_request(response, elapsed, error_type.__name__ if error_type else None)
 
         if not response.choices:
             raise ProviderResponseError("Hy3 response contained no choices")

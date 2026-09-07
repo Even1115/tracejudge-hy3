@@ -10,7 +10,8 @@
 
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
-  if (params.get("recording") === "1") document.body.classList.add("recording");
+  const RECORDING = params.get("recording") === "1";
+  if (RECORDING) document.body.classList.add("recording");
 
   const REVEAL_DELAY_MS = 1300;
   const POLL_MS = 600;
@@ -20,6 +21,90 @@
   let currentRunId = null;
   let showcaseData = null;
   let regressionData = null;
+  let runData = null;
+  let overviewReady = false;
+  let runFailed = false;
+  let sceneIndex = 0;
+  const SCENES = [
+    ["card-problem", "题目", "从一条明确需求开始", "展示输入范围与预期行为，再点击开始评估。"],
+    ["card-solution", "解答", "解题说明与代码，一起接受检查", "查看本次解答的需求理解、实现步骤与代码；这里展示的是模型输出的说明。"],
+    ["card-execution", "测试", "先看代码实际做了什么", "比较输入、预期结果与实际输出。测试结论只覆盖本次执行的用例。"],
+    ["card-alignment", "对齐", "检查说明是否与实现一致", "结构特征是辅助证据；是否违反要求，仍需结合具体需求与执行结果。"],
+    ["card-assessment", "定位", "把判断落到步骤与依据", "分别查看功能结论、过程结论与首错位置。高亮范围采用评估器原始输出，不额外推断精确行。"],
+    ["card-certificate", "证书", "让已确认的失败可以复查", "查看实际反例、证书等级与自动重放结果。未发现错误或证据不足时，如实展示。"],
+    ["card-contrast", "对照", "测试通过，为什么还要检查过程？", "切换到另一条已冻结的公开构造案例：代码未变，说明却与实现矛盾。"],
+    ["overview", "验证", "用完整实验说明方法的表现", "下面来自已发布研究结果，与刚才的单次运行分别统计；新实验完成前不并入。"],
+    ["card-costs", "成本", "效果与开销，放在一起看", "上方是本次样本的 Solver 与 Judge 开销；下方是冻结研究集的方法对照，保留来源和统计口径。"],
+  ];
+
+  function sceneAvailable(index) {
+    if (index < 0 || index >= SCENES.length) return false;
+    if (running) return index === 0;
+    if (index === 0) return true;
+    if (index === 6) return Boolean(showcaseData);
+    if (index === 7) return overviewReady;
+    if (index === 8) return true;
+    return Boolean(runData) || (index === 1 && runFailed);
+  }
+
+  function updatePresenter() {
+    if (!RECORDING) return;
+    const [id, , title, note] = SCENES[sceneIndex];
+    document.body.classList.toggle("recording-input", sceneIndex === 0);
+    $("control-panel").querySelector("h3").textContent = sceneIndex === 0 ? "运行模式" : "本次运行产物";
+    for (const [cardId] of SCENES) {
+      $(cardId).classList.toggle("recording-active", cardId === id);
+    }
+    $("scene-count").textContent = `${String(sceneIndex + 1).padStart(2, "0")} / ${String(SCENES.length).padStart(2, "0")} · 展示步骤`;
+    $("scene-title").textContent = title;
+    $("scene-note").textContent = note;
+    $("scene-source").textContent = sceneIndex === 8
+      ? "本次样本明细 ＋ 已发布研究方法对照 · 两种统计范围"
+      : sceneIndex === 6
+      ? "已冻结公开构造案例 · 非本次生成／评审结果"
+      : sceneIndex === 7
+        ? "已发布聚合实验 · 非本次运行统计"
+        : running
+          ? "本次流水线执行中 · 完成后可逐幕查看"
+          : runData
+            ? `${runData.mode === "fixture" ? "公开 Fixture · Mock 解答与评审" : "真实 Hy3 解答与评审"} · Run ${currentRunId || "—"}`
+            : runFailed ? "本次运行失败 · 未替换为示例结果" : "预置公开题目 · 等待开始";
+    $("scene-prev").disabled = !sceneAvailable(sceneIndex - 1) || sceneIndex === 0;
+    $("scene-next").disabled = sceneIndex === SCENES.length - 1 || !sceneAvailable(sceneIndex + 1);
+    document.querySelectorAll(".scene-tab").forEach((button, index) => {
+      button.disabled = !sceneAvailable(index);
+      button.setAttribute("aria-current", index === sceneIndex ? "step" : "false");
+    });
+  }
+
+  function selectScene(index) {
+    if (index < 0 || index >= SCENES.length || !sceneAvailable(index)) return;
+    sceneIndex = index;
+    updatePresenter();
+  }
+
+  function initPresenter() {
+    if (!RECORDING) return;
+    $("presenter").hidden = false;
+    $("card-contrast").hidden = false;
+    $("flow").appendChild($("overview"));
+    SCENES.forEach(([, label], index) => {
+      const button = el("button", "scene-tab", `${index + 1} ${label}`);
+      button.addEventListener("click", () => selectScene(index));
+      $("scene-tabs").appendChild(button);
+    });
+    $("scene-prev").addEventListener("click", () => selectScene(sceneIndex - 1));
+    $("scene-next").addEventListener("click", () => selectScene(sceneIndex + 1));
+    document.addEventListener("keydown", (event) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+          /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+      if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+        event.preventDefault();
+        selectScene(sceneIndex + (event.key === "ArrowRight" ? 1 : -1));
+      }
+    });
+    updatePresenter();
+  }
 
   // ---------------------------------------------------------------- helpers
 
@@ -60,7 +145,7 @@
     const card = $(id);
     card.classList.remove("pending");
     card.classList.add("revealed");
-    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!RECORDING) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function foot(text) {
@@ -106,6 +191,21 @@
     }
     $("export-certificate").hidden = !hasCertificate;
     $("export-actions").hidden = false;
+    updatePresenter();
+  }
+
+  function renderCode(code, span) {
+    const pre = el("pre", "code");
+    const match = typeof span === "string" && /^L(\d+)(?:-L?(\d+))?$/.exec(span);
+    const start = match ? Number(match[1]) : 0;
+    const end = match ? Number(match[2] || match[1]) : 0;
+    code.split("\n").forEach((line, index) => {
+      const row = el("span", `code-line${index + 1 >= start && index + 1 <= end ? " located" : ""}`);
+      row.appendChild(el("span", "lineno", String(index + 1)));
+      row.appendChild(document.createTextNode(line || " "));
+      pre.appendChild(row);
+    });
+    return pre;
   }
 
   // ------------------------------------------------------------ renderers
@@ -162,12 +262,7 @@
       body.appendChild(ul);
     }
 
-    const pre = el("pre", "code");
-    s.code.split("\n").forEach((line, i) => {
-      pre.appendChild(el("span", "lineno", String(i + 1)));
-      pre.appendChild(document.createTextNode(line + "\n"));
-    });
-    body.appendChild(pre);
+    body.appendChild(renderCode(s.code));
   }
 
   function renderAlignment(data) {
@@ -269,18 +364,35 @@
     body.appendChild(line);
 
     const dl = el("dl", "kv");
-    kv(dl, "functional_correct", fmtBool(a.functional_correct, "true", "false"), true);
-    kv(dl, "process_correct", fmtBool(a.process_correct, "true", "false"), true);
-    kv(dl, "first_faulty_layer", a.first_faulty_layer, true);
-    kv(dl, "first_faulty_step", a.first_faulty_step, true);
-    kv(dl, "violated_requirement", a.violated_requirement, true);
-    kv(dl, "error_type", a.error_type, true);
+    kv(dl, "功能判断", fmtBool(a.functional_correct, "正确", "存在问题"));
+    kv(dl, "过程判断", fmtBool(a.process_correct, "成立", "不成立"));
+    kv(dl, "首错层", a.first_faulty_layer, true);
+    kv(dl, "首错步骤", a.first_faulty_step, true);
+    kv(dl, "关联需求", a.violated_requirement, true);
+    kv(dl, "错误类型", a.error_type, true);
     kv(dl, "代码位置 code_span", a.code_span, true);
     if (a.secondary_error_types && a.secondary_error_types.length) {
       kv(dl, "次要错误类型", a.secondary_error_types.join(", "), true);
     }
-    body.appendChild(dl);
-    if (a.explanation) body.appendChild(el("p", "explanation", a.explanation));
+    const evidenceGrid = el("div", "assessment-grid");
+    evidenceGrid.appendChild(dl);
+    const located = el("section");
+    const locatedStep = data.solution.implementation_steps.find((step) => step.step_id === a.first_faulty_step);
+    if (locatedStep) {
+      located.appendChild(el("p", "located-step", `${locatedStep.step_id} · ${locatedStep.content}`));
+    }
+    if (a.code_span) {
+      located.appendChild(renderCode(data.solution.code, a.code_span));
+      located.appendChild(el("p", "fineprint", "标记为评估器报告的代码范围；范围可能覆盖整个函数，不等同于精确错误行。"));
+    }
+    evidenceGrid.appendChild(located);
+    body.appendChild(evidenceGrid);
+    if (a.explanation) {
+      const reasoning = el("div", "explanation");
+      reasoning.appendChild(el("small", null, `评估记录原文 · 本次评审来源：${data.mode === "fixture" ? "Mock（非真实 Hy3）" : "Hy3"}`));
+      reasoning.appendChild(el("p", null, a.explanation));
+      body.appendChild(reasoning);
+    }
   }
 
   function renderCertificate(data) {
@@ -291,7 +403,7 @@
 
     if (ce) {
       const box = el("div", "counterexample-box");
-      box.appendChild(el("span", null, "最小反例 MINIMAL COUNTEREXAMPLE"));
+      box.appendChild(el("span", null, ce.minimized ? "经最小化处理的反例" : "可重放反例（未标记为已最小化）"));
       box.appendChild(el("strong", null, `args = ${fmtJson(ce.args)}`));
       const meta = el("p", "mono");
       meta.textContent =
@@ -314,7 +426,7 @@
       kv(dl, "violated_requirement", cert.violated_requirement, true);
       kv(dl, "first_faulty_step", cert.first_faulty_step, true);
     } else {
-      kv(dl, "错误证书", "未产生（首次运行未发现错误）");
+      kv(dl, "错误证书", "本次未产生错误证书；以过程判断与证据说明为准");
     }
     const replay = data.replay;
     if (replay) {
@@ -334,6 +446,11 @@
   }
 
   function renderError(data) {
+    runData = null;
+    runFailed = true;
+    renderSampleCosts(data.cost_metrics);
+    if (currentRunId) configureExports(currentRunId, false);
+    $("execution-notice").textContent = "本次执行未完成。下面显示实际错误，不替换为演示结果。";
     const body = $("solution-body");
     body.textContent = "";
     const box = el("div", "error-box");
@@ -342,11 +459,13 @@
     box.appendChild(el("small", null, `error_type = ${data.error_type} · 页面未切换到 Mock，未展示预设结果`));
     body.appendChild(box);
     revealCard("card-solution");
+    selectScene(1);
   }
 
   function renderOverview(o, shouldScroll) {
     const section = $("overview");
     section.hidden = false;
+    overviewReady = true;
     $("overview-source").textContent =
       o.source === "structured_artifact"
         ? "数据来源：哈希绑定的结构化公开聚合产物"
@@ -383,7 +502,7 @@
     const r2 = el("div");
     r2.appendChild(el("b", null, `${review.second_completed}/${review.second_planned}`));
     r2.appendChild(
-      document.createTextNode(` 第二标注者独立复标，agreement = ${review.agreement_status}（尚未计算）`)
+      document.createTextNode(` 第二标注者独立复标；${review.agreement_status === "computed" ? "一致性已计算" : "一致性尚未计算"}`)
     );
     extra.appendChild(r2);
     for (const row of o.difficulty) {
@@ -393,7 +512,8 @@
       extra.appendChild(d);
     }
     $("overview-disclaimer").textContent = o.disclaimer;
-    if (shouldScroll) section.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (shouldScroll && !RECORDING) section.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    updatePresenter();
   }
 
   function renderCaseList(data) {
@@ -408,6 +528,40 @@
       button.addEventListener("click", () => selectCase(item.case_id));
       list.appendChild(button);
     }
+  }
+
+  function renderContrast() {
+    const item = showcaseData.cases.find((entry) => entry.case_id === "reasoning_swap");
+    if (!item) return;
+    const root = $("contrast-body");
+    root.textContent = "";
+    const badges = el("div", "agg");
+    badges.appendChild(el("span", item.functional_correct ? "result-pass" : "result-fail",
+      item.functional_correct ? "功能：公开测试通过" : "功能：存在问题"));
+    badges.appendChild(el("span", item.process_correct ? "result-pass" : "result-fail",
+      item.process_correct ? "过程：成立" : "过程：说明与代码矛盾"));
+    root.appendChild(badges);
+    const grid = el("div", "contrast-grid");
+    const explanation = el("section");
+    explanation.appendChild(el("h3", null, "这份解答声称"));
+    explanation.appendChild(el("p", "explanation", item.solution.requirement_understanding));
+    const steps = el("ul", "step-list");
+    for (const step of item.solution.implementation_steps) {
+      const li = el("li");
+      if (step.step_id === item.assessment.first_faulty_step) li.className = "faulty";
+      li.appendChild(el("b", null, step.step_id));
+      li.appendChild(document.createTextNode(step.content));
+      steps.appendChild(li);
+    }
+    explanation.appendChild(steps);
+    const implementation = el("section");
+    implementation.appendChild(el("h3", null, "代码实际实现"));
+    implementation.appendChild(renderCode(item.solution.code));
+    implementation.appendChild(el("p", "fineprint", item.execution.summary));
+    grid.append(explanation, implementation);
+    root.appendChild(grid);
+    root.appendChild(el("p", "explanation", item.summary));
+    root.appendChild(el("p", "fineprint", "来自哈希校验的公开构造案例与既有证据；切换到本幕不会再次调用模型或执行测试。"));
   }
 
   function renderCaseDetail(item) {
@@ -561,6 +715,8 @@
       const resp = await fetch("/api/showcase");
       if (!resp.ok) throw new Error("showcase unavailable");
       showcaseData = await resp.json();
+      renderContrast();
+      updatePresenter();
       renderCaseList(showcaseData);
       selectCase(showcaseData.cases[0].case_id);
       $("case-source").textContent = `公开源已校验 · SHA256 ${showcaseData.source.counterfactual_sha256.slice(0, 12)}…`;
@@ -583,7 +739,78 @@
 
   // ------------------------------------------------------------- run flow
 
+  function costTable(headers, rows) {
+    const wrap = el("div", "cost-table-wrap");
+    wrap.tabIndex = 0;
+    const table = el("table", "cost-table");
+    const head = el("thead");
+    const hr = el("tr");
+    headers.forEach((label) => { const th = el("th", null, label); th.scope = "col"; hr.appendChild(th); });
+    head.appendChild(hr);
+    table.appendChild(head);
+    const body = el("tbody");
+    rows.forEach((cells) => { const tr = el("tr"); cells.forEach((value) => tr.appendChild(el("td", null, value))); body.appendChild(tr); });
+    table.appendChild(body);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  const costNumber = (value) => value == null ? "未返回" : Number(value).toLocaleString("zh-CN");
+  const costSeconds = (value) => value == null ? "未采集" : `${Number(value).toFixed(3)} s`;
+
+  function renderSampleCosts(costs) {
+    const root = $("sample-costs");
+    root.textContent = "";
+    if (!costs) {
+      root.appendChild(el("p", "placeholder", "运行一条样本后显示 Solver 与 Judge 用量；历史运行未记录的数据无法补算。"));
+      return;
+    }
+    root.appendChild(el("p", "cost-source", `${costs.mode === "fixture" ? "公开 Fixture · 无模型 API 调用" : "真实 Hy3 · 当次请求用量"} · Run ${currentRunId || "—"} · 样本 ${costs.sample_id.slice(0, 12)}`));
+    const totals = el("div", "cost-totals");
+    for (const [label, value] of [["样本总耗时", costs.total_seconds], ["评测总耗时（排除 Solver）", costs.evaluation_seconds], ["其中：证书重放", costs.replay_seconds]]) {
+      const item = el("div"); item.appendChild(el("span", null, label)); item.appendChild(el("strong", null, costSeconds(value))); totals.appendChild(item);
+    }
+    root.appendChild(totals);
+    root.appendChild(costTable(["阶段", "输入 token", "输出 token", "模型请求耗时", "阶段耗时", "调用次数", "重试次数"],
+      ["solver", "judge"].map((role) => { const r = costs.roles[role]; return [role === "solver" ? "Solver 生成" : "Judge 评审", costNumber(r.input_tokens), costNumber(r.output_tokens), costSeconds(r.request_seconds), costSeconds(r.wall_seconds), r.calls, r.retries]; })));
+    root.appendChild(el("p", "cost-note", costs.scope));
+    root.appendChild(el("p", "cost-note", costs.token_scope));
+    for (const role of ["solver", "judge"]) {
+      const r = costs.roles[role];
+      if (r.input_tokens == null || r.output_tokens == null) root.appendChild(el("p", "boundary-note", `${role}: 已知输入 ${costNumber(r.known_input_tokens)}（${r.input_tokens_coverage}/${r.calls} 请求有记录）；已知输出 ${costNumber(r.known_output_tokens)}（${r.output_tokens_coverage}/${r.calls}）。缺失用量未按 0 计入总数。`));
+      if (r.failed_operations) root.appendChild(el("p", "boundary-note", `${role}: ${r.failed_operations} 次阶段执行失败；已发生的请求仍保留。请结合本次评估结果判断是否采用了降级结果。`));
+    }
+    const detail = el("details", "cost-requests");
+    detail.appendChild(el("summary", null, `逐次模型请求明细（${costs.requests.length} 次）`));
+    if (costs.requests.length) detail.appendChild(costTable(["序号", "角色", "阶段内尝试", "输入 token", "输出 token", "请求耗时", "请求状态"], costs.requests.map((r) => [r.request_id, r.role, `${r.attempt}${r.is_retry ? " · 重试" : ""}`, costNumber(r.input_tokens), costNumber(r.output_tokens), costSeconds(r.request_seconds), r.error_type || "已返回（解析结果见阶段状态）"])));
+    else detail.appendChild(el("p", "cost-note", costs.mode === "fixture" ? "Fixture 使用 Mock，真实 API 调用和 token 均为 0；本地执行耗时已测量。" : "本次尚未发起模型请求。"));
+    root.appendChild(detail);
+    root.appendChild(el("p", "cost-note", costs.persistence_ok ? `逐次记录已保存：${costs.artifact_relpath}；结果 JSON 包含同一份明细。` : "本地用量日志写入失败，请下载结果 JSON 保留当前明细。"));
+  }
+
+  async function loadMethodCosts() {
+    const root = $("method-costs");
+    try {
+      const response = await fetch("/api/method-costs");
+      if (!response.ok) throw new Error("method costs unavailable");
+      const data = await response.json();
+      root.textContent = "";
+      root.appendChild(el("p", "cost-source", `已发布阶段三实验 · ${data.cohort} · 非本次 Demo 数据`));
+      root.appendChild(costTable(["方法", "检测准确率", "有效判断 / 总数", "已知输入 token（覆盖行）", "已知输出 token（覆盖行）", "调用 / JSON 修复", "评测累计耗时"], data.rows.map((r) => [r.method, `${r.correct}/${r.total} · ${(r.accuracy * 100).toFixed(1)}%`, `${r.valid}/${r.total}${r.provider_failures ? ` · ${r.provider_failures} 次失败` : ""}`, `${costNumber(r.known_input_tokens)}（${r.input_coverage}/${r.total}）`, `${costNumber(r.known_output_tokens)}（${r.output_coverage}/${r.total}）`, `${r.calls} / ${r.json_repairs}`, `${r.duration_sum_seconds.toFixed(1)} s`])));
+      root.appendChild(el("p", "cost-note", data.scope));
+      root.appendChild(el("p", "boundary-note", data.boundary));
+      root.appendChild(el("p", "cost-note", `来源：${data.source}`));
+    } catch {
+      root.textContent = "公开报告成本表暂不可用；未填入估算值。";
+    }
+  }
+
   function resetRunUI() {
+    renderSampleCosts(null);
+    runData = null;
+    runFailed = false;
+    sceneIndex = 0;
+    $("execution-notice").textContent = "尚未运行。下方步骤用于展示结果，不代表实时执行进度。";
     for (const id of ["card-solution", "card-alignment", "card-execution", "card-assessment", "card-certificate"]) {
       const card = $(id);
       card.classList.add("pending");
@@ -611,22 +838,27 @@
     $("export-actions").hidden = true;
     $("mode-badge").className = "mode-badge";
     $("mode-badge").textContent = "待开始";
+    updatePresenter();
   }
 
   function setRunningUI(mode) {
+    $("execution-notice").textContent = "流水线正在执行；当前仅显示总耗时，完成后再展示各阶段结果。";
     $("mode-badge").className = `mode-badge ${mode}`;
     $("mode-badge").textContent =
       mode === "fixture" ? "公开 FIXTURE · 未调用真实 HY3" : "真实 HY3 · DOCKER 沙盒";
     $("caption-generate").textContent =
       mode === "fixture" ? "Mock Solver 生成结构化解答" : "Hy3 生成结构化解答";
     for (const n of [2, 3, 4, 5, 6]) setStage(n, "");
-    setStage(2, "running");
-    setCaption(2, "active");
+    // The endpoint reports whole-run status, not live per-stage progress.
     foot("流水线真实执行中…");
     $("run-meta").textContent = "";
+    updatePresenter();
   }
 
   async function revealResult(data) {
+    runData = data;
+    runFailed = false;
+    $("execution-notice").textContent = "执行已完成。当前为本次结果的分步展示；切换画面不会重复运行。";
     const stages = [
       [2, "card-solution", () => renderSolution(data)],
       [3, "card-alignment", () => renderAlignment(data)],
@@ -639,7 +871,7 @@
       setCaption(n, "active");
       render();
       revealCard(cardId);
-      await new Promise((resolve) => setTimeout(resolve, REVEAL_DELAY_MS));
+      if (!RECORDING) await new Promise((resolve) => setTimeout(resolve, REVEAL_DELAY_MS));
       setStage(n, "done");
       setCaption(n, "done");
     }
@@ -659,6 +891,7 @@
       meta.appendChild(line);
     }
     foot("完成 · 结果来自当次真实运行");
+    selectScene(1);
   }
 
   async function loadOverview(shouldScroll = false) {
@@ -679,6 +912,7 @@
         running = false;
         $("btn-start").disabled = false;
         foot("状态查询失败");
+        renderError({ error: "无法取得本次运行状态，请返回题目后重新检查服务。", error_type: "StatusError" });
         return;
       }
       const state = await resp.json();
@@ -689,6 +923,7 @@
       const data = state.result;
       running = false;
       $("btn-start").disabled = false;
+      renderSampleCosts(data && data.cost_metrics);
       if (!data || !data.ok) {
         renderError(data || { error: "未知错误", error_type: "UnknownError" });
         setStage(2, "failed");
@@ -721,6 +956,7 @@
         throw new Error(err.error || "请求被拒绝");
       }
       const { run_id: runId } = await resp.json();
+      currentRunId = runId;
       await pollRun(runId);
     } catch (exc) {
       running = false;
@@ -734,6 +970,12 @@
   // ----------------------------------------------------------------- init
 
   async function init() {
+    initPresenter();
+    $("open-costs").addEventListener("click", () => {
+      showView("demo");
+      if (RECORDING) selectScene(8);
+      else $("card-costs").scrollIntoView({behavior: "smooth", block: "start"});
+    });
     document.querySelectorAll(".view-button").forEach((button) => {
       button.addEventListener("click", () => showView(button.dataset.view));
     });
@@ -769,14 +1011,14 @@
           ? "已配置，但 Docker 不可用"
           : "未配置 HY3 环境变量，当前不可用";
         $("option-hy3").classList.add("disabled");
-        $("option-hy3 input").disabled = true;
+        $("option-hy3").querySelector("input").disabled = true;
       }
       foot("就绪");
     } catch {
       $("problem-body").textContent = "无法连接本地演示服务，请确认服务已启动。";
       foot("服务未连接");
     }
-    await Promise.all([loadOverview(false), loadShowcase(), loadRegression()]);
+    await Promise.all([loadOverview(false), loadShowcase(), loadRegression(), loadMethodCosts()]);
   }
 
   init();

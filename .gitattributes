@@ -1,0 +1,3 @@
+# These public demo sources are byte-bound to published SHA256 commitments.
+/data/phase3/public_counterfactuals_v1.json text eol=lf
+/data/phase3/public_certificate_claims_v1.json text eol=lf

@@ -1,5 +1,14 @@
 # TraceJudge-Hy3 竞赛无声演示
 
+## 当前全流程录制
+
+- [八幕展示流程与 118 秒录制脚本](full_flow_storyboard.md)：操作步骤、字幕、真实 Hy3 与离线预演分工。
+- 工作台录制入口：`http://127.0.0.1:8765/?recording=1`，运行后手动逐幕展示、首错高亮、公开对照与结果总览。
+- “效果与成本”入口／第 9 幕：新 Demo 的 Solver／Judge 逐次请求明细，以及已发布的五方法效果与成本对照。单条用量自动保存为 JSONL，并随结果 JSON 导出。
+- Windows：`.\scripts\run_recording_demo.ps1` 自动检查并按需启动 Docker Desktop；加 `-Offline` 可跳过 Docker 进行离线预演。macOS / Linux：`./scripts/run_recording_demo.sh`。
+
+下列 MP4/GIF 为此前发布的确定性渲染素材。新录制使用独立文件名，保留旧素材及其历史口径。
+
 ## 交付物
 
 - [`assets/tracejudge_hy3_contest_demo.mp4`](assets/tracejudge_hy3_contest_demo.mp4)：74 秒、1280×720、无声 MP4。
@@ -15,7 +24,7 @@
 
 演示中的 57 条轨迹、285 个配对判断、98.2% 最佳观察检测准确率和 2.33% Full TraceJudge 误报率来自已发布的阶段四竞赛结果总览。`safe_mean` 案例来自仓库公开自建 Fixture；画面中的 `hidden` / `challenge` 只是该 Fixture 的内部类别名称。
 
-视频由已核验画面确定性渲染，不冒充实时 Hy3 调用、第三方隐藏测试录屏或阶段三独立复现实验。当前结果仍是单主标注者、探索性证据，第二标注者一致性尚未计算。
+视频由已核验画面确定性渲染，不冒充实时 Hy3 调用、第三方隐藏测试录屏或阶段三独立复现实验。旧素材录制时，第二标注者一致性尚未计算；当前页面以新版公开报告的复标状态为准。总体研究结果仍需保留其探索性证据边界。
 
 ## 本地预览
 

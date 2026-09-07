@@ -209,12 +209,17 @@ def test_canonical_project_documents_mark_release_and_p1_boundaries():
     readme = ROOT_README.read_text(encoding="utf-8")
     design = DESIGN_DOCUMENT.read_text(encoding="utf-8")
     protocol = PHASE4_PROTOCOL.read_text(encoding="utf-8")
-    combined = readme + design + protocol
+    guide_target = "docs/running_and_development.md"
+    guide = (REPO_ROOT / guide_target).read_text(encoding="utf-8")
+    combined = readme + design + protocol + guide
 
-    assert "P0 Gate A、B、C、E" in readme
+    assert f"]({guide_target})" in readme
+    assert "](docs/experiments/phase4_protocol.md)" in readme
+    assert "当前工作版" in readme
+    assert "v0.1.0" in readme
+    assert "P0 Gate A、B、C、E" in protocol
     assert "P0 Gate A、B、C、E 仓库内交付已完成" in design
     assert "P0 封版 + P1 Gate D 两标注者一致性分析版" in protocol
-    assert "charts-verify" in readme
     assert "charts-verify" in protocol
     assert "P0 尚需聚合图表" not in combined
     assert "待完成 Gate E" not in combined

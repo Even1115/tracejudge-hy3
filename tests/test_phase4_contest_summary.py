@@ -71,23 +71,35 @@ def test_published_contest_documents_are_exact_deterministic_renders():
 
 def test_readme_first_screen_links_contribution_results_demo_and_case():
     readme = README.read_text(encoding="utf-8")
-    first_screen = readme[: readme.index("## 1. 项目要解决的问题")]
+    video_start = readme.index("## 演示视频")
+    case_start = readme.index("## 一个案例")
+    design_start = readme.index("## 核心设计")
+    first_screen = readme[:design_start]
 
-    assert "## 60 秒看懂项目" in first_screen
-    assert "### 一句话研究问题" in first_screen
-    assert "### 四项贡献" in first_screen
-    assert "### 五个核心数字" in first_screen
-    assert "**98.2%**" in first_screen
-    assert "**2.33%**" in first_screen
-    assert "### 代表案例：答案正确，但过程错误" in first_screen
-    assert "phase4_contest_results_overview_v1.md" in first_screen
-    assert "phase4_p1_post_adjudication_sensitivity_v1.md" in first_screen
-    assert "phase4_difficulty_proxy_analysis_v1.md" in first_screen
-    assert "phase4_fixture_demo_v1.md" in first_screen
-    assert "tracejudge_hy3_contest_demo.mp4" in first_screen
+    assert video_start < case_start < design_start
+    for anchor in ("演示视频", "快速体验", "实验发现", "成果导航"):
+        assert f"](#{anchor})" in readme[:video_start]
+        assert f"## {anchor}" in readme
+    assert "四层对齐" in readme
+    assert "分级错误证书" in readme
+    assert "reasoning_swap" in first_screen
+    assert "未录制实时 Hy3 调用" in first_screen
     assert "04_reasoning_swap_detection.svg" in first_screen
-    assert "./scripts/run_demo.sh" in first_screen
-    assert "版本化公开 Fixture 回归卡片" in first_screen
+    assert "./scripts/run_demo.sh" in readme
+    for target in (
+        "docs/demo/assets/tracejudge_hy3_contest_demo.mp4",
+        "docs/demo/full_flow_storyboard.md",
+        "docs/releases/phase4/phase4_contest_results_overview_v1.md",
+        "docs/releases/phase4/phase3_research_report_public_v1.md",
+        "docs/releases/phase4/phase4_p1_post_adjudication_sensitivity_v1.md",
+        "docs/releases/phase4/phase4_difficulty_proxy_analysis_v1.md",
+        "docs/releases/phase4/phase4_fixture_demo_v1.md",
+        "docs/four_dataset_evaluation_report.md",
+        "docs/evaluation_release/2026-09-06-four-datasets-v1/README.md",
+        "docs/running_and_development.md",
+    ):
+        assert f"]({target})" in readme
+        assert (REPO_ROOT / target).is_file()
 
 
 def test_release_index_exposes_overview_and_sensitivity_analyses():

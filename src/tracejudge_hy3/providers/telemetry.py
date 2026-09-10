@@ -1,4 +1,4 @@
-"""Opt-in request observations; no prompts, credentials, or response text."""
+"""Opt-in request accounting and separately sanitized failure diagnostics."""
 
 from __future__ import annotations
 
@@ -8,6 +8,11 @@ from typing import Any
 
 request_observer: ContextVar[Callable[[dict[str, Any]], None] | None] = ContextVar(
     "request_observer", default=None
+)
+
+# Providers must sanitize error/response text BEFORE emitting to this sink.
+failure_observer: ContextVar[Callable[[dict[str, Any]], None] | None] = ContextVar(
+    "failure_observer", default=None
 )
 
 

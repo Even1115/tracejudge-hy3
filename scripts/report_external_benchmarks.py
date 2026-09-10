@@ -65,22 +65,37 @@ def render(mbpp, lcb):
 
 
 if __name__ == "__main__":
+    from benchmark_sources import DEFAULT_REGISTRY, ROOT, load_verified_reports
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mbpp-run", type=Path)
     parser.add_argument("--lcb-run", type=Path)
+    parser.add_argument("--registry", type=Path, help="Use a reviewed fixed-source registry")
+    parser.add_argument("--project-root", type=Path, default=ROOT)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if not (args.mbpp_run or args.lcb_run):
-        parser.error("provide at least one completed/in-progress run")
+    if args.registry and (args.mbpp_run or args.lcb_run):
+        parser.error("--registry cannot be combined with explicit run directories")
     reports = []
     hashes = {}
+    fixed = None
+    if not (args.mbpp_run or args.lcb_run):
+        fixed, verification = load_verified_reports(
+            args.project_root, args.registry or DEFAULT_REGISTRY
+        )
+        hashes["source_registry"] = verification["registry_sha256"]
     for name, folder in (("mbppplus", args.mbpp_run), ("livecodebench", args.lcb_run)):
-        if folder is None:
+        if fixed is not None:
+            report = fixed[name]["primary"]
+            digest = verification["resolved_reports"][name]["primary"]["sha256"]
+        elif folder is not None:
+            path = folder / "report.json"
+            raw = path.read_bytes()
+            report = json.loads(raw)
+            digest = hashlib.sha256(raw).hexdigest()
+        else:
             reports.append(None)
             continue
-        path = folder / "report.json"
-        raw = path.read_bytes()
-        report = json.loads(raw)
         expected = (
             "mbpp120-combined-report-v1"
             if name == "mbppplus"
@@ -89,7 +104,7 @@ if __name__ == "__main__":
         if report.get("schema") != expected:
             raise ValueError("unsupported report schema")
         reports.append(report)
-        hashes[name] = hashlib.sha256(raw).hexdigest()
+        hashes[name] = digest
     text = (
         render(*reports)
         + "\n输入报告 SHA256：\n\n```json\n"

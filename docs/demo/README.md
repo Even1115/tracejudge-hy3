@@ -4,6 +4,8 @@
 
 - [九幕展示流程与录制脚本](full_flow_storyboard.md)：操作步骤、字幕、真实 Hy3 与离线预演分工。
 - 工作台录制入口：`http://127.0.0.1:8765/?recording=1`，运行后手动逐幕展示、首错高亮、公开对照与结果总览。
+- 新增“重点案例”入口：`/?case=tuple_str_int` 展示官方测试通过但边界承诺有缺陷；`/?case=find_char_long` 展示构造探针中计划 `>= 4` 与代码 `> 4` 的失配。两个入口均位于现有“典型案例”页，操作与证据说明见 [典型过程案例](featured_process_cases_v1.md)。
+- 新增「60 秒看懂项目」四站导览：`/?tour=1` 或页面右上角按钮进入，依次展示重点案例 tuple_str_int、构造探针 find_char_long、已有证书重放结果与最新补充验证；只读取已有材料，不触发运行。操作与讲解建议见 [四站导览说明](tour_guide.md)。
 - “效果与成本”入口／第 9 幕：新 Demo 的 Solver／Judge 逐次请求明细，以及已发布的五方法效果与成本对照。单条用量自动保存为 JSONL，并随结果 JSON 导出。
 - Windows：`.\scripts\run_recording_demo.ps1` 自动检查并按需启动 Docker Desktop；加 `-Offline` 可跳过 Docker 进行离线预演。macOS / Linux：`./scripts/run_recording_demo.sh`。
 

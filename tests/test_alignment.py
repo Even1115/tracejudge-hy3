@@ -11,6 +11,7 @@ from tracejudge_hy3.evaluator.rule_based import (
     check_complexity_declaration,
     check_empty_input_claim,
     check_set_usage_claim,
+    check_single_pass_claim,
     evaluate_alignment_rules,
 )
 from tracejudge_hy3.sandbox.trusted_local import TrustedLocalSandbox
@@ -53,6 +54,90 @@ def _faulty_solution() -> SolutionTrace:
 def _correct_solution() -> SolutionTrace:
     sol = _faulty_solution()
     return sol.model_copy(update={"code": CORRECT_CODE})
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "def scan(nums):\n    total = 0\n    for x in nums:\n        for k in range(2):\n            total += x\n    return total\n",
+        "def scan(nums):\n    total = 0\n    for row in nums:\n        for x in row:\n            total += x\n    return total\n",
+        "def scan(nums):\n    for i in range(len(nums)):\n        for j in range(len(nums)):\n            return nums[j]\n    return 0\n",
+    ],
+)
+def test_nesting_alone_does_not_disprove_single_pass(code):
+    solution = _correct_solution().model_copy(
+        update={
+            "code": code,
+            "design_summary": "single pass over the input",
+            "implementation_steps": [],
+        }
+    )
+    assert check_single_pass_claim(solution, analyze_code(code, "scan")) is None
+
+
+def test_constant_claim_with_immediate_return_is_not_proven_wrong():
+    code = "def first(nums):\n    for x in nums:\n        return x\n    return None\n"
+    solution = _correct_solution().model_copy(
+        update={
+            "code": code,
+            "declared_time_complexity": "O(1)",
+        }
+    )
+    assert check_complexity_declaration(solution, analyze_code(code, "first")) is None
+
+
+def test_explicit_repeated_index_scans_still_conflict_with_single_pass():
+    code = (
+        "def scan(nums):\n    total = 0\n"
+        "    for i in range(len(nums)):\n"
+        "        for j in range(len(nums)):\n"
+        "            total += nums[i] * nums[j]\n    return total\n"
+    )
+    solution = _correct_solution().model_copy(
+        update={
+            "code": code,
+            "design_summary": "Single pass over nums",
+            "implementation_steps": [],
+        }
+    )
+    static = analyze_code(code, "scan")
+    result = check_single_pass_claim(solution, static)
+    assert result is not None
+    assert result.plan_code_aligned is False
+    assert result.functional_correct is None
+    assert result.first_faulty_step is None  # A summary is not an invented S1.
+    denied = solution.model_copy(update={"design_summary": "Not a single pass over nums"})
+    assert check_single_pass_claim(denied, static) is None
+
+
+def test_mixed_time_space_declaration_is_not_forced_to_constant_time():
+    code = (
+        "def scan(nums):\n    total = 0\n    for x in nums:\n        total += x\n    return total\n"
+    )
+    solution = _correct_solution().model_copy(
+        update={
+            "code": code,
+            "declared_time_complexity": "O(n) time, O(1) extra space",
+        }
+    )
+    assert check_complexity_declaration(solution, analyze_code(code, "scan")) is None
+
+
+def test_missing_execution_is_unknown_instead_of_functional_failure(problem):
+    from tracejudge_hy3.schemas.execution import ExecutionSummary
+
+    solution = _correct_solution()
+    result = combine_assessment(
+        problem,
+        solution,
+        analyze_code(solution.code, "safe_mean"),
+        ExecutionSummary(
+            problem_id=problem.problem_id, function_name="safe_mean", sandbox_backend="none"
+        ),
+        llm_assessment=None,
+    )
+    assert result.functional_correct is None
+    assert result.process_correct is None
 
 
 @pytest.fixture

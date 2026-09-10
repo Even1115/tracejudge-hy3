@@ -710,6 +710,18 @@ async def test_hy3_auth_failure_records_one_provider_error_and_never_retries(mon
         ({"first_faulty_step": "S999"}, "S999"),
         ({"affected_steps": ["S1", "S999"]}, "S999"),
         ({"violated_requirement": "R999"}, "R999"),
+        (
+            {
+                "process_correct": False,
+                "first_faulty_layer": "reasoning",
+                "error_type": "P01_ALGORITHM_ERROR",
+                "first_faulty_location": {
+                    "source_field": "design_summary",
+                    "quote": "ABSENT_QUOTE_CANARY",
+                },
+            },
+            "location quote is absent",
+        ),
     ],
 )
 async def test_hy3_evaluator_repairs_unknown_context_references(
@@ -736,10 +748,10 @@ async def test_hy3_evaluator_repairs_unknown_context_references(
         process_correct=True,
         explanation="all checks passed",
     )
-    invalid_assessment = valid_assessment.model_copy(update=invalid_update)
+    invalid_assessment = valid_assessment.model_dump(mode="json") | invalid_update
     provider._call_model = AsyncMock(
         side_effect=[
-            invalid_assessment.model_dump_json(),
+            json.dumps(invalid_assessment),
             valid_assessment.model_dump_json(),
         ]
     )

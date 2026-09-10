@@ -1,0 +1,526 @@
+{
+  "audit": {
+    "path": "artifacts/process-heldout/mbpp84-audit-20260909-v1/heldout-audit.json",
+    "sha256": "69e7176e5680b012cb83e6ca5f3528ff6c18498a4d019b95d4ad424cbf18eddb"
+  },
+  "created": "2026-09-09",
+  "freeze_commitments": [
+    "item set, exclusion rules and material hashes frozen before any labeling",
+    "no method predictions on held-out items may influence label creation",
+    "labels, once created, are bound by a new config with hash-pinned files",
+    "held-out texts stay unopened until the labeling protocol starts",
+    "counterfactual bundle and development labels never mix into held-out statistics"
+  ],
+  "items": [
+    {
+      "item_id": "item-0252f8275c86dd103067",
+      "packet_item_sha256": "9840b8aca3245f8cb81c075667be09ebb1454e57f81b022679a3a70bdd667a40",
+      "parent_task_id": "Mbpp/474",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-05a912f051b19695b8a9",
+      "packet_item_sha256": "a9fb59ecf63025c7511611b2d6464b260b68c95a6866c75f554814fd6210b6ea",
+      "parent_task_id": "Mbpp/432",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-06a6797c9b50af5cc3a9",
+      "packet_item_sha256": "fd8bd15f876446a7db67ca29e9e08231bd88d42d91794b06d82f69c552bea695",
+      "parent_task_id": "Mbpp/765",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-0af2667f8078236825eb",
+      "packet_item_sha256": "bc2a368e5a79f50be37b1dae188b0c1a8ce3b661c49521c714d7f0b9794bb479",
+      "parent_task_id": "Mbpp/234",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-0ce24a574bd1de60b2b7",
+      "packet_item_sha256": "4b724eef1013f9befa845e3c8298b6e7274fb5ad4c2bfd2b76385f70b8b9566e",
+      "parent_task_id": "Mbpp/600",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-155c8a65b8adfc6c0546",
+      "packet_item_sha256": "e79dc38060f050cf46cd38b09beb932fe05c1f2e97db257f8bc1b80b5d700a7f",
+      "parent_task_id": "Mbpp/125",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-15bb8b4b0177ba0ccade",
+      "packet_item_sha256": "e07bce7fb584592bd6f95c07c7040b6573ab113cbe5f071342f9872c65a73043",
+      "parent_task_id": "Mbpp/161",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-1955404407e1f3cff405",
+      "packet_item_sha256": "16c84b61ca28e0bc0826693432fb2c5c45aeffc76457c51d013e9a38d5830365",
+      "parent_task_id": "Mbpp/755",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-19862ef5fda79bbabf34",
+      "packet_item_sha256": "746b5c833e9bbd3a6fdbfee7e1fcc3b02643b4d3401d14f70cb1d2116df12f08",
+      "parent_task_id": "Mbpp/456",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-1b2cc23df97e5bbbdad0",
+      "packet_item_sha256": "74cf56b4f654d65f37de5023e01f4a1425ffa70f708b7c6e79e29233edb73f69",
+      "parent_task_id": "Mbpp/265",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-1b86e99c3d89fd6a0299",
+      "packet_item_sha256": "810e7cb542f01c58f5726586f0c3bb414f8bf404bed50b368670f0eadb829d6a",
+      "parent_task_id": "Mbpp/445",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-1c5ffafa40c8dde98800",
+      "packet_item_sha256": "0ddc5e4d37afe10968f61cf92ae32b8e5ddcd2d7df997e60954ba06e2e0b36d8",
+      "parent_task_id": "Mbpp/388",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-201bed01953e91562166",
+      "packet_item_sha256": "016755dc1dd060763f83ec2fdf47cbc6e18241b178334c80726015f569b505fd",
+      "parent_task_id": "Mbpp/757",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-2a36ec8e4bbd0bb28f7e",
+      "packet_item_sha256": "e44ea1716a182b08650426e2ae5905aa2f62c383ac35beeaa52bffc2671bcdd7",
+      "parent_task_id": "Mbpp/17",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-2c31255126da18c5444b",
+      "packet_item_sha256": "486327f2dbc6a2dd2c82627285f31e125dec8d94e6b5af35edc4610f209742cb",
+      "parent_task_id": "Mbpp/93",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-2d9a939d725bb8eb16bc",
+      "packet_item_sha256": "30dd1ba866ee84162584fe372c16bbf492cd02b8ba335a9b1644260631007435",
+      "parent_task_id": "Mbpp/446",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-3833df55618816b640c7",
+      "packet_item_sha256": "f3d31b01cad04cfd45efdc0bec83225c84d094a668a662cc65373dca7dd0aaa0",
+      "parent_task_id": "Mbpp/436",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-3e92f99f771969d57fe8",
+      "packet_item_sha256": "267ba68c1b63f98008cdc17fc54dc3d71f045a260b1b0196ef36c5b269805695",
+      "parent_task_id": "Mbpp/64",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-3f4441240685767cecdc",
+      "packet_item_sha256": "4765335fd7b6262d5ec64d405331562bf0a2417558d551a54ffc5583ed98e67c",
+      "parent_task_id": "Mbpp/391",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-40ba77a0b02386faef0e",
+      "packet_item_sha256": "a5ea43e5c3e947a931aae63d504d08761f2da1b74edc81a8646d6d0137de0547",
+      "parent_task_id": "Mbpp/299",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-4819cc9ccca46d2d79c8",
+      "packet_item_sha256": "cae6b44a38220714df8091172ec516b55e0c5aaa98f7fc03d7173c6829e87d80",
+      "parent_task_id": "Mbpp/77",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-4fe28e6e245f9df1b104",
+      "packet_item_sha256": "664712011a453f4ff4c0cdd7387b24fa7314cc5d70d85dfc7e54fd5e28cf9b0d",
+      "parent_task_id": "Mbpp/266",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-540b13ef31e4b228b4c6",
+      "packet_item_sha256": "5e110a4231bce4714b5923e9612ee4fd197d0aea6fdb491b7482eaecfb17adbb",
+      "parent_task_id": "Mbpp/800",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-55bf59c26205a5017f78",
+      "packet_item_sha256": "f818054cbc9aefc7aadae63d9c3d344a50558c65d34b8a9a5e9e8c59abd9c291",
+      "parent_task_id": "Mbpp/281",
+      "status": "held_out_flagged_similarity"
+    },
+    {
+      "item_id": "item-58196330bf118b3b448f",
+      "packet_item_sha256": "26e333db140e75b2c3c3165d8a5364f4445d62bb7786f38294f7aafc7cff2b15",
+      "parent_task_id": "Mbpp/300",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-59b63499e681215a98fe",
+      "packet_item_sha256": "88a8de64d4eec6954dcdd5b66a74b470f75e54237bee091cbbd3ff436f993370",
+      "parent_task_id": "Mbpp/591",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-5db517ad28dc06232810",
+      "packet_item_sha256": "aadb02b49c3624a7a90b2fbae4756038589b8242e478205c0c917dfcaef5929b",
+      "parent_task_id": "Mbpp/297",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-5f8245ce5db98d830fc8",
+      "packet_item_sha256": "43383f7e1473da1de83db0e3c9575fe46b0f8e1f3996a622a866d044c0fad441",
+      "parent_task_id": "Mbpp/563",
+      "status": "excluded_near_duplicate"
+    },
+    {
+      "item_id": "item-63174d14a4c3cd832f8d",
+      "packet_item_sha256": "f1fcc12580d2f43622d2a244634e65f08053e7709e7c5aab59fa92b9b9260e62",
+      "parent_task_id": "Mbpp/740",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-679fd897277e36508b0e",
+      "packet_item_sha256": "481c1813b18a28f61d8c18f6efd038788e5cdffe36aecf93bc9ca3ff6f9772d5",
+      "parent_task_id": "Mbpp/267",
+      "status": "excluded_near_duplicate"
+    },
+    {
+      "item_id": "item-68565928b170be9a1080",
+      "packet_item_sha256": "dcd5040a49c231ad5d5a8f079631fb92b922d66334d7bdd54e56ec9e15431bea",
+      "parent_task_id": "Mbpp/739",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-68a3868b05421c0a1908",
+      "packet_item_sha256": "80ea71e580c88c38f5c75f43b6e03ed13678e8f50b7ac361d921d612e9ac69cf",
+      "parent_task_id": "Mbpp/628",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-7d33e0766e2fe45399c7",
+      "packet_item_sha256": "4e80da500f82613b70d8dc40a84d30e33ba068e2dc803808dfd157abc5ed568c",
+      "parent_task_id": "Mbpp/732",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-814c892059218fa5ad3c",
+      "packet_item_sha256": "b2f146d8aae9b9204bd1258d62e62415bf5d9c8853d92ba629a190d9dc163990",
+      "parent_task_id": "Mbpp/72",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-830000e7e4fb23a2b4a8",
+      "packet_item_sha256": "a89d5df18c305301f2f3e701c410568e951d80e3176e907e163b0f230d00cc62",
+      "parent_task_id": "Mbpp/397",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-88782954f6abc9d46cf6",
+      "packet_item_sha256": "84df0db7bbd29822291db59427bb65524c0f4a711ca5d0e073a76323632b6e36",
+      "parent_task_id": "Mbpp/792",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-88c5770df812766d26e3",
+      "packet_item_sha256": "944a50cdba199df235ec5dfd26a4abec20a561c655f9990120f3fd3ec4bcf66a",
+      "parent_task_id": "Mbpp/775",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-895562c4b563ce8c3be6",
+      "packet_item_sha256": "739af2dae76fadd0806470d9d8dbb811070571a4ce93c6965e565d9fc1c72cdd",
+      "parent_task_id": "Mbpp/256",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-8ca703c0ebe597e41804",
+      "packet_item_sha256": "d33195ce8fcf073e07f065e57de0a0537678c47e5a2b10233fe7722405741ef4",
+      "parent_task_id": "Mbpp/475",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-8f0c754a6d91ba01d03e",
+      "packet_item_sha256": "181e66452db7dbe7e2b3c4c5c563949330f112b5bf270c9f5d935af568193c2d",
+      "parent_task_id": "Mbpp/622",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-91af2bfa2a07f0f25c66",
+      "packet_item_sha256": "911a8de7f1d56b053bbdb14b625122cad6615fe1847cba2ae1aa2ae060ac2227",
+      "parent_task_id": "Mbpp/610",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-92c147d5978385fad743",
+      "packet_item_sha256": "9f4a598f7ac85340f7bc0a98ca70b17025a27a6098299e0e4b966026e2176841",
+      "parent_task_id": "Mbpp/109",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-9778e9b3eb78676aa06e",
+      "packet_item_sha256": "e6b393d3eafa8791089a456ad2ca1d9770faf880e264184b565db9f5065ae3e1",
+      "parent_task_id": "Mbpp/604",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-9b129d5ba20e5919c6af",
+      "packet_item_sha256": "34e565307c0622db00503ea33f79c8789066cd180c6befae99cd3f051c81f539",
+      "parent_task_id": "Mbpp/278",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-9c39c49cacc96e70bbab",
+      "packet_item_sha256": "13bf58d272813d170c598a3b7afca2ac37c79053c92121f144bb98ea9f8007d3",
+      "parent_task_id": "Mbpp/283",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-9c4fe979f83cfc81ac3d",
+      "packet_item_sha256": "71b0e19ac57fcfaf25f7bd3372235c4c1b1101cd670f7f5ce4f08d7d53a23743",
+      "parent_task_id": "Mbpp/98",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-9c85c59fc3919db034da",
+      "packet_item_sha256": "cddd512f587892f079260310ca0e229660c2cd3b495be1eb37c892c06209965c",
+      "parent_task_id": "Mbpp/457",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-9ecff806e2240e40c8fc",
+      "packet_item_sha256": "469795d65b63fe6283ceb0694f9135b849aa615aac2bd602b40bccc3f1f5ac98",
+      "parent_task_id": "Mbpp/581",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-a08695f46292e2a8893d",
+      "packet_item_sha256": "7748d97dedc6dc01120d85b5ddac64131957fd324c2151e41a911839e3fe487e",
+      "parent_task_id": "Mbpp/235",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-a33ab44e91263244e821",
+      "packet_item_sha256": "28aa5a1bc1ee2b168dcf8b688786cf817349204ba3a69a84bc6991fd75e3229a",
+      "parent_task_id": "Mbpp/598",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-a3e5939a2c7368ebb386",
+      "packet_item_sha256": "161ccf7d7bef7f7e7a1c1a4098a6dd608c7be1e38649088d61359dd09e70e2fd",
+      "parent_task_id": "Mbpp/722",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-a96aad43626e9e631a64",
+      "packet_item_sha256": "9cb2b2d5df3e8826ce5654503f223a0c4d807b3876305388b0a15fb07b4409fc",
+      "parent_task_id": "Mbpp/57",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-abb9130d28cb4fd5d645",
+      "packet_item_sha256": "0ed58c2feaf3301bd737b0fc96ac90fcabf06f4551cbc5a80cf25f6d6aebca6b",
+      "parent_task_id": "Mbpp/735",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-b20cd44444e919569990",
+      "packet_item_sha256": "277bbb7c1a620c66ef32984157c845e0c13c798f8dacc07c6493806065dd0a9f",
+      "parent_task_id": "Mbpp/230",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-b64453595d200d05e4f2",
+      "packet_item_sha256": "e38b86bbea582bde0cc2526bebe8cf44f942dcb087e77b59a19bc8a4d8a0e140",
+      "parent_task_id": "Mbpp/635",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-b7b25dafb8e4c3482bd5",
+      "packet_item_sha256": "9c87d35d7d467775fcd03b1335cd0968d3ec8a449fafb0583497148c2e92020c",
+      "parent_task_id": "Mbpp/233",
+      "status": "held_out_flagged_similarity"
+    },
+    {
+      "item_id": "item-bb5bccfa780e75a5cae3",
+      "packet_item_sha256": "64fb21d98db2d1dd533407e43cd9368aa8f37d0645787d96adafb8cf0bbcf444",
+      "parent_task_id": "Mbpp/764",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-c07a4b8c6c3922ac4524",
+      "packet_item_sha256": "8a7bd256cfa41d30b767cb175677cc0fcc6d7c37792860ed0b3378b9d3e32162",
+      "parent_task_id": "Mbpp/67",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-c080034f6bd459437535",
+      "packet_item_sha256": "b9ef85bf1f33424cef8639930cc3118f8669b575c2ff0283b69201c0af631018",
+      "parent_task_id": "Mbpp/463",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-c085c717a5344fdf8ac2",
+      "packet_item_sha256": "2c39cf1de0f50e6e5ef80e9dd0bd7045681227c4598bd85f821a36177e32d324",
+      "parent_task_id": "Mbpp/737",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-c269eac5f8d57aaa9fb8",
+      "packet_item_sha256": "53c152dd0aad5ca099c749b963fcc11bda6bd8bef91a79a1b4bde8167a2aac02",
+      "parent_task_id": "Mbpp/133",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-c2ff503ca621c1ab6594",
+      "packet_item_sha256": "5890a1f9bd706e5ff9b26fb2ca285de4f3ea848b2d095dcec0879cbd598255a9",
+      "parent_task_id": "Mbpp/245",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-c527824ac52854702127",
+      "packet_item_sha256": "e8f7e53c590bbcdfe16366e84beb999ef3e8070814b803db8efdb81cb84ca3a5",
+      "parent_task_id": "Mbpp/805",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-c8fd56dfc073f883a303",
+      "packet_item_sha256": "a08c08d53d6617c87edd45a0d21716f44b3ea0bbe1b93a6a335c093df9450ecd",
+      "parent_task_id": "Mbpp/277",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-ca944474f8ceaf8048b0",
+      "packet_item_sha256": "905d88a0a13ca7813e3a7ef588d597d939d29d5a209ea7fe407b82129fb539d9",
+      "parent_task_id": "Mbpp/293",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-d268dc6549239940327f",
+      "packet_item_sha256": "c3c2eab62719826109af3280675398c3d0ba35637b592ed56e15b15719c7e52a",
+      "parent_task_id": "Mbpp/104",
+      "status": "excluded_near_duplicate"
+    },
+    {
+      "item_id": "item-d2b698cb55c9915bdeab",
+      "packet_item_sha256": "55ea095b3d9b54dd1b134193ef80971f4511e94e729359be59f57ca42a4173d5",
+      "parent_task_id": "Mbpp/390",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-d820f9384360b323acc2",
+      "packet_item_sha256": "aa4e9d291327fc569f82ab7f1d3f09a1703e9c4064d776ed087e77ea8773e83e",
+      "parent_task_id": "Mbpp/777",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-d9ea3e90bacc4e07e1a9",
+      "packet_item_sha256": "fbe44788575077de2e63f0e3c762a80d4a96a5d762bcf7124de5408832508652",
+      "parent_task_id": "Mbpp/101",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-daace9951db0be75c8ab",
+      "packet_item_sha256": "2a65afc05d218de73f00e2be85b2edd10661046b4f1429784df7ac8bd0f12cf0",
+      "parent_task_id": "Mbpp/734",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-dadc724ce07e2a270929",
+      "packet_item_sha256": "913a5f876795829960fcd836930fedc04f611ca2f9170c41e078586944dd61e0",
+      "parent_task_id": "Mbpp/439",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-dc449268674acd5d690e",
+      "packet_item_sha256": "f61ae20b476a48890fc3339cd519efb948eb9b3386841afd7a96ed9be2e3647e",
+      "parent_task_id": "Mbpp/560",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-e044c704f758f56b37b5",
+      "packet_item_sha256": "7542af6bfec61d84fe1ca5932184f0f68b9ca6335271de7ff0d60c3d5f6b4df0",
+      "parent_task_id": "Mbpp/614",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-e4cf50aa7e14ca987726",
+      "packet_item_sha256": "926e86e249e9b5cd5e8a3ce088154f054b77600e8e6a7c4f059993b1bf522dab",
+      "parent_task_id": "Mbpp/750",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-e638a75b8ca2dd026d26",
+      "packet_item_sha256": "30503365946d25e61e277eec884a3bbf712e7de271a42ce5388b4bf09be88fae",
+      "parent_task_id": "Mbpp/769",
+      "status": "held_out_flagged_similarity"
+    },
+    {
+      "item_id": "item-e6da12b4bff45c9fc1cc",
+      "packet_item_sha256": "6c8f15fc42b9a53da2958ffea9a4e3183ddc6444fbb5600fec5e811906215846",
+      "parent_task_id": "Mbpp/602",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-eadce394c7f6b5c12fc0",
+      "packet_item_sha256": "7ab8909511480e751c87a29a95fbebb7b8f1e037a7e2abb6b8b41cbafd5eb33f",
+      "parent_task_id": "Mbpp/784",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-ed7621fa9dee0c30ff73",
+      "packet_item_sha256": "722f083a4094bdb2d829149ceed4b2d37ee8a92c45580a595ab1588e5776ca23",
+      "parent_task_id": "Mbpp/448",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-ef333d73b5262b19003f",
+      "packet_item_sha256": "2b56fa3200e8a00922b114af0336aa35f7245e21261a5659f0a4fb9d1bc036a1",
+      "parent_task_id": "Mbpp/84",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-f79231c97d4d758fcd36",
+      "packet_item_sha256": "3b9bb4d6f721f262a3cc34e27a969985c9bb77f5de3d974eec7350013f944b52",
+      "parent_task_id": "Mbpp/450",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-f9f542fd4e57208eba1f",
+      "packet_item_sha256": "49cb5cabfcb31d48bc5f4ad14744726a0a0c5820247fed5186faa9a4d542f9cd",
+      "parent_task_id": "Mbpp/424",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-fc8b09b6b4bff70358b5",
+      "packet_item_sha256": "54dd199942d69450f7e78fb9b38f5994b6b40b367175139127e7b0137c99fe68",
+      "parent_task_id": "Mbpp/292",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-fe23eb9835997cac2d76",
+      "packet_item_sha256": "afba6181796bf6591bf6980034af5c0e0263f18a4947d73bf96d41c7ffe5d5d9",
+      "parent_task_id": "Mbpp/166",
+      "status": "held_out"
+    },
+    {
+      "item_id": "item-ff146e3b9c63ecea5546",
+      "packet_item_sha256": "7e68db64682db9347f77720d027dc2b277f9239c52cb3d5c5059c192be2d198b",
+      "parent_task_id": "Mbpp/238",
+      "status": "held_out"
+    }
+  ],
+  "label_status": "unlabeled_no_labeling_started",
+  "schema": "tracejudge-process-heldout-v1",
+  "source_packet": {
+    "path": "artifacts/process-annotations/mbpp120-process-v1/manifest.json",
+    "sha256": "f1d6733de1e6c8f9de8bf1f01a18c004848973dc2f085ed1acd5d59be1b003da"
+  }
+}

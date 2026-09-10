@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -48,6 +49,9 @@ def test_runtime_freeze_is_clean_independent_and_leaves_parent_index_unchanged(t
 @pytest.fixture
 def mbpp_cli(tmp_path, monkeypatch):
     module = load_script("run_mbppplus")
+    # The CLI deliberately chdirs to its (fake) project root during preflight;
+    # restore the caller's cwd at teardown so later tests still see the repo root.
+    monkeypatch.chdir(Path.cwd())
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "require_idle_benchmark_containers", lambda: None)
     monkeypatch.setattr(module, "execution_identity", lambda *_: {})
@@ -115,6 +119,27 @@ def test_mbpp_preflight_never_instantiates_a_provider(mbpp_cli, tmp_path, monkey
 
     monkeypatch.setattr(mbpp_cli, "Hy3OpenAIProvider", forbidden)
     assert mbpp_cli.main() == 0
+
+
+def test_mbpp_restores_project_cwd_after_executor_preflight(mbpp_cli, tmp_path, monkeypatch):
+    displaced = tmp_path / "displaced"
+    displaced.mkdir()
+
+    class Executor:
+        def __init__(self, **kwargs):
+            self.limits = kwargs["limits"]
+
+        def preflight(self, **kwargs):
+            os.chdir(displaced)
+            return SimpleNamespace(ready=True, runtime={"verified_task_count": 120})
+
+    monkeypatch.setattr(mbpp_cli, "MbppPlusDockerRunner", Executor)
+    monkeypatch.setattr(
+        "sys.argv", ["run_mbppplus.py", "--project-root", str(tmp_path), "--preflight"]
+    )
+
+    assert mbpp_cli.main() == 0
+    assert Path.cwd() == tmp_path.resolve()
 
 
 def test_mbpp_incomplete_generation_preserves_denominator_and_defers_export(

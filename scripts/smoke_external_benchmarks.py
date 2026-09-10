@@ -232,6 +232,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", choices=("mbpp", "lcb"), required=True)
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "--work-root",
+        type=Path,
+        help="existing native filesystem directory for temporary container workspaces",
+    )
     parser.add_argument("--image", help="LCB local image ID or pinned repository reference")
     args = parser.parse_args()
     try:
@@ -242,7 +247,17 @@ def main():
     project = args.project_root.resolve()
     output = project / "artifacts/benchmark-readiness"
     output.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=f".{args.dataset}-smoke-", dir=output) as folder:
+    try:
+        work_root = (
+            args.work_root.expanduser().resolve(strict=True)
+            if args.work_root is not None
+            else Path(tempfile.gettempdir()).resolve(strict=True)
+        )
+    except OSError:
+        parser.error("--work-root must be an existing directory")
+    if not work_root.is_dir() or work_root.is_symlink():
+        parser.error("--work-root must be an existing real directory")
+    with tempfile.TemporaryDirectory(prefix=f".{args.dataset}-smoke-", dir=work_root) as folder:
         if args.dataset == "mbpp":
             report = mbpp(project, Path(folder))
         else:

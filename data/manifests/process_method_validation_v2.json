@@ -1,0 +1,15 @@
+{
+  "schema": "tracejudge-method-validation-config-v2",
+  "development": {
+    "path": "data/manifests/process_development_v1.json",
+    "sha256": "bdcce65b01afc9e3f5c2d1336de54c8bc6dd13a4a87570f1c326a5fc65609850"
+  },
+  "probes": {
+    "path": "data/process-eval/mbpp_process_counterfactuals_v1.json",
+    "sha256": "479ff1e8ae1d9e0966cbf0ea9d53532fd158dc1f77cf1f1436b788e283800d7f"
+  },
+  "conditions": ["ablation_a"],
+  "rubrics": ["baseline", "assumption_audit_v1"],
+  "max_attempts_per_judgment": 2,
+  "statistics_policy": "development and constructed probes remain separate; no heldout access"
+}

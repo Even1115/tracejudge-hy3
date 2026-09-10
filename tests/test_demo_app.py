@@ -272,6 +272,19 @@ def test_index_page_served_with_security_headers(server):
     assert "default-src 'self'" in headers.get("Content-Security-Policy", "")
 
 
+def test_index_page_marks_scene_eight_identities(server):
+    status, body, _headers = _get(server, "/?recording=1")
+    assert status == 200
+    html = body.decode("utf-8")
+    # Scene 8 shows the historical frozen study and the latest supplementary
+    # validation as two separate, clearly-labelled blocks.
+    assert "历史阶段四冻结研究 · 57 条轨迹" in html
+    assert "HISTORICAL FROZEN STUDY · 历史冻结" in html
+    assert "2026-09-10 最新补充验证" in html
+    assert "LATEST SUPPLEMENTARY · 最新补充" in html
+    assert 'id="current-validation-body"' in html
+
+
 def test_unknown_and_traversal_paths_rejected(server):
     assert _get(server, "/nonexistent")[0] == 404
     assert _get(server, "/static/../server.py")[0] == 404

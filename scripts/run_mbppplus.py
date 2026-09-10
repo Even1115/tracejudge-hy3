@@ -7,6 +7,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import os
 import re
 import sys
 import uuid
@@ -127,6 +128,10 @@ def main():
     work = ROOT / "artifacts/benchmark-preflight/mbpp"
     work.mkdir(parents=True, exist_ok=True)
     preflight = executor.preflight(task_metadata=metadata, workspace=work)
+    # Docker Desktop on WSL can leave the Python process attached to a deleted
+    # staging-directory inode after the preflight bind mounts are cleaned up.
+    # Re-enter the explicit project root before generation code asks for cwd.
+    os.chdir(project)
     if not preflight.ready:
         print(f"[blocked] MBPP preflight: {preflight.infrastructure_error_type}")
         return 1

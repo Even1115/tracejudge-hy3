@@ -1,0 +1,29 @@
+{
+  "schema": "tracejudge-process-development-config-v1",
+  "label_stage": "post_feedback_development_extension",
+  "annotation_provenance": "carried_rows=reviewed_pilot_submission_a_consensus_independence_unverified; extension_rows=single_reviewer_ai_assisted_2026-09-09_public_materials_only_exposure_disclosed_in_review_notes",
+  "packet_manifest": {
+    "path": "artifacts/process-annotations/mbpp120-process-v1/manifest.json",
+    "sha256": "f1d6733de1e6c8f9de8bf1f01a18c004848973dc2f085ed1acd5d59be1b003da"
+  },
+  "review_audit": {
+    "path": "artifacts/annotation-audit/mbpp-pilot-20260909-v2/structural-audit.json",
+    "sha256": "d25382633251d81f016999fca50c9b4a8bfff202954c992cd63a1528c637dec5"
+  },
+  "pilot_config": {
+    "path": "data/manifests/process_pilot_v1.json",
+    "sha256": "c2cf24cb69f288addc54d343b4dbc89aa620e4ba96f13b4fc42fde07a01f5424"
+  },
+  "annotations": {
+    "carried": {
+      "path": "artifacts/annotation-development/mbpp36-dev-20260909-v1/labels_carried_pilot_v1.jsonl",
+      "sha256": "7dd40bdbdb4f960a5074d715e04f785c650433aa2510c95d0dec92ac58a4dbd5"
+    },
+    "extension": {
+      "path": "artifacts/annotation-development/mbpp36-dev-20260909-v1/labels_extension_20260909.jsonl",
+      "sha256": "65a7a513a7efe27ce7c54f68708589e8015b471a5d92e1d167f39c3323067569",
+      "annotator": "annotator_dev"
+    }
+  },
+  "benchmark_registry": "data/manifests/benchmark_sources_v1.json"
+}

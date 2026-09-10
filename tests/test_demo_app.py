@@ -7,6 +7,7 @@ published Markdown consistency), and the HTTP surface's safety boundaries.
 
 from __future__ import annotations
 
+import errno
 import json
 import time
 import urllib.error
@@ -23,6 +24,7 @@ from tracejudge_hy3.demo_app.overview import (
 from tracejudge_hy3.demo_app.preflight import demo_preflight
 from tracejudge_hy3.demo_app.regression import build_regression_card
 from tracejudge_hy3.demo_app.runner import run_demo
+from tracejudge_hy3.demo_app.server import main as server_main
 from tracejudge_hy3.demo_app.server import make_server
 from tracejudge_hy3.demo_app.showcase import load_public_showcase
 
@@ -294,6 +296,39 @@ def test_overview_endpoint(server):
     assert payload["trace_count"] == 57
 
 
+def test_method_costs_endpoint(server):
+    status, payload, _headers = _get(server, "/api/method-costs")
+    assert status == 200
+    assert len(payload["rows"]) == 5
+    assert payload["rows"][1]["input_coverage"] == 56
+
+
+def test_duplicate_demo_port_is_rejected():
+    first = make_server(port=0, repo_root=REPO_ROOT)
+    try:
+        with pytest.raises(OSError):
+            make_server(port=first.server_port, repo_root=REPO_ROOT)
+    finally:
+        first.server_close()
+
+
+def test_server_bind_error_has_actionable_message(monkeypatch, capsys):
+    def occupied_port(**_kwargs):
+        raise OSError(errno.EADDRINUSE, "address in use")
+
+    monkeypatch.setattr("tracejudge_hy3.demo_app.server.make_server", occupied_port)
+    assert server_main(["--port", "8765"]) == 2
+    message = capsys.readouterr().err
+    assert "already in use" in message and "--port" in message
+    assert "Traceback" not in message
+
+
+def test_status_exposes_offline_launch_marker(server, monkeypatch):
+    monkeypatch.setenv("TRACEJUDGE_DEMO_OFFLINE", "1")
+    _status, payload, _headers = _get(server, "/api/status")
+    assert payload["app"]["offline_mode"] is True
+
+
 def test_showcase_regression_and_svg_endpoints(server):
     status, showcase, _headers = _get(server, "/api/showcase")
     assert status == 200
@@ -336,6 +371,7 @@ def test_full_fixture_run_over_http(server):
     assert status == 200
     assert exported["kind"] == "tracejudge_demo_result_export"
     assert exported["run_id"] == run_id
+    assert exported["result"]["cost_metrics"]["roles"]["solver"]["calls"] == 0
     assert "attachment" in headers["Content-Disposition"]
 
     status, certificate, _headers = _get(server, f"/api/export/{run_id}/certificate.json")
@@ -347,4 +383,5 @@ def test_full_fixture_run_over_http(server):
     assert status == 200
     assert b"TraceJudge-Hy3" in report
     assert b"confirmed_bug" in report
+    assert "单条样本成本".encode() in report
     assert "attachment" in headers["Content-Disposition"]

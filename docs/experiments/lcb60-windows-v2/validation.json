@@ -1,0 +1,9 @@
+{
+  "report_scope": "lcb60-windows-20260906-v2",
+  "task_rows": 60,
+  "all_aggregate_counts_match_audit": true,
+  "csv_difficulty_and_attempt_totals_match": true,
+  "incomplete_status_and_both_denominators_present": true,
+  "safe_export_scan_passed": true,
+  "real_model_api_calls": 0
+}

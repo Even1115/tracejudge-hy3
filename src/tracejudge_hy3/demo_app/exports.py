@@ -69,12 +69,48 @@ def render_result_html(run_id: str, result: dict[str, Any]) -> str:
         f"<tr><th>{html.escape(label)}</th><td>{_value(value)}</td></tr>" for label, value in rows
     )
     explanation = _value(assessment.get("explanation"))
+    costs = result.get("cost_metrics") or {}
+    cost_rows = "".join(
+        "<tr>"
+        + "".join(
+            f"<td>{_value(value)}</td>"
+            for value in (
+                role,
+                row["input_tokens"],
+                row["output_tokens"],
+                row["request_seconds"],
+                row["wall_seconds"],
+                row["calls"],
+                row["retries"],
+            )
+        )
+        + "</tr>"
+        for role, row in costs.get("roles", {}).items()
+    )
+    cost_html = ""
+    if costs:
+        cost_html = (
+            "<h2>单条样本成本</h2><p>"
+            + _value(costs["scope"])
+            + "</p>"
+            + "<p>本次总耗时："
+            + _value(costs["total_seconds"])
+            + " s；评测总耗时："
+            + _value(costs["evaluation_seconds"])
+            + " s</p>"
+            + "<table><tr><th>角色</th><th>输入 tokens</th><th>输出 tokens</th>"
+            + "<th>请求秒数</th><th>阶段秒数</th><th>调用</th><th>重试</th></tr>"
+            + cost_rows
+            + "</table><p>"
+            + _value(costs["token_scope"])
+            + "</p>"
+        )
     return f"""<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TraceJudge-Hy3 报告 · {_value(run_id)}</title>
 <style>body{{font:16px/1.6 -apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;max-width:920px;margin:40px auto;padding:0 24px;color:#14202b}}h1{{font-size:28px}}.note{{padding:12px 16px;background:#eef7fa;border-left:4px solid #1687a7}}table{{width:100%;border-collapse:collapse;margin:24px 0}}th,td{{border:1px solid #d6e0e7;padding:10px;text-align:left;vertical-align:top}}th{{width:220px;background:#f5f8fa}}code{{font-family:ui-monospace,monospace}}small{{color:#5f7180}}</style>
 </head><body><h1>TraceJudge-Hy3 人类可读报告</h1>
 <p class="note">{_value(result.get("mode_note"))}。本报告仅复述当前本地 Demo 运行的白名单字段。</p>
-<table>{table}</table><h2>判定依据</h2><p>{explanation}</p>
+<table>{table}</table><h2>判定依据</h2><p>{explanation}</p>{cost_html}
 <small>配置与版本已随本报告记录；完整结构化内容请下载同一 Run ID 的 JSON。</small>
 </body></html>"""

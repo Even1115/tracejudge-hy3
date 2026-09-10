@@ -21,6 +21,7 @@ no ``reference_code``, no absolute paths, no endpoint URLs, no API keys.
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ from typing import Any
 from tracejudge_hy3 import __version__
 from tracejudge_hy3.config import get_settings
 from tracejudge_hy3.dataset.loader import load_problem_by_id
+from tracejudge_hy3.demo_app.costs import DemoCosts, MeteredProvider
 from tracejudge_hy3.exceptions import (
     ConfigurationError,
     ProviderAuthError,
@@ -393,18 +395,28 @@ def run_demo(mode: str) -> dict[str, Any]:
             "error": "未知的运行模式。",
             "error_type": "DemoModeError",
         }
+    costs = None
+    started = None
+    measured_seconds = None
+    replay_seconds = 0.0
     try:
+        settings = get_settings()
+        costs = DemoCosts(settings.artifact_path, mode)
         problem = load_problem_by_id(data_path("sample_problems.jsonl"), DEMO_PROBLEM_ID)
         if mode == "fixture":
             provider, backend = _make_fixture_pipeline()
         else:
             provider, backend = _make_hy3_pipeline()
 
+        provider = MeteredProvider(provider, costs)
         started = time.perf_counter()
         result = asyncio.run(_run_pipeline_async(problem, provider, backend))
         duration_seconds = time.perf_counter() - started
 
+        replay_started = time.perf_counter()
         replay = _replay_certificate(result, backend)
+        replay_seconds = time.perf_counter() - replay_started
+        measured_seconds = time.perf_counter() - started
 
         settings = get_settings()
         artifact_path = timestamped_artifact_path(settings.artifact_path, f"demo_web_{mode}")
@@ -415,7 +427,7 @@ def run_demo(mode: str) -> dict[str, Any]:
         artifact_path = save_result_json(result, artifact_path)
         artifact_relpath = _public_artifact_reference(artifact_path)
 
-        return _display_payload(
+        payload = _display_payload(
             mode=mode,
             result=result,
             provider=provider,
@@ -425,9 +437,22 @@ def run_demo(mode: str) -> dict[str, Any]:
             duration_seconds=duration_seconds,
         )
     except TraceJudgeError as exc:
-        return _error_payload(mode, exc)
+        payload = _error_payload(mode, exc)
     except Exception as exc:  # never leak details of unexpected failures
-        return _error_payload(mode, exc)
+        payload = _error_payload(mode, exc)
+    if costs is not None:
+        total = measured_seconds
+        if total is None:
+            total = time.perf_counter() - started if started is not None else 0.0
+        metrics = costs.summary(total, replay_seconds)
+        metrics["artifact_relpath"] = _public_artifact_reference(costs.path)
+        metrics["problem_id"] = DEMO_PROBLEM_ID
+        metrics["provider"] = payload.get("provider")
+        metrics["result_artifact_relpath"] = payload.get("artifact_relpath")
+        costs.write({"event": "complete", "ok": payload["ok"], "cost_metrics": metrics})
+        metrics["persistence_ok"] = costs.persistence_ok
+        payload["cost_metrics"] = metrics
+    return payload
 
 
 def demo_status() -> dict[str, Any]:
@@ -451,6 +476,7 @@ def demo_status() -> dict[str, Any]:
             "name": "tracejudge-hy3",
             "version": __version__,
             "display_schema_version": 1,
+            "offline_mode": os.environ.get("TRACEJUDGE_DEMO_OFFLINE") == "1",
         },
         "modes": {
             "fixture": {

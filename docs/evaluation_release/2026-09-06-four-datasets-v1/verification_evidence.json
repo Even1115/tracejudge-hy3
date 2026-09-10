@@ -1,0 +1,184 @@
+{
+  "verified_at_utc": "2026-09-06T13:39:31.893781+00:00",
+  "repository_head": "afd37e0b7eb94978f142a8b9cffad7e4d0fa788c",
+  "working_tree_original_verifier": {
+    "status": "FAIL",
+    "reason": "Exact-byte hashes differ after Windows CRLF checkout"
+  },
+  "git_blob_checks": [
+    {
+      "path": "docs/evaluation_release/2026-09-06/README.md",
+      "expected_sha256": "00eafed589c8dbc6543133dd8e1d2272fe6f325473c981482402c2a542bfaa4d",
+      "git_blob_sha256": "00eafed589c8dbc6543133dd8e1d2272fe6f325473c981482402c2a542bfaa4d",
+      "working_tree_sha256": "f836379dfc036fdc2f90fdc41e257d55edbb3b39781a26ba9cef516a82c7cf07",
+      "working_tree_exact_match": false,
+      "working_tree_differs_only_by_crlf": true,
+      "git_blob_matches_expected": true
+    },
+    {
+      "path": "docs/evaluation_release/2026-09-06/configurations.json",
+      "expected_sha256": "fa1166b3c8e0d463cfcf80c0cb8abcf935cc744577ad426d2519a32c52af7857",
+      "git_blob_sha256": "fa1166b3c8e0d463cfcf80c0cb8abcf935cc744577ad426d2519a32c52af7857",
+      "working_tree_sha256": "37750c5bf8d7098ca947210fe32a522fa5be548559f5d5f1d8aabdb7fe1225df",
+      "working_tree_exact_match": false,
+      "working_tree_differs_only_by_crlf": true,
+      "git_blob_matches_expected": true
+    },
+    {
+      "path": "docs/evaluation_release/2026-09-06/livecodebench_handoff.md",
+      "expected_sha256": "2bbba6df06bc0599d366ed226add58ed7d3ea5098b90d0581ca5e0670928754e",
+      "git_blob_sha256": "2bbba6df06bc0599d366ed226add58ed7d3ea5098b90d0581ca5e0670928754e",
+      "working_tree_sha256": "1ee40b170ec32f5769ef8ff8b81ec515f477a01a80e507aeea050f3a0f3762ae",
+      "working_tree_exact_match": false,
+      "working_tree_differs_only_by_crlf": true,
+      "git_blob_matches_expected": true
+    },
+    {
+      "path": "docs/evaluation_release/2026-09-06/results.json",
+      "expected_sha256": "dd3cb0a2f18fde2b2710b49ea5ece349aad17daacfbdaea8e9e4093174356ef6",
+      "git_blob_sha256": "dd3cb0a2f18fde2b2710b49ea5ece349aad17daacfbdaea8e9e4093174356ef6",
+      "working_tree_sha256": "31a5392a933a1cdae05f84dfd89614b58ac720ce3a963f7bfd3dcb66d3346f42",
+      "working_tree_exact_match": false,
+      "working_tree_differs_only_by_crlf": true,
+      "git_blob_matches_expected": true
+    },
+    {
+      "path": "docs/evaluation_release/2026-09-06/source_hashes.json",
+      "expected_sha256": "c9f40379417593dc4fc8a9deda3b3c67065ca6f907015033edb8117cd4983ee3",
+      "git_blob_sha256": "c9f40379417593dc4fc8a9deda3b3c67065ca6f907015033edb8117cd4983ee3",
+      "working_tree_sha256": "9c566c68330a3d972465ef5eb205cbf7489216da190a7d5ce93d62a8d134bddc",
+      "working_tree_exact_match": false,
+      "working_tree_differs_only_by_crlf": true,
+      "git_blob_matches_expected": true
+    },
+    {
+      "path": "docs/evaluation_release/2026-09-06/verify_release.py",
+      "expected_sha256": "2e22f6bc7e27115478fb61793d61d577988d5ab00496a879d4c8a99495c65066",
+      "git_blob_sha256": "2e22f6bc7e27115478fb61793d61d577988d5ab00496a879d4c8a99495c65066",
+      "working_tree_sha256": "4e4a8b9a2583b6d2bc5c255b68ca477dff12fbf0c384a94b3f6d133532b42e0a",
+      "working_tree_exact_match": false,
+      "working_tree_differs_only_by_crlf": true,
+      "git_blob_matches_expected": true
+    },
+    {
+      "path": "docs/two_dataset_interim_evaluation_report.md",
+      "expected_sha256": "300be2fc10ddb452a468318ca976e07e37db0cc2e2c333a0906171899bdf8b90",
+      "git_blob_sha256": "300be2fc10ddb452a468318ca976e07e37db0cc2e2c333a0906171899bdf8b90",
+      "working_tree_sha256": "2d913c8e4e4148e72fdda108872d23a3b6a15420c1d49084b4d49dccd3474300",
+      "working_tree_exact_match": false,
+      "working_tree_differs_only_by_crlf": true,
+      "git_blob_matches_expected": true
+    }
+  ],
+  "committed_snapshot_verifier": {
+    "status": "PASS",
+    "public_files_hashed": 7,
+    "local_links_checked": 23,
+    "source_hash_references": 36,
+    "index_checked": false,
+    "scope": "Public-package consistency only; no private-data rescoring or remote experiment verification."
+  },
+  "snapshot_files_created": 10,
+  "lcb_publication_files_verified": 13,
+  "codejudge_original_file_hash_checks": [
+    {
+      "source_id": "codejudge.full_v1.recomputed",
+      "present_at_expected_local_path": false
+    },
+    {
+      "source_id": "codejudge.v3a_complete.manifest",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3a_complete.receipt",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3a_complete.records",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3a_complete.report",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3a_interrupted.manifest",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3a_interrupted.receipt",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3a_interrupted.records",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3a_interrupted.report",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3b.manifest",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3b.receipt",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3b.records",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    },
+    {
+      "source_id": "codejudge.v3b.report",
+      "present_at_expected_local_path": true,
+      "size_matches": true,
+      "sha256_matches": true
+    }
+  ],
+  "scope": "Public evidence arithmetic and exact Git blob identity; optional local source hashes, not private-record rescoring.",
+  "old_evidence_modified": false,
+  "model_api_calls": 0,
+  "candidate_or_hidden_test_execution": false,
+  "lcb_current_audit_time_utc": "2026-09-06T13:40:09.451980+00:00",
+  "lcb_current_checks": {
+    "event_chain_valid": true,
+    "recomputed_report_matches": true,
+    "receipt_matches": true,
+    "source_selection_tasks_prompt_and_smoke_match": true,
+    "runtime_git_clean": true,
+    "result_file_count": 124,
+    "results_unchanged_during_audit": true,
+    "unchanged_since_previous_audit": true,
+    "provider_and_execution_source_match_pre_run_validation": true
+  },
+  "additional_source_availability": {
+    "humanevalplus_final_recovery_original_directory_present": false,
+    "mbppplus_final_run_original_directory_present": false,
+    "note": "Their final private run directories were checked at the recorded locations and were absent; this report validates the pulled public evidence, not those machines or private candidate records."
+  },
+  "model_api_calls_by_this_report": 0,
+  "experiments_restarted_or_reconfigured": false
+}

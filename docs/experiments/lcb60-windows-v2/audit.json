@@ -1,0 +1,1015 @@
+{
+  "audit_time_utc": "2026-09-06T11:22:22.495744+00:00",
+  "run_id": "lcb60-windows-20260906-v2",
+  "run_directory": "/home/even/projects/tracejudge-hy3-lcb60-windows-20260906/artifacts/benchmark-runtime/f4249a0448427578/artifacts/experiments/livecodebench/lcb60-windows-20260906-v2",
+  "runtime": "/home/even/projects/tracejudge-hy3-lcb60-windows-20260906/artifacts/benchmark-runtime/f4249a0448427578",
+  "runtime_commit": "0096a408f7703aabf1fadd7dd38400290d74438d",
+  "report": {
+    "actual_execution_n": 58,
+    "complete": false,
+    "execution_events": 58,
+    "execution_pending_n": 0,
+    "execution_status_counts": {
+      "compile_error": 1,
+      "failed": 3,
+      "passed": 53,
+      "timeout": 1
+    },
+    "generation_coverage": {
+      "denominator": 60,
+      "numerator": 58,
+      "value": 0.9666666666666667,
+      "wilson_95": [
+        0.886362257256914,
+        0.9908106807438021
+      ]
+    },
+    "generation_events": 62,
+    "generation_status_counts": {
+      "provider_error": 2,
+      "success": 58
+    },
+    "limitations": [
+      "not_full_livecodebench",
+      "difficulty_balanced_not_natural_prevalence",
+      "no_training_contamination_guarantee",
+      "process_judge_not_run"
+    ],
+    "metrics_scope": "fixed_stratified_stdio_subset_single_sample",
+    "pass_conditional_on_execution": {
+      "denominator": 58,
+      "numerator": 53,
+      "value": 0.9137931034482759,
+      "wilson_95": [
+        0.8135637093712647,
+        0.962614616873809
+      ]
+    },
+    "pass_full_denominator": {
+      "denominator": 60,
+      "numerator": 53,
+      "value": 0.8833333333333333,
+      "wilson_95": [
+        0.7782121197582914,
+        0.9423227935994396
+      ]
+    },
+    "per_difficulty": {
+      "easy": {
+        "actual_execution_n": 20,
+        "execution_pending_n": 0,
+        "execution_status_counts": {
+          "passed": 20
+        },
+        "generation_coverage": {
+          "denominator": 20,
+          "numerator": 20,
+          "value": 1.0,
+          "wilson_95": [
+            0.8388748419471806,
+            1.0
+          ]
+        },
+        "generation_status_counts": {
+          "success": 20
+        },
+        "pass_conditional_on_execution": {
+          "denominator": 20,
+          "numerator": 20,
+          "value": 1.0,
+          "wilson_95": [
+            0.8388748419471806,
+            1.0
+          ]
+        },
+        "pass_full_denominator": {
+          "denominator": 20,
+          "numerator": 20,
+          "value": 1.0,
+          "wilson_95": [
+            0.8388748419471806,
+            1.0
+          ]
+        },
+        "planned_n": 20
+      },
+      "hard": {
+        "actual_execution_n": 18,
+        "execution_pending_n": 0,
+        "execution_status_counts": {
+          "compile_error": 1,
+          "failed": 2,
+          "passed": 14,
+          "timeout": 1
+        },
+        "generation_coverage": {
+          "denominator": 20,
+          "numerator": 18,
+          "value": 0.9,
+          "wilson_95": [
+            0.6989663547715128,
+            0.9721335187862319
+          ]
+        },
+        "generation_status_counts": {
+          "provider_error": 2,
+          "success": 18
+        },
+        "pass_conditional_on_execution": {
+          "denominator": 18,
+          "numerator": 14,
+          "value": 0.7777777777777778,
+          "wilson_95": [
+            0.5478541568378739,
+            0.9099907189139831
+          ]
+        },
+        "pass_full_denominator": {
+          "denominator": 20,
+          "numerator": 14,
+          "value": 0.7,
+          "wilson_95": [
+            0.4810271816464765,
+            0.8545227551323956
+          ]
+        },
+        "planned_n": 20
+      },
+      "medium": {
+        "actual_execution_n": 20,
+        "execution_pending_n": 0,
+        "execution_status_counts": {
+          "failed": 1,
+          "passed": 19
+        },
+        "generation_coverage": {
+          "denominator": 20,
+          "numerator": 20,
+          "value": 1.0,
+          "wilson_95": [
+            0.8388748419471806,
+            1.0
+          ]
+        },
+        "generation_status_counts": {
+          "success": 20
+        },
+        "pass_conditional_on_execution": {
+          "denominator": 20,
+          "numerator": 19,
+          "value": 0.95,
+          "wilson_95": [
+            0.763868806553258,
+            0.9911185511992047
+          ]
+        },
+        "pass_full_denominator": {
+          "denominator": 20,
+          "numerator": 19,
+          "value": 0.95,
+          "wilson_95": [
+            0.763868806553258,
+            0.9911185511992047
+          ]
+        },
+        "planned_n": 20
+      }
+    },
+    "planned_n": 60,
+    "provider_attempts": 74,
+    "schema": "lcb60-generation-execution-report-v1"
+  },
+  "identity": {
+    "source_sha256": "cbc6e1b6029da63037125ea5e6a3966ffb2837ab0335bfcdce116ecccbc2c6c7",
+    "python": "3.12.3",
+    "dependencies": {
+      "openai": "3.8.0",
+      "pydantic": "2.13.5",
+      "pydantic-settings": "2.15.0",
+      "rich": "15.0.0",
+      "typer": "0.27.2"
+    },
+    "provider": {
+      "provider": "hy3",
+      "model": "tencent/hy3",
+      "reasoning_effort": "high",
+      "reasoning_effort_enabled": true,
+      "timeout_seconds": 120.0,
+      "max_retries": 2,
+      "max_parse_repairs": 1,
+      "stdio_prompt_sha256": "5e8803b396db03bcd16a9feda8ad36176d1f76750b11eff2863a1ae73af256b0"
+    },
+    "limits": {
+      "cleanup_timeout_seconds": 10.0,
+      "cpus": "1",
+      "inspect_timeout_seconds": 30.0,
+      "memory": "4g",
+      "per_task_timeout_seconds": 600,
+      "pids": 128,
+      "tmpfs_size": "1g"
+    },
+    "per_test_timeout_seconds": 6,
+    "prompt_version": "lcb-stdio-solution-trace-v1",
+    "prompt_sha256": "5e8803b396db03bcd16a9feda8ad36176d1f76750b11eff2863a1ae73af256b0",
+    "tasks_sha256": "77f4675933db2d604e9b4f372361cab6ab9dc64f3fb8378bb3c3a23b82670ca8",
+    "image": "sha256:98466e5add3e7198167d81f098a3005b285a5daca4b9ae7ceb70b7bbb9e070c2",
+    "selection_protocol": {
+      "algorithm": "lcb60-stdio-window-2024-06-01..2025-04-30-difficulty-stratified-20-sha256(seed,NUL,question_id)-lowest-v1",
+      "seed": 20260904,
+      "strata": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "stratum_size": 20,
+      "total_count": 60,
+      "window_end": "2025-04-30",
+      "window_start": "2024-06-01"
+    },
+    "ordered_ids_sha256": "01a4b6bbf91d8337530f005e34b3caf8b9f19fecb46510f98329dbc958d4017e",
+    "selection_file_sha256": "bb30680876e0f1780954fa92c208704a8d50529c2bf240e1a396d61005daf381",
+    "uv_lock_sha256": "d6c9ba5c7f569d4a5dea7cc072d87a7b0c549d0d8d00ebdc9098ddf1a0c4a287",
+    "smoke_receipt_sha256": "12d454b494841e0f4772501c74592c3ae62a139430dff515c0b5fea801bd5e37",
+    "execution_source_sha256": {
+      "src/tracejudge_hy3/lcb/docker_runner.py": "1f44e809a3e0d78ebd127d8e66134ae782fd70a3bb4d68917212d31da3b69087",
+      "src/tracejudge_hy3/lcb/container_entrypoint.py": "6ff1840f36f5eafb36e4e32621dd06a7e82a57dc7b82e85309d9b7fb31b83d84",
+      "src/tracejudge_hy3/benchmark/livecodebench.py": "f5dce4bdf4a739f625c612b53e33f68be891d48627f0a2bd607cab313821a693"
+    },
+    "provider_source_sha256": "46ffb1e760e4285715a2d071666d2a10fcae3594a424df5332f78690e08e6633",
+    "freeze_manifest_sha256": "197383a4fa4e4687fc9215e16c057c4905ea3debcde7a09a597d25a9b6f7092f"
+  },
+  "timeline": {
+    "initial_started_at": "2026-09-06T07:01:07.475415+00:00",
+    "initial_finished_at": "2026-09-06T09:29:16.006925+00:00",
+    "initial_elapsed_seconds": 8888.53151,
+    "resume_started_at": "2026-09-06T10:15:12.652104+00:00",
+    "resume_last_event_completed_at": "2026-09-06T10:45:32.157361+00:00",
+    "resume_elapsed_seconds": 1819.505257,
+    "latest_receipt_updated_at": "2026-09-06T10:45:32.177095+00:00",
+    "initial_provider_attempts": 68,
+    "resume_provider_attempts": 6
+  },
+  "provider_attempt_outcomes": {
+    "success": 58,
+    "provider_error": 16
+  },
+  "non_pass_tasks": [
+    {
+      "index": 27,
+      "task_id": "abc374_d",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "failed",
+      "failure_kind": "wrong_answer",
+      "execution_duration_seconds": 0.5343785660006688
+    },
+    {
+      "index": 41,
+      "task_id": "arc189_d",
+      "difficulty": "hard",
+      "generation_status": "provider_error",
+      "generation_event_count": 2,
+      "provider_attempt_count_total": 6,
+      "execution_status": "not_run",
+      "failure_kind": null,
+      "execution_duration_seconds": null
+    },
+    {
+      "index": 44,
+      "task_id": "arc186_e",
+      "difficulty": "hard",
+      "generation_status": "provider_error",
+      "generation_event_count": 2,
+      "provider_attempt_count_total": 6,
+      "execution_status": "not_run",
+      "failure_kind": null,
+      "execution_duration_seconds": null
+    },
+    {
+      "index": 49,
+      "task_id": "arc183_b",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 3,
+      "execution_status": "failed",
+      "failure_kind": "wrong_answer",
+      "execution_duration_seconds": 0.6353520579978067
+    },
+    {
+      "index": 54,
+      "task_id": "abc363_f",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "failed",
+      "failure_kind": "wrong_answer",
+      "execution_duration_seconds": 0.6597966160006763
+    },
+    {
+      "index": 55,
+      "task_id": "arc182_c",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "compile_error",
+      "failure_kind": "compile_error",
+      "execution_duration_seconds": null
+    },
+    {
+      "index": 58,
+      "task_id": "abc389_g",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 2,
+      "execution_status": "timeout",
+      "failure_kind": "time_limit_exceeded",
+      "execution_duration_seconds": 6.719764834000671
+    }
+  ],
+  "task_statuses": [
+    {
+      "index": 1,
+      "task_id": "abc357_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.01228642463684082
+    },
+    {
+      "index": 2,
+      "task_id": "abc397_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03710222244262695
+    },
+    {
+      "index": 3,
+      "task_id": "abc361_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.016810894012451172
+    },
+    {
+      "index": 4,
+      "task_id": "abc395_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03769993782043457
+    },
+    {
+      "index": 5,
+      "task_id": "abc373_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.0678102970123291
+    },
+    {
+      "index": 6,
+      "task_id": "abc388_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.05324840545654297
+    },
+    {
+      "index": 7,
+      "task_id": "abc381_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.05580544471740723
+    },
+    {
+      "index": 8,
+      "task_id": "abc392_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.054052114486694336
+    },
+    {
+      "index": 9,
+      "task_id": "abc382_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.0695335865020752
+    },
+    {
+      "index": 10,
+      "task_id": "abc386_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.07727670669555664
+    },
+    {
+      "index": 11,
+      "task_id": "abc380_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.035845041275024414
+    },
+    {
+      "index": 12,
+      "task_id": "abc388_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03677201271057129
+    },
+    {
+      "index": 13,
+      "task_id": "abc360_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.04481673240661621
+    },
+    {
+      "index": 14,
+      "task_id": "abc392_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03603506088256836
+    },
+    {
+      "index": 15,
+      "task_id": "abc387_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03602409362792969
+    },
+    {
+      "index": 16,
+      "task_id": "abc391_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.04945659637451172
+    },
+    {
+      "index": 17,
+      "task_id": "abc390_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.08213376998901367
+    },
+    {
+      "index": 18,
+      "task_id": "abc383_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.0802009105682373
+    },
+    {
+      "index": 19,
+      "task_id": "abc370_a",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.004372596740722656
+    },
+    {
+      "index": 20,
+      "task_id": "abc396_b",
+      "difficulty": "easy",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03648567199707031
+    },
+    {
+      "index": 21,
+      "task_id": "abc374_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 13.206316947937012
+    },
+    {
+      "index": 22,
+      "task_id": "abc372_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 1.7675955295562744
+    },
+    {
+      "index": 23,
+      "task_id": "abc356_d",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.05147576332092285
+    },
+    {
+      "index": 24,
+      "task_id": "arc195_a",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.0646812915802002
+    },
+    {
+      "index": 25,
+      "task_id": "abc388_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.09209775924682617
+    },
+    {
+      "index": 26,
+      "task_id": "abc382_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.48243117332458496
+    },
+    {
+      "index": 27,
+      "task_id": "abc374_d",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "failed",
+      "failure_kind": "wrong_answer",
+      "execution_duration_seconds": 0.5343785660006688
+    },
+    {
+      "index": 28,
+      "task_id": "abc397_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03961801528930664
+    },
+    {
+      "index": 29,
+      "task_id": "abc392_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.10848450660705566
+    },
+    {
+      "index": 30,
+      "task_id": "arc183_a",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.17847490310668945
+    },
+    {
+      "index": 31,
+      "task_id": "abc399_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.5879850387573242
+    },
+    {
+      "index": 32,
+      "task_id": "abc373_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 2.993645191192627
+    },
+    {
+      "index": 33,
+      "task_id": "abc369_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.5452606678009033
+    },
+    {
+      "index": 34,
+      "task_id": "abc398_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.035604238510131836
+    },
+    {
+      "index": 35,
+      "task_id": "abc361_b",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.049967050552368164
+    },
+    {
+      "index": 36,
+      "task_id": "abc357_d",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.0602264404296875
+    },
+    {
+      "index": 37,
+      "task_id": "abc400_d",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 2,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.11035370826721191
+    },
+    {
+      "index": 38,
+      "task_id": "abc383_b",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.044255971908569336
+    },
+    {
+      "index": 39,
+      "task_id": "abc360_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.6433336734771729
+    },
+    {
+      "index": 40,
+      "task_id": "abc367_c",
+      "difficulty": "medium",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.7920670509338379
+    },
+    {
+      "index": 41,
+      "task_id": "arc189_d",
+      "difficulty": "hard",
+      "generation_status": "provider_error",
+      "generation_event_count": 2,
+      "provider_attempt_count_total": 6,
+      "execution_status": "not_run",
+      "failure_kind": null,
+      "execution_duration_seconds": null
+    },
+    {
+      "index": 42,
+      "task_id": "abc394_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.12613677978515625
+    },
+    {
+      "index": 43,
+      "task_id": "arc185_d",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 1.8288257122039795
+    },
+    {
+      "index": 44,
+      "task_id": "arc186_e",
+      "difficulty": "hard",
+      "generation_status": "provider_error",
+      "generation_event_count": 2,
+      "provider_attempt_count_total": 6,
+      "execution_status": "not_run",
+      "failure_kind": null,
+      "execution_duration_seconds": null
+    },
+    {
+      "index": 45,
+      "task_id": "abc385_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.03822684288024902
+    },
+    {
+      "index": 46,
+      "task_id": "abc390_f",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.10606241226196289
+    },
+    {
+      "index": 47,
+      "task_id": "arc183_c",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 21.166212797164917
+    },
+    {
+      "index": 48,
+      "task_id": "arc187_b",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 2.009706735610962
+    },
+    {
+      "index": 49,
+      "task_id": "arc183_b",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 3,
+      "execution_status": "failed",
+      "failure_kind": "wrong_answer",
+      "execution_duration_seconds": 0.6353520579978067
+    },
+    {
+      "index": 50,
+      "task_id": "abc368_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 12.558440923690796
+    },
+    {
+      "index": 51,
+      "task_id": "abc390_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 4.088325500488281
+    },
+    {
+      "index": 52,
+      "task_id": "arc195_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.04520273208618164
+    },
+    {
+      "index": 53,
+      "task_id": "abc386_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.41243743896484375
+    },
+    {
+      "index": 54,
+      "task_id": "abc363_f",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "failed",
+      "failure_kind": "wrong_answer",
+      "execution_duration_seconds": 0.6597966160006763
+    },
+    {
+      "index": 55,
+      "task_id": "arc182_c",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "compile_error",
+      "failure_kind": "compile_error",
+      "execution_duration_seconds": null
+    },
+    {
+      "index": 56,
+      "task_id": "abc374_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 0.20450377464294434
+    },
+    {
+      "index": 57,
+      "task_id": "abc371_g",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 4.274150848388672
+    },
+    {
+      "index": 58,
+      "task_id": "abc389_g",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 2,
+      "execution_status": "timeout",
+      "failure_kind": "time_limit_exceeded",
+      "execution_duration_seconds": 6.719764834000671
+    },
+    {
+      "index": 59,
+      "task_id": "abc357_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 3.189728260040283
+    },
+    {
+      "index": 60,
+      "task_id": "abc361_e",
+      "difficulty": "hard",
+      "generation_status": "success",
+      "generation_event_count": 1,
+      "provider_attempt_count_total": 1,
+      "execution_status": "passed",
+      "failure_kind": null,
+      "execution_duration_seconds": 10.645969867706299
+    }
+  ],
+  "checks": {
+    "event_chain_valid": true,
+    "recomputed_report_matches": true,
+    "receipt_matches": true,
+    "source_selection_tasks_prompt_and_smoke_match": true,
+    "runtime_git_clean": true,
+    "result_file_count": 124,
+    "results_unchanged_during_audit": true,
+    "unchanged_since_previous_audit": true,
+    "provider_and_execution_source_match_pre_run_validation": true
+  },
+  "boundaries": {
+    "real_model_api_calls": 0,
+    "env_file_read": false,
+    "private_tests_decoded": false,
+    "candidate_executed": false,
+    "formal_code_config_or_results_modified": false
+  }
+}

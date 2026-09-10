@@ -1,0 +1,139 @@
+{
+  "run_id": "lcb60-windows-20260906-v2",
+  "complete": false,
+  "generation_status_counts": {
+    "provider_error": 2,
+    "success": 58
+  },
+  "execution_status_counts": {
+    "compile_error": 1,
+    "failed": 3,
+    "passed": 53,
+    "timeout": 1
+  },
+  "actual_execution_n": 58,
+  "pass_full_denominator": {
+    "denominator": 60,
+    "numerator": 53,
+    "value": 0.8833333333333333,
+    "wilson_95": [
+      0.7782121197582914,
+      0.9423227935994396
+    ]
+  },
+  "pass_conditional_on_execution": {
+    "denominator": 58,
+    "numerator": 53,
+    "value": 0.9137931034482759,
+    "wilson_95": [
+      0.8135637093712647,
+      0.962614616873809
+    ]
+  },
+  "provider_attempts_total": 74,
+  "provider_attempts_added": 6,
+  "generation_events_added": 2,
+  "execution_events_added": 0,
+  "provider_attempt_outcomes_total": {
+    "success": 58,
+    "provider_error": 16
+  },
+  "failed_tasks": {
+    "arc189_d": {
+      "history": [
+        {
+          "status": "provider_error",
+          "attempt_count": 3,
+          "attempt_outcomes": [
+            "provider_error",
+            "provider_error",
+            "provider_error"
+          ],
+          "error_type": "ProviderResponseError",
+          "duration_seconds": 910.9219496919977,
+          "started_at": "2026-09-06T07:42:55.304174+00:00",
+          "completed_at": "2026-09-06T07:58:04.507754+00:00",
+          "raw_output_is_none": true,
+          "solution_is_none": true
+        },
+        {
+          "status": "provider_error",
+          "attempt_count": 3,
+          "attempt_outcomes": [
+            "provider_error",
+            "provider_error",
+            "provider_error"
+          ],
+          "error_type": "ProviderResponseError",
+          "duration_seconds": 912.9758843970012,
+          "started_at": "2026-09-06T10:15:12.652104+00:00",
+          "completed_at": "2026-09-06T10:30:23.040073+00:00",
+          "raw_output_is_none": true,
+          "solution_is_none": true
+        }
+      ],
+      "total_attempts_this_run": 6
+    },
+    "arc186_e": {
+      "history": [
+        {
+          "status": "provider_error",
+          "attempt_count": 3,
+          "attempt_outcomes": [
+            "provider_error",
+            "provider_error",
+            "provider_error"
+          ],
+          "error_type": "ProviderResponseError",
+          "duration_seconds": 911.1066266369999,
+          "started_at": "2026-09-06T08:06:00.294547+00:00",
+          "completed_at": "2026-09-06T08:21:09.423382+00:00",
+          "raw_output_is_none": true,
+          "solution_is_none": true
+        },
+        {
+          "status": "provider_error",
+          "attempt_count": 3,
+          "attempt_outcomes": [
+            "provider_error",
+            "provider_error",
+            "provider_error"
+          ],
+          "error_type": "ProviderResponseError",
+          "duration_seconds": 912.2345771969995,
+          "started_at": "2026-09-06T10:30:23.051299+00:00",
+          "completed_at": "2026-09-06T10:45:32.157361+00:00",
+          "raw_output_is_none": true,
+          "solution_is_none": true
+        }
+      ],
+      "total_attempts_this_run": 6
+    }
+  },
+  "new_files": [
+    "events/000118.json",
+    "events/000119.json"
+  ],
+  "updated_existing_files_by_user_resume": [
+    "completion_receipt.json",
+    "report.json"
+  ],
+  "all_previous_events_and_manifest_unchanged": true,
+  "current_result_file_count": 124,
+  "audit_did_not_modify_results": true,
+  "report_and_receipt_match_recomputed_events": true,
+  "runtime_and_smoke_identity_match": true,
+  "sdk_http_module": "httpx2",
+  "configured_timeout_fields": {
+    "connect": 120.0,
+    "read": 120.0,
+    "write": 120.0,
+    "pool": 120.0
+  },
+  "timeout_implementation_path": "/home/even/projects/tracejudge-hy3-lcb60-windows-20260906/.venv/lib/python3.12/site-packages/openai/__init__.py",
+  "provider_source_path": "/home/even/projects/tracejudge-hy3-lcb60-windows-20260906/artifacts/benchmark-runtime/f4249a0448427578/src/tracejudge_hy3/providers/hy3_openai.py",
+  "model_api_calls_by_audit": 0,
+  "env_file_read": false,
+  "private_tests_decoded": false,
+  "candidate_executed": false
+}

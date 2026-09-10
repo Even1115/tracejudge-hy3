@@ -1,0 +1,148 @@
+{
+  "schema": "tracejudge-current-validation-summary-v1",
+  "title": "2026-09-10 最新补充验证",
+  "generated_on": "2026-09-10",
+  "calls_made": 0,
+  "candidate_executions": 0,
+  "sources": {
+    "dev36_label_rescore": {
+      "path": "artifacts/experiments/process-method-v2/dev36-label-rescore-20260910-v2/label-rescore.json",
+      "sha256": "07a45dd1db17f5c8e8bcd22252505a51114a68eedef8ae7564ea9611958f0475"
+    },
+    "ablation_repetition_tally": {
+      "path": "artifacts/experiments/process-pilot/mbpp12-ablation-repetition-tally-20260909-v1/tally-report.json",
+      "sha256": "5f6c8ed854831944c6a5aead4d748446133f638b3ea58c42b5ed596427d84831"
+    },
+    "location_comparison": {
+      "path": "artifacts/experiments/process-method-v2/probes3-location-comparison-20260910-v1/comparison.json",
+      "sha256": "8aee75d735f8e74636f086fb6a76c8f5320569a46a9d69916cf8ab791e8efcf1"
+    },
+    "location_review": {
+      "path": "artifacts/experiments/process-method-v2/probes3-location-review-20260910-v2/location-review.json",
+      "sha256": "5e61a213e5ff54e04369810b8c88beffe55c1fb6707f82d0d22acb557e2739dc"
+    }
+  },
+  "experiments": {
+    "dev36_label_rescore": {
+      "scope": "36 条开发样本 · baseline 与 assumption audit 两方法 · 修订开发标签 v2 · 同一批预测离线重计分（0 次模型调用、0 次候选执行）",
+      "item_count": 36,
+      "methods": [
+        "baseline",
+        "assumption_audit"
+      ],
+      "accuracy_numerator": 33,
+      "accuracy_denominator": 36,
+      "tp": 2,
+      "fp": 0,
+      "tn": 31,
+      "fn": 3,
+      "error_recall_numerator": 2,
+      "error_recall_denominator": 5,
+      "false_positive_numerator": 0,
+      "false_positive_denominator": 31,
+      "coverage_ok": 36,
+      "label_stage": "post_prediction_development_revision_v2",
+      "limitations": [
+        "开发标签为预测后单人 AI 辅助复核（tuple_str_int 亦为预测后复核），非独立盲审金标，也不是独立留出集。",
+        "与原口径 32/36 的差异完全来自标签修订，不是模型能力提升；两方法仍漏检 3 条错误。"
+      ]
+    },
+    "ablation_repetition": {
+      "scope": "12 条开发试点 · 四证据条件 · 五轮冻结重复（rep1 + rep2–5）· 原方案与原标签",
+      "item_count": 12,
+      "repetition_count": 5,
+      "rep1_accuracy": {
+        "ablation_a": [
+          8,
+          10
+        ],
+        "ablation_b": [
+          8,
+          10
+        ],
+        "ablation_c": [
+          8,
+          10
+        ],
+        "ablation_d": [
+          9,
+          10
+        ]
+      },
+      "max_product_detection": {
+        "ablation_a": [
+          1,
+          5
+        ],
+        "ablation_b": [
+          0,
+          4
+        ],
+        "ablation_c": [
+          0,
+          5
+        ],
+        "ablation_d": [
+          2,
+          5
+        ]
+      },
+      "division_elements_detection": {
+        "ablation_a": [
+          0,
+          5
+        ],
+        "ablation_b": [
+          0,
+          5
+        ],
+        "ablation_c": [
+          0,
+          5
+        ],
+        "ablation_d": [
+          0,
+          5
+        ]
+      },
+      "division_elements_total": [
+        0,
+        20
+      ],
+      "provider_timeout_note": "B 条件 max_product 一次 Provider 超时，分母为 4",
+      "limitations": [
+        "12 条开发试点、原方案与原标签；样本量小，只报告计数与飘动，不做统计显著性或泛化声明。",
+        "rep1 的 D 检出未稳定复现，不得声称 D 稳定优于其他条件。"
+      ]
+    },
+    "location_probes": {
+      "scope": "3 条构造错误探针 · 新定位规范 v2 · baseline 与 assumption audit 两方法",
+      "item_count": 3,
+      "constructed": true,
+      "detection_numerator": 3,
+      "detection_denominator": 3,
+      "first_layer_numerator": 3,
+      "first_layer_denominator": 3,
+      "first_step_numerator": 1,
+      "first_step_denominator": 3,
+      "structured_location_exact_numerator": 0,
+      "structured_location_exact_denominator": 3,
+      "supplementary_citation_numerator": 1,
+      "supplementary_citation_denominator": 3,
+      "requests": {
+        "baseline": 5,
+        "assumption_audit": 3
+      },
+      "limitations": [
+        "3 条全部是构造错误样本，不能据此计算或宣称总体误报率。",
+        "补充同源引用覆盖是事后机械指标，不能代替精确定位（0/3）。"
+      ]
+    }
+  },
+  "global_limitations": [
+    "各实验样本、方法与标签阶段不同：不合并、不相加、不建立总排行榜。",
+    "36 条为开发集标签，不是独立留出集；81 条保留集仍封存，没有保留集成绩。",
+    "历史 57 条五方法研究、历史 12 条三方法试点、单轮 2×2 消融与以上补充验证各自独立统计。"
+  ],
+  "overview_doc": "docs/contest_results_overview.md"
+}

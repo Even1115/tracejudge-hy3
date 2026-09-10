@@ -22,8 +22,11 @@ research materials) is ever serialized to the browser.
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import re
+import socket
+import sys
 import threading
 import time
 import uuid
@@ -32,6 +35,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from tracejudge_hy3.demo_app.costs import load_method_comparison
 from tracejudge_hy3.demo_app.exports import (
     certificate_export_payload,
     render_result_html,
@@ -249,6 +253,14 @@ class DemoHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
+        if path == "/api/method-costs":
+            try:
+                self._send_json(load_method_comparison(self.repo_root))
+            except (OSError, ValueError):
+                self._send_json(
+                    {"error": "published method costs unavailable"}, HTTPStatus.SERVICE_UNAVAILABLE
+                )
+            return
         if path in _STATIC_FILES:
             filename, content_type = _STATIC_FILES[path]
             self._send_static(filename, content_type)
@@ -336,6 +348,17 @@ class DemoHTTPRequestHandler(BaseHTTPRequestHandler):
         self._send_json({"run_id": run_id, "status": "running"}, HTTPStatus.ACCEPTED)
 
 
+class DemoHTTPServer(ThreadingHTTPServer):
+    # Windows SO_REUSEADDR can bind a second server to an occupied port and keep
+    # delivering requests to the old server. Reject duplicate launches instead.
+    allow_reuse_address = False
+
+    def server_bind(self) -> None:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def make_server(port: int = DEFAULT_PORT, repo_root: str | Path = ".") -> ThreadingHTTPServer:
     """Build the demo server bound to 127.0.0.1 only."""
 
@@ -344,7 +367,7 @@ def make_server(port: int = DEFAULT_PORT, repo_root: str | Path = ".") -> Thread
         (DemoHTTPRequestHandler,),
         {"registry": _RunRegistry(), "repo_root": Path(repo_root)},
     )
-    return ThreadingHTTPServer((BIND_HOST, port), handler)
+    return DemoHTTPServer((BIND_HOST, port), handler)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -352,11 +375,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = parser.parse_args(argv)
 
-    server = make_server(port=args.port, repo_root=".")
+    try:
+        server = make_server(port=args.port, repo_root=".")
+    except OSError as exc:
+        if exc.errno in {errno.EADDRINUSE, errno.EACCES} or getattr(exc, "winerror", None) in {
+            10048,
+            10013,
+        }:
+            print(
+                f"Cannot bind demo port {args.port}: it is already in use or reserved. "
+                "Use the running demo, stop it in its original terminal, or choose another --port.",
+                file=sys.stderr,
+            )
+            return 2
+        raise
     host, port = server.server_address[:2]
     print(f"TraceJudge-Hy3 录屏演示服务已启动（仅本机）：http://{host}:{port}/")
     print(f"录制模式：http://{host}:{port}/?recording=1")
-    print("按 Ctrl+C 停止。")
+    print("按 Ctrl+C 停止。", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

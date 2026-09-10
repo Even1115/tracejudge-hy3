@@ -75,7 +75,7 @@ HumanEval/81, HumanEval/95, HumanEval/96, HumanEval/105, HumanEval/120
 
 `--selection-role research_natural --count 45 --seed 20260825 --exclude-manifest <pilot_manifest>` 会生成 schema v2 的研究子集 manifest：在 164 题中排除指定 Pilot manifest 的题号后，按同一算法取前 45 题；v2 manifest 额外记录 `selection_role`、`excluded_manifests`（含每个被排除 manifest 的 SHA256、角色与题号）、`excluded_problem_ids` 及其 SHA256、被排除 manifest 列表哈希。
 
-Pilot bundle 同样只有 `problems.jsonl` 和 `dataset_manifest.json`；后者（v1）额外绑定父 manifest SHA256、固定 seed、选择算法和题号列表，`experiment_label` 固定为 `humanevalplus_10_public_prompt_generation_pilot`。研究子集 bundle（v2）的 `experiment_label` 固定为 `humanevalplus_45_public_prompt_generation_research_natural`。`tracejudge dataset validate` 只离线验证 `ProblemSpec` JSONL 的 schema/重复 ID 等通用约束，不调用 Provider，也不执行任何代码或测试。完整的可复现命令见 README 的“HumanEval+ 固定 10 题阶段一 Pilot”和“HumanEval+ 45 题自然研究子集”。
+Pilot bundle 同样只有 `problems.jsonl` 和 `dataset_manifest.json`；后者（v1）额外绑定父 manifest SHA256、固定 seed、选择算法和题号列表，`experiment_label` 固定为 `humanevalplus_10_public_prompt_generation_pilot`。研究子集 bundle（v2）的 `experiment_label` 固定为 `humanevalplus_45_public_prompt_generation_research_natural`。`tracejudge dataset validate` 只离线验证 `ProblemSpec` JSONL 的 schema/重复 ID 等通用约束，不调用 Provider，也不执行任何代码或测试。完整的可复现命令见[运行与开发指南](running_and_development.md)中的历史 10 题 Pilot 和 45 题自然研究子集章节。
 
 ## `data/mock_responses/*.json`
 

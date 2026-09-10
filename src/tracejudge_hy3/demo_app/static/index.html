@@ -17,6 +17,8 @@
         </div>
       </div>
       <div class="header-actions">
+        <a class="recording-link" href="/?recording=1">全流程录制</a>
+        <button class="compact-button" id="open-costs">效果与成本</button>
         <nav class="view-switch" aria-label="页面切换">
           <button class="view-button active" data-view="demo" aria-pressed="true">评估演示</button>
           <button class="view-button" data-view="cases" aria-pressed="false">典型案例</button>
@@ -24,6 +26,19 @@
         <div class="mode-badge" id="mode-badge">待开始</div>
       </div>
     </header>
+
+    <section class="presenter" id="presenter" hidden aria-label="录制流程控制">
+      <div class="presenter-heading">
+        <div><span class="eyebrow" id="scene-count">01 / 08 · 展示步骤</span><h1 id="scene-title">从一条明确需求开始</h1></div>
+        <a class="workspace-link" href="/">返回工作台</a>
+      </div>
+      <p id="scene-note">先展示题目，再选择运行模式。</p>
+      <nav class="scene-tabs" id="scene-tabs" aria-label="展示步骤"></nav>
+      <div class="presenter-bottom">
+        <span id="scene-source" role="status">预置公开题目 · 等待开始</span>
+        <div class="scene-actions"><button id="scene-prev" disabled>上一幕</button><button id="scene-next" disabled>下一幕</button></div>
+      </div>
+    </section>
 
     <section class="page-view" id="page-demo">
     <nav class="captions" id="captions" aria-label="演示阶段字幕">
@@ -94,6 +109,19 @@
           <div class="card-head"><span class="card-index">06</span><h2>最小反例与错误证书</h2><em class="card-tag">可执行 · 可重放</em></div>
           <div class="card-body" id="certificate-body"><p class="placeholder">等待运行。</p></div>
         </article>
+        <article class="card" id="card-contrast" hidden>
+          <div class="card-head"><span class="card-index">07</span><h2>测试通过，解释仍可能错误</h2><em class="card-tag">已冻结公开案例</em></div>
+          <div class="card-body" id="contrast-body"><p class="placeholder">公开案例正在载入。</p></div>
+        </article>
+        <article class="card" id="card-costs">
+          <div class="card-head"><span class="card-index">COST</span><h2>效果与成本</h2><em class="card-tag">真实用量 · 分项统计</em></div>
+          <div class="card-body">
+            <h3>单条样本明细</h3>
+            <div id="sample-costs"><p class="placeholder">运行一条样本后显示 Solver 与 Judge 用量；历史运行未记录的数据无法补算。</p></div>
+            <h3 class="method-cost-heading">各评测方法的效果与成本</h3>
+            <div id="method-costs"><p class="placeholder">正在读取已发布研究报告…</p></div>
+          </div>
+        </article>
       </section>
 
       <aside class="sidebar">
@@ -129,6 +157,7 @@
 
         <div class="panel" id="status-panel">
           <h3>执行状态</h3>
+          <p class="execution-notice" id="execution-notice" role="status">尚未运行。下方步骤用于展示结果，不代表实时执行进度。</p>
           <ol class="stages" id="stages">
             <li data-stage="1"><i></i>题目载入</li>
             <li data-stage="2"><i></i>生成结构化解答</li>

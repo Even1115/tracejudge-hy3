@@ -1,0 +1,419 @@
+{
+  "schema": "tracejudge-public-four-dataset-configurations-v1",
+  "scope": "Recorded configurations only. Endpoint hashes/URLs, machine paths, credentials, raw prompts and candidates are withheld. Missing settings are not inferred. Local freeze commits need not exist in the GitHub object database.",
+  "humanevalplus": {
+    "generation_run_id": "phase1_20260905T085110677252Z_65d2a9ad3f12",
+    "provider": {
+      "provider": "hy3",
+      "model": "tencent/hy3",
+      "max_retries": 2,
+      "max_parse_repairs": 1,
+      "timeout_seconds": 120,
+      "reasoning_effort": "high",
+      "reasoning_effort_enabled": true
+    },
+    "generation_git": {
+      "commit": "10864227396fe82687998a1484e1ec17d939c709",
+      "dirty": false
+    },
+    "dataset": {
+      "dataset_id": "evalplus/humanevalplus",
+      "revision": "d32357cf319e50e9c8d8dab5ea876c72b0fd321b",
+      "manifest_sha256": "8b0efef0b09328d27b9d25ddea035337d4220486722f643f8cc2a3243f317222",
+      "ordered_problem_ids_sha256": "1e9abb2ec6b56a79cd60a9aadc01bd85c337fb30d521773357aeb059775c99e8",
+      "selection_algorithm": "all-pinned-task-ids-numeric-order-v1"
+    },
+    "recovery_git": {
+      "commit": "67085adb75cb64d349f6cb89ded3f27356b5c967",
+      "dirty": true,
+      "implementation_sha256": "5c9f3ab2af4bb775492ed47a9b9d3eb4d2f9b80154e5af4784358841eba9d5a6"
+    },
+    "original_execution_git": {
+      "commit": "10864227396fe82687998a1484e1ec17d939c709",
+      "dirty": true,
+      "implementation_sha256": "5c8c81659109a441ccf1aecad6704c17e50689f2bf3a5eb0771dc7c34ce0d2ca"
+    },
+    "recovery_execution": {
+      "per_task_outer_seconds": 180,
+      "task_parallelism": 1,
+      "executor": {
+        "name": "official_evalplus_docker",
+        "image": "ganler/evalplus@sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740",
+        "image_digest": "sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740",
+        "requested_platform": "linux/amd64",
+        "evalplus_version": "0.4.0.dev2",
+        "evalplus_commit": "f11cfb92c1d52896a87f988cbebbd74727d56c7e",
+        "python_version": "3.11.10",
+        "official_command": {
+          "dataset": "humaneval",
+          "gt_time_limit_factor": 4,
+          "min_time_limit_seconds": 4,
+          "parallel": 1,
+          "test_details": true
+        },
+        "reference_cache": {
+          "compression_level": 1,
+          "file_size_limit_unchanged": true,
+          "logical_pickle_contents": "unchanged",
+          "scope": "private_oracle_pickle_only",
+          "storage": "gzip-stream-v1"
+        }
+      }
+    },
+    "original_reference_cache": null,
+    "original_reference_cache_note": "The original executor manifest has no reference_cache field; no value is inferred.",
+    "limits": {
+      "cpus": "1",
+      "memory": "4g",
+      "memory_swap": "4g",
+      "tmpfs_size": "1g",
+      "pids_limit": 128,
+      "per_file_fsize_limit_bytes": 134217728,
+      "network": "none",
+      "read_only_root_filesystem": true,
+      "security_boundary": "basic_non_adversarial"
+    }
+  },
+  "mbppplus": {
+    "run_id": "mbpp120-v1",
+    "provider": {
+      "provider": "hy3",
+      "model": "tencent/hy3",
+      "max_retries": 2,
+      "max_parse_repairs": 1,
+      "timeout_seconds": 120,
+      "reasoning_effort": "high",
+      "reasoning_effort_enabled": true
+    },
+    "git": {
+      "commit": "1956f013eacf35bdd04cfbedad3535964869c633",
+      "dirty": false,
+      "implementation_sha256": "1cfc0f57f6c1ad642c491c923e61e33e4daaddb63bb4fdb63e19a56244ffc582"
+    },
+    "runtime_freeze_id": "910cc78164ccc5c0",
+    "frozen_file_count": 217,
+    "dataset": {
+      "dataset_id": "evalplus/mbppplus",
+      "revision": "64fc4195b858a17cdfdb3324f0baf37939144e14",
+      "release_tag": "v0.2.0",
+      "manifest_sha256": "031ebeaecf4210722a5702f7f85daf3b710b766348703c4a579bfd574ffa32cd",
+      "ordered_problem_ids_sha256": "7ca61a19a425211e2a3c8230999767c8c7519d6b9e42f721c249ea360301f43e",
+      "selection_algorithm": "sha256(seed\\0problem_id)-lowest-v1",
+      "selection_seed": 20260905
+    },
+    "selection": {
+      "count": 120,
+      "algorithm": "sha256(seed\\0problem_id)-lowest-v1",
+      "seed": 20260905,
+      "selected_problem_ids_sha256": "7ca61a19a425211e2a3c8230999767c8c7519d6b9e42f721c249ea360301f43e"
+    },
+    "execution": {
+      "batch_cleanup_grace_seconds": 5,
+      "batch_timeout_seconds": 14400,
+      "official_gt_time_limit_factor": 4,
+      "official_internal_timeout_cap_seconds": 60,
+      "official_min_time_limit_seconds": 4,
+      "official_parallel_per_task": 1,
+      "official_test_details": true,
+      "per_task_container_timeout_seconds": 180,
+      "task_parallelism": 1
+    },
+    "platform": {
+      "host_machine": "arm64",
+      "host_system": "Darwin",
+      "requested_platform": "linux/amd64"
+    },
+    "image": {
+      "image": "ganler/evalplus@sha256:26b118098bef281fe8dfe999bf05f1d5b45374b4e6c00161ec0f30592aef4740",
+      "image_id": "sha256:f9d1e7b55cae8a8c1548f15e7978502ec958bd5e6d41776a0a65ee0f92fe9c1e",
+      "architecture": "amd64",
+      "operating_system": "linux",
+      "platform": "linux/amd64"
+    },
+    "runtime": {
+      "evalplus_version": "0.4.0.dev2",
+      "evalplus_commit": "f11cfb92c1d52896a87f988cbebbd74727d56c7e",
+      "mbpp_plus_version": "v0.2.0",
+      "python_version": "3.11.10",
+      "dataset_task_count": 378,
+      "verified_task_count": 120
+    },
+    "generation_timing": {
+      "started_at": "2026-09-06T06:10:47.809Z",
+      "completed_at": "2026-09-06T07:14:43.638Z"
+    },
+    "execution_timing": {
+      "created_at": "2026-09-06T07:14:44.348Z",
+      "completed_at": "2026-09-06T08:07:46.828Z"
+    }
+  },
+  "codejudge_eval": {
+    "v3a_interrupted": {
+      "run_id": "v3a-20260905T083333Z",
+      "dataset_id": "codejudge-eval",
+      "dataset_revision": "6541deb0c42e56ec1300d94d4e9ae7b3b4cc764a",
+      "git_commit": "10864227396fe82687998a1484e1ec17d939c709",
+      "git_global_dirty": true,
+      "git_experiment_scope_clean": true,
+      "code_sha256": {
+        "scripts/run_codejudge_eval_v3.py": "5d83e86653080a947329b5efbdc9f1cda8304b2fecafaf0771e1a382db9cfd90",
+        "src/tracejudge_hy3/benchmark/codejudge_eval.py": "0f7955ffcc0cc3c1626b8dfdfd793c11eefbd5d21a2b4a27d430cc0ba47b5a21",
+        "src/tracejudge_hy3/benchmark/codejudge_v3.py": "683812d1054f439b9724e33673e44454f3a67b071352327d3ae82b16cad0c7eb",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_execution.py": "a29521dd4bd5de8b6af2b2a38dcf5e8a32cb88954a2be9a2507dbcf5c19a0e38",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_manifest.py": "aeb1e329f34834882602f58f5df792b2081c5b655cd301634f7596119827778e",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_metrics.py": "6350ebf7364e9b5a8b2c8a80f9dc6d38c8965b47cf3b8eb510a41fff932379ad",
+        "src/tracejudge_hy3/benchmark/contracts.py": "aa308f9ca732237ce6b8a7268d01e38372790e0eb53289a4c9df97aed9f58852",
+        "src/tracejudge_hy3/benchmark/hy3_judge_only.py": "8980dcc8d5152b5c754b250e43d3ed240aabba4b80fbd1882a3f842d5b43b9ec",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt.py": "0922dac4900786070107f8dddcbab7b1bdbf344f13b87fd96db64ce4be2f9d61",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt_v3.py": "6c56ddc00b2bab46268bf4f1ec173a3e5db01b3501dd59df8a5419635de95992",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt_v4.py": "53fccfd3bc6673e889ffebd1b66bcbe9060579c12d8c0f34e8220c3ea28047c4",
+        "src/tracejudge_hy3/config.py": "ed18f2a02474890eaa51c68300c9e8199599b0a0a10e933129d7a33f19d2197f",
+        "src/tracejudge_hy3/exceptions.py": "1317453ce848b32ad58fae278cd3e6922bffd61c89dce615f4209e64e112e4ee",
+        "src/tracejudge_hy3/logging_config.py": "8cbc138a45fe1ec8bf10e24d32d308501debd84eb99d05b3787a5c2373b13c51",
+        "src/tracejudge_hy3/schemas/evaluation.py": "e1e350eb70361bf03edb3e9688a5db97ddaed6ae76d5044dcd60a380c3aca23e"
+      },
+      "dependency_lock_sha256": {
+        "requirements/phase4-py312-constraints.txt": "8b847326f7957f5f0bd2e8c5a9b5910ffc7fb0a2087fbdde5162ad3cd49aef1d",
+        "uv.lock": "d6c9ba5c7f569d4a5dea7cc072d87a7b0c549d0d8d00ebdc9098ddf1a0c4a287"
+      },
+      "python_version": "3.12.14",
+      "prompt_bundle_version": "codejudge_eval_judge_only_v4",
+      "prompt_bundle_sha256": "7a5657d6df18167fc064ae32a696e7d427e4e5cb90f794a50fb6969408ea6d4a",
+      "protocol_sha256": "77f985dfc1148a666e55bce81ae970441597b4156df0e289808476f7ea9804eb",
+      "selection_file_sha256": "79a7777d936520d2f687152feba58b9635f80b21e3dbcc37da0dc686687065e5",
+      "selection_entries_sha256": "877d52d60a124220386eb61524c772d9ffa605d54462915a3b6dbbf669790c87",
+      "planned_calls_sha256": "59376dd2b6f31398c251724c2917bfddd526744631b22eb7237f90f7c0357e69",
+      "planned_call_n": 120,
+      "selection_algorithm": "codejudge_eval_v3a:hard_file_labels;exclude_full_v1_task_ids;one_candidate_per_task=min_data_id_in_stratum;random.Random(20260905).sample per stratum,order=AC,CE,WA,RE,TLE,MIXED;preregistered_degradation=fixed_order_redistribution,AC_fail_closed",
+      "metrics_policy": {
+        "a_bootstrap_seed": 20260907,
+        "a_primary": "balanced_accuracy_full_gold_class_denominators",
+        "b_bootstrap_seed": 20260908,
+        "b_failure_rate_limit": 0.05,
+        "b_holm_family_size": 3,
+        "b_missingness": "no_imputation_complete_pairs",
+        "b_native_label_bootstrap_seed_offset": 100,
+        "b_paired_difference_interval": "candidate_percentile_bootstrap",
+        "b_primary": "three_complete_pair_exact_mcnemar_tests",
+        "bootstrap_resamples": 10000
+      },
+      "provider": {
+        "provider": "hy3",
+        "model": "tencent/hy3",
+        "reasoning_effort": "high",
+        "temperature": 0,
+        "timeout_seconds": 120,
+        "max_retries": 2
+      },
+      "receipt_timing": {
+        "started_at": "2026-09-05T08:33:34.153175+00:00",
+        "completed_at": "2026-09-05T10:11:09.386505+00:00",
+        "duration_seconds": 5855.23333
+      }
+    },
+    "v3a_complete": {
+      "run_id": "v3a-20260905T103721Z",
+      "dataset_id": "codejudge-eval",
+      "dataset_revision": "6541deb0c42e56ec1300d94d4e9ae7b3b4cc764a",
+      "git_commit": "10864227396fe82687998a1484e1ec17d939c709",
+      "git_global_dirty": true,
+      "git_experiment_scope_clean": true,
+      "code_sha256": {
+        "scripts/run_codejudge_eval_v3.py": "5d83e86653080a947329b5efbdc9f1cda8304b2fecafaf0771e1a382db9cfd90",
+        "src/tracejudge_hy3/benchmark/codejudge_eval.py": "0f7955ffcc0cc3c1626b8dfdfd793c11eefbd5d21a2b4a27d430cc0ba47b5a21",
+        "src/tracejudge_hy3/benchmark/codejudge_v3.py": "683812d1054f439b9724e33673e44454f3a67b071352327d3ae82b16cad0c7eb",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_execution.py": "a29521dd4bd5de8b6af2b2a38dcf5e8a32cb88954a2be9a2507dbcf5c19a0e38",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_manifest.py": "aeb1e329f34834882602f58f5df792b2081c5b655cd301634f7596119827778e",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_metrics.py": "6350ebf7364e9b5a8b2c8a80f9dc6d38c8965b47cf3b8eb510a41fff932379ad",
+        "src/tracejudge_hy3/benchmark/contracts.py": "aa308f9ca732237ce6b8a7268d01e38372790e0eb53289a4c9df97aed9f58852",
+        "src/tracejudge_hy3/benchmark/hy3_judge_only.py": "8980dcc8d5152b5c754b250e43d3ed240aabba4b80fbd1882a3f842d5b43b9ec",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt.py": "0922dac4900786070107f8dddcbab7b1bdbf344f13b87fd96db64ce4be2f9d61",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt_v3.py": "6c56ddc00b2bab46268bf4f1ec173a3e5db01b3501dd59df8a5419635de95992",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt_v4.py": "53fccfd3bc6673e889ffebd1b66bcbe9060579c12d8c0f34e8220c3ea28047c4",
+        "src/tracejudge_hy3/config.py": "ed18f2a02474890eaa51c68300c9e8199599b0a0a10e933129d7a33f19d2197f",
+        "src/tracejudge_hy3/exceptions.py": "1317453ce848b32ad58fae278cd3e6922bffd61c89dce615f4209e64e112e4ee",
+        "src/tracejudge_hy3/logging_config.py": "8cbc138a45fe1ec8bf10e24d32d308501debd84eb99d05b3787a5c2373b13c51",
+        "src/tracejudge_hy3/schemas/evaluation.py": "e1e350eb70361bf03edb3e9688a5db97ddaed6ae76d5044dcd60a380c3aca23e"
+      },
+      "dependency_lock_sha256": {
+        "requirements/phase4-py312-constraints.txt": "8b847326f7957f5f0bd2e8c5a9b5910ffc7fb0a2087fbdde5162ad3cd49aef1d",
+        "uv.lock": "d6c9ba5c7f569d4a5dea7cc072d87a7b0c549d0d8d00ebdc9098ddf1a0c4a287"
+      },
+      "python_version": "3.12.14",
+      "prompt_bundle_version": "codejudge_eval_judge_only_v4",
+      "prompt_bundle_sha256": "7a5657d6df18167fc064ae32a696e7d427e4e5cb90f794a50fb6969408ea6d4a",
+      "protocol_sha256": "77f985dfc1148a666e55bce81ae970441597b4156df0e289808476f7ea9804eb",
+      "selection_file_sha256": "79a7777d936520d2f687152feba58b9635f80b21e3dbcc37da0dc686687065e5",
+      "selection_entries_sha256": "877d52d60a124220386eb61524c772d9ffa605d54462915a3b6dbbf669790c87",
+      "planned_calls_sha256": "59376dd2b6f31398c251724c2917bfddd526744631b22eb7237f90f7c0357e69",
+      "planned_call_n": 120,
+      "selection_algorithm": "codejudge_eval_v3a:hard_file_labels;exclude_full_v1_task_ids;one_candidate_per_task=min_data_id_in_stratum;random.Random(20260905).sample per stratum,order=AC,CE,WA,RE,TLE,MIXED;preregistered_degradation=fixed_order_redistribution,AC_fail_closed",
+      "metrics_policy": {
+        "a_bootstrap_seed": 20260907,
+        "a_primary": "balanced_accuracy_full_gold_class_denominators",
+        "b_bootstrap_seed": 20260908,
+        "b_failure_rate_limit": 0.05,
+        "b_holm_family_size": 3,
+        "b_missingness": "no_imputation_complete_pairs",
+        "b_native_label_bootstrap_seed_offset": 100,
+        "b_paired_difference_interval": "candidate_percentile_bootstrap",
+        "b_primary": "three_complete_pair_exact_mcnemar_tests",
+        "bootstrap_resamples": 10000
+      },
+      "provider": {
+        "provider": "hy3",
+        "model": "tencent/hy3",
+        "reasoning_effort": "high",
+        "temperature": 0,
+        "timeout_seconds": 120,
+        "max_retries": 2
+      },
+      "receipt_timing": {
+        "started_at": "2026-09-05T10:37:22.469559+00:00",
+        "completed_at": "2026-09-05T12:01:06.345546+00:00",
+        "duration_seconds": 5023.875987
+      }
+    },
+    "v3b": {
+      "run_id": "v3b-20260905T120255Z",
+      "dataset_id": "codejudge-eval",
+      "dataset_revision": "6541deb0c42e56ec1300d94d4e9ae7b3b4cc764a",
+      "git_commit": "10864227396fe82687998a1484e1ec17d939c709",
+      "git_global_dirty": true,
+      "git_experiment_scope_clean": true,
+      "code_sha256": {
+        "scripts/run_codejudge_eval_v3.py": "5d83e86653080a947329b5efbdc9f1cda8304b2fecafaf0771e1a382db9cfd90",
+        "src/tracejudge_hy3/benchmark/codejudge_eval.py": "0f7955ffcc0cc3c1626b8dfdfd793c11eefbd5d21a2b4a27d430cc0ba47b5a21",
+        "src/tracejudge_hy3/benchmark/codejudge_v3.py": "683812d1054f439b9724e33673e44454f3a67b071352327d3ae82b16cad0c7eb",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_execution.py": "a29521dd4bd5de8b6af2b2a38dcf5e8a32cb88954a2be9a2507dbcf5c19a0e38",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_manifest.py": "aeb1e329f34834882602f58f5df792b2081c5b655cd301634f7596119827778e",
+        "src/tracejudge_hy3/benchmark/codejudge_v3_metrics.py": "6350ebf7364e9b5a8b2c8a80f9dc6d38c8965b47cf3b8eb510a41fff932379ad",
+        "src/tracejudge_hy3/benchmark/contracts.py": "aa308f9ca732237ce6b8a7268d01e38372790e0eb53289a4c9df97aed9f58852",
+        "src/tracejudge_hy3/benchmark/hy3_judge_only.py": "8980dcc8d5152b5c754b250e43d3ed240aabba4b80fbd1882a3f842d5b43b9ec",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt.py": "0922dac4900786070107f8dddcbab7b1bdbf344f13b87fd96db64ce4be2f9d61",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt_v3.py": "6c56ddc00b2bab46268bf4f1ec173a3e5db01b3501dd59df8a5419635de95992",
+        "src/tracejudge_hy3/benchmark/judge_only_prompt_v4.py": "53fccfd3bc6673e889ffebd1b66bcbe9060579c12d8c0f34e8220c3ea28047c4",
+        "src/tracejudge_hy3/config.py": "ed18f2a02474890eaa51c68300c9e8199599b0a0a10e933129d7a33f19d2197f",
+        "src/tracejudge_hy3/exceptions.py": "1317453ce848b32ad58fae278cd3e6922bffd61c89dce615f4209e64e112e4ee",
+        "src/tracejudge_hy3/logging_config.py": "8cbc138a45fe1ec8bf10e24d32d308501debd84eb99d05b3787a5c2373b13c51",
+        "src/tracejudge_hy3/schemas/evaluation.py": "e1e350eb70361bf03edb3e9688a5db97ddaed6ae76d5044dcd60a380c3aca23e"
+      },
+      "dependency_lock_sha256": {
+        "requirements/phase4-py312-constraints.txt": "8b847326f7957f5f0bd2e8c5a9b5910ffc7fb0a2087fbdde5162ad3cd49aef1d",
+        "uv.lock": "d6c9ba5c7f569d4a5dea7cc072d87a7b0c549d0d8d00ebdc9098ddf1a0c4a287"
+      },
+      "python_version": "3.12.14",
+      "prompt_bundle_version": "codejudge_eval_judge_only_v4",
+      "prompt_bundle_sha256": "7a5657d6df18167fc064ae32a696e7d427e4e5cb90f794a50fb6969408ea6d4a",
+      "protocol_sha256": "77f985dfc1148a666e55bce81ae970441597b4156df0e289808476f7ea9804eb",
+      "selection_file_sha256": "cd8b077e08646b5a126f0d9f83198919e35840be206a86a367e126b43f671676",
+      "selection_entries_sha256": "7c5ebf615ab4632362321e313c8a62d28456ea5bffe12d064680229adf1db202",
+      "planned_calls_sha256": "5ace44497cf974d4e548fb8409ff3c65d06ada5e7412e33c11597c89121e1170",
+      "planned_call_n": 150,
+      "selection_algorithm": "codejudge_eval_v3b:paired_same_candidate_three_granularities;exclude_full_v1_and_v3a_task_ids;stratify=hard_gold_class;random.Random(20260906).sample per class;one_candidate_per_task=min_data_id;call_order=latin_square_rotation_by_entry_index_mod_3;preregistered_degradation=fixed_order_redistribution,AC_fail_closed",
+      "metrics_policy": {
+        "a_bootstrap_seed": 20260907,
+        "a_primary": "balanced_accuracy_full_gold_class_denominators",
+        "b_bootstrap_seed": 20260908,
+        "b_failure_rate_limit": 0.05,
+        "b_holm_family_size": 3,
+        "b_missingness": "no_imputation_complete_pairs",
+        "b_native_label_bootstrap_seed_offset": 100,
+        "b_paired_difference_interval": "candidate_percentile_bootstrap",
+        "b_primary": "three_complete_pair_exact_mcnemar_tests",
+        "bootstrap_resamples": 10000
+      },
+      "provider": {
+        "provider": "hy3",
+        "model": "tencent/hy3",
+        "reasoning_effort": "high",
+        "temperature": 0,
+        "timeout_seconds": 120,
+        "max_retries": 2
+      },
+      "receipt_timing": {
+        "started_at": "2026-09-05T12:02:56.301716+00:00",
+        "completed_at": "2026-09-05T13:46:49.855034+00:00",
+        "duration_seconds": 6233.553318
+      }
+    }
+  },
+  "livecodebench": {
+    "run_id": "lcb60-windows-20260906-v2",
+    "runtime_freeze_id": "f4249a0448427578",
+    "runtime_commit": "0096a408f7703aabf1fadd7dd38400290d74438d",
+    "runtime_git_clean": true,
+    "source_identity_sha256": "cbc6e1b6029da63037125ea5e6a3966ffb2837ab0335bfcdce116ecccbc2c6c7",
+    "freeze_manifest_sha256": "197383a4fa4e4687fc9215e16c057c4905ea3debcde7a09a597d25a9b6f7092f",
+    "python": "3.12.3",
+    "dependencies": {
+      "openai": "3.8.0",
+      "pydantic": "2.13.5",
+      "pydantic-settings": "2.15.0",
+      "rich": "15.0.0",
+      "typer": "0.27.2"
+    },
+    "provider": {
+      "provider": "hy3",
+      "model": "tencent/hy3",
+      "reasoning_effort": "high",
+      "reasoning_effort_enabled": true,
+      "timeout_seconds": 120.0,
+      "max_retries": 2,
+      "max_parse_repairs": 1,
+      "stdio_prompt_sha256": "5e8803b396db03bcd16a9feda8ad36176d1f76750b11eff2863a1ae73af256b0"
+    },
+    "dataset": {
+      "dataset_id": "livecodebench/code_generation_lite",
+      "release": "release_v6",
+      "revision": "0fe84c3912ea0c4d4a78037083943e8f0c4dd505",
+      "selection_protocol": {
+        "algorithm": "lcb60-stdio-window-2024-06-01..2025-04-30-difficulty-stratified-20-sha256(seed,NUL,question_id)-lowest-v1",
+        "seed": 20260904,
+        "strata": [
+          "easy",
+          "medium",
+          "hard"
+        ],
+        "stratum_size": 20,
+        "total_count": 60,
+        "window_end": "2025-04-30",
+        "window_start": "2024-06-01"
+      },
+      "ordered_ids_sha256": "01a4b6bbf91d8337530f005e34b3caf8b9f19fecb46510f98329dbc958d4017e",
+      "selection_file_sha256": "bb30680876e0f1780954fa92c208704a8d50529c2bf240e1a396d61005daf381",
+      "public_tasks_sha256": "77f4675933db2d604e9b4f372361cab6ab9dc64f3fb8378bb3c3a23b82670ca8"
+    },
+    "platform": {
+      "host": "Windows with WSL2 Ubuntu-24.04",
+      "architecture": "x86_64",
+      "container_platform": "linux/amd64"
+    },
+    "image": {
+      "identity_type": "docker_local_image_id",
+      "value": "sha256:98466e5add3e7198167d81f098a3005b285a5daca4b9ae7ceb70b7bbb9e070c2"
+    },
+    "checker_commit": "28fef95ea8c9f7a547c8329f2cd3d32b92c1fa24",
+    "limits": {
+      "cleanup_timeout_seconds": 10.0,
+      "cpus": "1",
+      "inspect_timeout_seconds": 30.0,
+      "memory": "4g",
+      "per_task_timeout_seconds": 600,
+      "pids": 128,
+      "tmpfs_size": "1g"
+    },
+    "per_test_timeout_seconds": 6,
+    "concurrent_containers": 1,
+    "prompt_version": "lcb-stdio-solution-trace-v1",
+    "prompt_sha256": "5e8803b396db03bcd16a9feda8ad36176d1f76750b11eff2863a1ae73af256b0",
+    "uv_lock_sha256": "d6c9ba5c7f569d4a5dea7cc072d87a7b0c549d0d8d00ebdc9098ddf1a0c4a287",
+    "smoke_receipt_sha256": "12d454b494841e0f4772501c74592c3ae62a139430dff515c0b5fea801bd5e37",
+    "execution_source_sha256": {
+      "src/tracejudge_hy3/lcb/docker_runner.py": "1f44e809a3e0d78ebd127d8e66134ae782fd70a3bb4d68917212d31da3b69087",
+      "src/tracejudge_hy3/lcb/container_entrypoint.py": "6ff1840f36f5eafb36e4e32621dd06a7e82a57dc7b82e85309d9b7fb31b83d84",
+      "src/tracejudge_hy3/benchmark/livecodebench.py": "f5dce4bdf4a739f625c612b53e33f68be891d48627f0a2bd607cab313821a693"
+    },
+    "provider_source_sha256": "46ffb1e760e4285715a2d071666d2a10fcae3594a424df5332f78690e08e6633"
+  }
+}

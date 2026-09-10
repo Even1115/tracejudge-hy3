@@ -4,17 +4,21 @@
 
 犀牛鸟开源实战任务 2「可验证场景：过程评估与错误定位」个人／活动作品。项目由参与者独立实现，非腾讯官方发布。
 
-[观看演示](#演示视频) · [启动工作台](#快速体验) · [查看实验发现](#实验发现) · [成果与复现入口](#成果导航)
+[一页成果总览](docs/contest_results_overview.md) · [启动工作台](#快速体验) · [观看演示](#演示视频) · [查看实验发现](#实验发现) · [成果与复现入口](#成果导航)
+
+**更新至 2026-09-10 的工作副本。** 面向需要检查 AI 生成代码的开发者与评测人员，提供“生成结构化解答 → 检查过程 → 定位错误 → 查看证据”的工作流。评估对象是模型输出的解题说明与代码，不是模型内部思维。
+
+第一次访问建议先读[一页成果总览](docs/contest_results_overview.md)：两个典型案例、主要实验结论与证据边界集中在一页。要直接体验，请使用[无需 API Key 的公开 Fixture](#快速体验)；真实 Hy3 模式另行配置。
 
 ## 演示视频
 
-从题目与需求出发，展示结构化解答、过程评估、错误定位和证据验证。点击下方 12 秒摘要预览，观看 **74 秒公开 Fixture 演示**。
+下方为 **2026-09-10 当前工作台的 16 秒循环预览**：九幕录制入口 → 公开过程失配案例 → 最新补充验证 → 五轮消融结论。点击预览可观看 **86 秒新版演示视频**。
 
-[![TraceJudge-Hy3 解题与过程评估流程预览](docs/demo/assets/tracejudge_hy3_preview.gif)](docs/demo/assets/tracejudge_hy3_contest_demo.mp4)
+[![2026-09-10 工作台预览：九幕入口、过程失配案例、最新验证与五轮消融](docs/demo/assets/tracejudge_hy3_preview.gif)](docs/demo/assets/tracejudge_hy3_contest_demo.mp4)
 
-[观看 MP4](docs/demo/assets/tracejudge_hy3_contest_demo.mp4) · [全流程录制脚本](docs/demo/full_flow_storyboard.md)
+[观看新版 86 秒演示视频](docs/demo/assets/tracejudge_hy3_contest_demo.mp4) · [一页成果总览](docs/contest_results_overview.md) · [全流程录制脚本](docs/demo/full_flow_storyboard.md)
 
-> 当前视频由公开 Fixture（预置样例）与冻结结果画面生成，未录制实时 Hy3 调用。最终提交用的两分钟内 Hy3 全流程视频待录制；完成后更新此入口。旧视频中的实验状态以本文链接的最新报告为准。
+> 新版 MP4 为 2026-09-10 本地工作台录屏，时长 86.313 秒、分辨率 2560×1600，展示启动检查、真实 Hy3 运行模式及结果页面；具体调用和结果以画面中的运行状态与来源标识为准。GIF 和下方截图由已有公开案例与核验结果生成。
 
 ## 一个案例：测试通过，说明与实现却不一致
 
@@ -29,7 +33,9 @@
 
 **测试验证了被执行代码的行为；过程评估进一步检查代码是否实现了它声称的方案。** 这里的“推理”指模型输出的解题说明与实现计划，评估对象是这些可观察内容。
 
-![公开 reasoning_swap 案例：Test-only 检出 0/3，四种 Judge 均检出 3/3](docs/releases/phase4/charts/contest_showcase_v1/04_reasoning_swap_detection.svg)
+![2026-09-10 工作台第 7 幕：公开测试通过，但解题说明与代码矛盾](docs/demo/assets/tracejudge_hy3_process_case_20260910.png)
+
+上图为当前页面的公开冻结案例。历史三条样本的[检出统计图（Test-only 0/3，四种 Judge 各 3/3）](docs/releases/phase4/charts/contest_showcase_v1/04_reasoning_swap_detection.svg)保留供核对。
 
 同类 3 条公开构造轨迹中，Test-only 检出 **0/3**，四种 Judge 均检出 **3/3**。这是小样本机制展示，不能据此声称 Full 优于其余 Judge。另一个 `boundary_deletion` 案例删去空输入处理，可展示失败反例与证书重放；两种案例分别说明过程失配和功能失败。[案例与统计依据](docs/releases/phase4/phase3_research_report_public_v1.md)
 
@@ -68,7 +74,25 @@ flowchart LR
 
 以下分别展示**过程评估器的验证结果**和 **Hy3 在外部任务上的表现**。两类实验的对象、标签和分母不同，分别解释。
 
-### 过程评估：检测与定位各有取舍
+### 近期过程验证：有效性、稳定性与定位分开报告
+
+![2026-09-10 最新补充验证：36 条开发集、五轮冻结消融重复、3 条构造定位探针及各自限制](docs/demo/assets/tracejudge_hy3_current_validation_20260910.png)
+
+截图来自工作台第 8 幕“最新补充验证”，与下表使用相同口径；点击图片可查看原始分辨率。
+
+| 实验与范围 | 已核验的结果 | 能说明什么 |
+| --- | --- | --- |
+| **36 条 MBPP 开发样本**；基线与需求—假设核对，使用修订标签 v2 离线重计分 | 两方法均为准确率 **33/36**、错误召回 **2/5**、误报 **0/31** | 本轮两方法持平；仍漏检 3 条错误，不能只看总准确率 |
+| **12 条试点 × 4 个证据条件 × 5 轮**；冻结原标签与方案 | `max_product` 在 D 条件仅 **2/5** 轮检出；`division_elements` **0/20** 检出 | 单轮优势未稳定复现，增加证据不保证更好 |
+| **3 条构造探针 × 2 方法**；最新定位规范 v2 真实运行 | 两方法各 **3/3** 检出、层级 **3/3**、步骤 **1/3**、结构化位置精确匹配 **0/3**；共 **8** 次请求 | 检出、层级和精确定位是不同能力；本轮没有 `code_span` 格式失败 |
+
+36 条使用同一批既有预测：标签从 32 成立 / 4 错误修订为 31 成立 / 5 错误后，准确率由 32/36 变为 33/36，**这是标签变化，不是模型提升**。标签含单人 AI 辅助开发复核，`tuple_str_int` 修订已接触两方法预测，不是独立盲审。新定位规范只在三个探针上运行，未在这 36 条上重跑。
+
+三个探针都是错误样本，不能估计总体误报率；补充“同源引用覆盖”两方法均为 1/3，独立于旧精确匹配指标，属于事后机械引用分析。`judge_raw` 与规则合并视图一致，本轮规则未改变判断。另有 **81 条保留集继续封存，未提供保留集成绩**。
+
+[开发标签复核与重计分](docs/experiments/process-method-validation-v2-repair.md) · [五轮重复验证](docs/experiments/process-pilot-repetition-v1.md) · [定位规范与独立指标定义](docs/experiments/process-location-format-v2.md) · [最新运行数字及来源](docs/contest_results_overview.md#结果与证据)
+
+### 历史 57 条研究：检测与定位各有取舍
 
 固定 **42 条自然轨迹 + 15 条公开反事实 = 57 条轨迹**，比较五种方法，共 **285 个配对判断，283 个有效、2 个 Provider 失败**。
 
@@ -89,9 +113,9 @@ flowchart LR
 
 这些是探索性结果。自然集的预注册比较未发现 Full 优于 Test-only 或 Direct Judge 的证据；研究仅有 3 个反事实父题，不能据此建立普遍优势或组件因果增益。[研究报告、区间与配对分析](docs/releases/phase4/phase3_research_report_public_v1.md)
 
-### 外部任务：增强测试揭示遗漏，代码判断仍需降低误报
+### 历史外部任务：增强测试揭示遗漏，代码判断仍需降低误报
 
-最新汇总版本为 `four-dataset-interim-v1`，结果截至 **2026-09-06 21:40:09（北京时间）**。
+以下是 `four-dataset-interim-v1` 的历史汇总，结果截至 **2026-09-06 21:40:09（北京时间）**。该表保留原运行范围，不与后续 MBPP 过程评估或新运行混合计分。
 
 | 数据集与任务 | 本轮覆盖 | 主要结果 | 完成状态 |
 | --- | --- | --- | --- |
@@ -118,9 +142,11 @@ CodeJudge v3-B 使用**同一 50 个候选 × 3 种输出标签粒度**。三组
 
 ### 当前版本状态
 
-本文描述 **2026-09-07 当前工作版**；`v0.1.0` 及冻结报告保留各自的历史范围。Web 工作台、完整 HumanEval+ 164 题和 MBPP+ 固定 120 题已有实现或结果，后续工作见文末。
+本文描述 **2026-09-10 工作副本**；`v0.1.0`、历史 57 条研究和四数据集报告各保留自己的版本与来源。工作台已有评估演示、典型案例、方法对比和证据消融入口；后两者读取各自明确绑定的历史运行，不会随新实验自动更新。近期 36 条重计分、五轮重复及新定位探针从上述文档入口查看。
 
-当前四数据集报告、证据包与新增 Demo 改动尚未全部进入 Git 版本记录，对外提交状态待确认。现有工作台已展示历史五方法与成本；最新四数据集报告目前从上述文档入口查看，尚未接入页面实验总览。
+新定位实现的关联回归 **117 项通过**；本轮未运行全套件，不能据此宣称全套件通过。来源和数据不匹配时，报告加载器拒绝计分或展示；失败请求、预算、脱敏诊断和重试均留痕。
+
+**发布范围说明：** `artifacts/` 中的原始运行记录默认被 Git 忽略。本地已完成实验不等于这些记录已随公开仓库发布；仅克隆源码不能保证重放全部本地实验。公开文档用于阅读结论，完整复核还需对应配置所绑定的材料。本文更新不代表已完成提交包验收或发布。
 
 ## 可信度与成本
 
@@ -212,6 +238,8 @@ python3 -m venv .venv
 
 | 想深入了解什么 | 对应材料 |
 | --- | --- |
+| 两分钟了解项目价值、最新成果和限制 | [一页成果总览](docs/contest_results_overview.md) |
+| 近期开发集、重复验证与定位规范 | [36 条标签复核与重计分](docs/experiments/process-method-validation-v2-repair.md) · [五轮重复报告](docs/experiments/process-pilot-repetition-v1.md) · [新定位规范与指标](docs/experiments/process-location-format-v2.md) |
 | 设计依据、系统结构与错误分类 | [完整设计方案（含历史规划）](TraceJudge-Hy3：基于四层对齐与可执行错误证书的代码生成过程评估系统.md) · [架构](docs/architecture.md) · [数据模型](docs/data_format.md) · [实现状态](IMPLEMENTATION_STATUS.md) |
 | 过程评估效果、首错、误报与案例 | [结果总览](docs/releases/phase4/phase4_contest_results_overview_v1.md) · [完整研究报告](docs/releases/phase4/phase3_research_report_public_v1.md) |
 | 四个外部数据集的成绩与边界 | [四数据集报告](docs/four_dataset_evaluation_report.md) · [CSV 指标](docs/evaluation_release/2026-09-06-four-datasets-v1/summary.csv) · [机器可读汇总](docs/evaluation_release/2026-09-06-four-datasets-v1/results.json) |
@@ -221,6 +249,6 @@ python3 -m venv .venv
 | 演示、视频与样本成本 | [演示素材说明](docs/demo/README.md) · [全流程脚本与成本口径](docs/demo/full_flow_storyboard.md) |
 | 运行、开发与历史实验命令 | [运行与开发指南](docs/running_and_development.md) · [阶段三协议](docs/experiments/phase3_protocol.md) · [阶段四协议](docs/experiments/phase4_protocol.md) |
 
-当前优先推进：补齐 LCB 两题服务失败、录制正式 Hy3 视频、把四数据集结果接入工作台；随后围绕正确程序误报和等价实现扩展配对样本、人工复核与多次重复实验。跨运行比较、多模型 Judge、通用属性测试和仓库级任务仍是后续方向。
+新版演示视频已经接入；提交前优先完成干净目录启动验证与公开材料完整性检查。现有实验版本与保留集状态保持明确；更大样本的独立验证、误报改善和更精细的定位设计留待后续，不把待办写成已完成成果。
 
 代码采用 [MIT License](LICENSE)。公开演示样例为项目自建；外部数据版本、来源与使用范围见[配置及来源清单](docs/evaluation_release/2026-09-06-four-datasets-v1/README.md)。本项目通过用户配置的 Hy3 服务调用模型，不训练或微调模型。

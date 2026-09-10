@@ -12,13 +12,13 @@
 
 ## 演示视频
 
-下方为 **2026-09-10 当前工作台的 16 秒循环预览**：九幕录制入口 → 公开过程失配案例 → 最新补充验证 → 五轮消融结论。点击预览可观看 **86 秒新版演示视频**。
+下方为 **2026-09-10 当前工作台的 16 秒循环预览**：九幕录制入口 → 公开过程失配案例 → 最新补充验证 → 五轮消融结论。点击预览可观看 **107 秒新版演示视频**。
 
 [![2026-09-10 工作台预览：九幕入口、过程失配案例、最新验证与五轮消融](docs/demo/assets/tracejudge_hy3_preview.gif)](docs/demo/assets/tracejudge_hy3_contest_demo.mp4)
 
-[观看新版 86 秒演示视频](docs/demo/assets/tracejudge_hy3_contest_demo.mp4) · [一页成果总览](docs/contest_results_overview.md) · [全流程录制脚本](docs/demo/full_flow_storyboard.md)
+[观看新版 107 秒演示视频](docs/demo/assets/tracejudge_hy3_contest_demo.mp4) · [一页成果总览](docs/contest_results_overview.md) · [全流程录制脚本](docs/demo/full_flow_storyboard.md)
 
-> 新版 MP4 为 2026-09-10 本地工作台录屏，时长 86.313 秒、分辨率 2560×1600，展示启动检查、真实 Hy3 运行模式及结果页面；具体调用和结果以画面中的运行状态与来源标识为准。GIF 和下方截图由已有公开案例与核验结果生成。
+> 新版 MP4 为 2026-09-10 本地工作台录屏，时长 107 秒；具体演示内容、模型调用和结果以画面中的运行状态与来源标识为准。GIF 和下方截图由已有公开案例与核验结果生成。
 
 ## 一个案例：测试通过，说明与实现却不一致
 
@@ -249,6 +249,6 @@ python3 -m venv .venv
 | 演示、视频与样本成本 | [演示素材说明](docs/demo/README.md) · [全流程脚本与成本口径](docs/demo/full_flow_storyboard.md) |
 | 运行、开发与历史实验命令 | [运行与开发指南](docs/running_and_development.md) · [阶段三协议](docs/experiments/phase3_protocol.md) · [阶段四协议](docs/experiments/phase4_protocol.md) |
 
-新版演示视频已经接入；提交前优先完成干净目录启动验证与公开材料完整性检查。现有实验版本与保留集状态保持明确；更大样本的独立验证、误报改善和更精细的定位设计留待后续，不把待办写成已完成成果。
+107 秒新版演示视频已接入。源码与配套材料已在独立目录复用现有 Python 依赖完成只读启动检查；这不等于全新环境安装验收或完整实验数据包。现有实验版本与保留集状态保持明确；更大样本的独立验证、误报改善和更精细的定位设计留待后续，不把待办写成已完成成果。
 
 代码采用 [MIT License](LICENSE)。公开演示样例为项目自建；外部数据版本、来源与使用范围见[配置及来源清单](docs/evaluation_release/2026-09-06-four-datasets-v1/README.md)。本项目通过用户配置的 Hy3 服务调用模型，不训练或微调模型。

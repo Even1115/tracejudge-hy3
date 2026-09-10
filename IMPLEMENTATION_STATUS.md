@@ -14,7 +14,7 @@
 | MBPP+ | 已完成接入与固定 120/378 子集评测，120/120 有效执行，Base+Extra 95/120；尚非 378 题全量成绩。 |
 | LiveCodeBench | 固定 60 题中 58 题有效执行、53 题通过；另外两题 Provider 失败，`complete=false`。 |
 | CodeJudge-Eval | v3-A 的 120 个平衡候选、v3-B 的同一 50 个候选 × 3 个标签粒度条件均完成约定轮次；这是外部代码 judge-only 评测，不直接验证过程定位。 |
-| 演示视频 | 已有 [74 秒公开 Fixture 预演](docs/demo/assets/tracejudge_hy3_contest_demo.mp4)；包含实时 Hy3 解题与评估的正式视频待录制。 |
+| 演示视频（2026-09-10 更新） | 发布入口已替换为 [107 秒新版工作台录屏](docs/demo/assets/tracejudge_hy3_contest_demo.mp4)；具体演示内容、模型调用与结果以画面内标识为准。 |
 
 四数据集状态以[阶段性综合报告](docs/four_dataset_evaluation_report.md)为准，统计截至 **2026-09-06 21:40:09（北京时间）**。截至本页更新，四数据集报告与证据包、新 Demo 改动仍有未提交内容；本地完成不等于已进入公开 Release。生成任务成绩、外部代码判断和下文的 57 条过程评估实验分开报告，不汇成一个总准确率。
 

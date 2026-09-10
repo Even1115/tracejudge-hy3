@@ -13,7 +13,7 @@ README 的 GIF、截图和主 MP4 已更新为 2026-09-10 当前工作台画面�
 
 ## 交付物
 
-- [`assets/tracejudge_hy3_contest_demo.mp4`](assets/tracejudge_hy3_contest_demo.mp4)：2026-09-10 新版工作台录屏，86.313 秒、2560×1600；展示启动检查、真实 Hy3 运行模式以及当前结果页面，具体调用与结果以画面内标识为准。源文件 SHA-256：`a29f57d19a52e3c1cdc3fd75c5b41869edaf5c3db5d046ef031cdc3a468edba9`。
+- [`assets/tracejudge_hy3_contest_demo.mp4`](assets/tracejudge_hy3_contest_demo.mp4)：2026-09-10 新版工作台录屏，107 秒；具体演示内容、模型调用与结果以画面内标识为准。文件 SHA-256：`580563829fc9dfd1d4fe9350633c2601711cef057e1b1605a9ccbd0f71c1cb5b`。
 - [`assets/tracejudge_hy3_preview.gif`](assets/tracejudge_hy3_preview.gif)：2026-09-10 更新，16 秒、1440×1000、四张真实浏览器截图组成的循环 GIF；依次展示九幕入口、公开过程失配案例、最新补充验证和五轮消融结论，不是实时评估录屏。
 - [`assets/tracejudge_hy3_process_case_20260910.png`](assets/tracejudge_hy3_process_case_20260910.png)：第 7 幕公开冻结案例，展示说明与代码的矛盾。
 - [`assets/tracejudge_hy3_current_validation_20260910.png`](assets/tracejudge_hy3_current_validation_20260910.png)：第 8 幕最新补充验证完整区域，保留三个实验的指标、来源状态和限制。

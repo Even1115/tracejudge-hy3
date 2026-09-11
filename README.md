@@ -6,19 +6,19 @@
 
 [一页成果总览](docs/contest_results_overview.md) · [启动工作台](#快速体验) · [观看演示](#演示视频) · [查看实验发现](#实验发现) · [成果与复现入口](#成果导航)
 
-**更新至 2026-09-10 的工作副本。** 面向需要检查 AI 生成代码的开发者与评测人员，提供“生成结构化解答 → 检查过程 → 定位错误 → 查看证据”的工作流。评估对象是模型输出的解题说明与代码，不是模型内部思维。
+面向需要检查 AI 生成代码的开发者与评测人员，提供“生成结构化解答 → 检查过程 → 定位错误 → 查看证据”的工作流。评估对象是模型输出的解题说明与代码，不是模型内部思维。
 
 第一次访问建议先读[一页成果总览](docs/contest_results_overview.md)：两个典型案例、主要实验结论与证据边界集中在一页。要直接体验，请使用[无需 API Key 的公开 Fixture](#快速体验)；真实 Hy3 模式另行配置。
 
 ## 演示视频
 
-下方为 **2026-09-10 当前工作台的 16 秒循环预览**：九幕录制入口 → 公开过程失配案例 → 最新补充验证 → 五轮消融结论。点击预览可观看 **107 秒新版演示视频**。
+下方为 **当前工作台的 16 秒循环预览**：九幕录制入口 → 公开过程失配案例 → 最新补充验证 → 五轮消融结论。点击预览可观看 **107 秒新版演示视频**。
 
-[![2026-09-10 工作台预览：九幕入口、过程失配案例、最新验证与五轮消融](docs/demo/assets/tracejudge_hy3_preview.gif)](docs/demo/assets/tracejudge_hy3_contest_demo.mp4)
+[![工作台预览：九幕入口、过程失配案例、最新验证与五轮消融](docs/demo/assets/tracejudge_hy3_preview.gif)](docs/demo/assets/tracejudge_hy3_contest_demo.mp4)
 
-[观看新版 107 秒演示视频](docs/demo/assets/tracejudge_hy3_contest_demo.mp4) · [一页成果总览](docs/contest_results_overview.md) · [全流程录制脚本](docs/demo/full_flow_storyboard.md)
+[观看 107 秒演示视频](docs/demo/assets/tracejudge_hy3_contest_demo.mp4) · [一页成果总览](docs/contest_results_overview.md) · [全流程录制脚本](docs/demo/full_flow_storyboard.md)
 
-> 新版 MP4 为 2026-09-10 本地工作台录屏，时长 107 秒；具体演示内容、模型调用和结果以画面中的运行状态与来源标识为准。GIF 和下方截图由已有公开案例与核验结果生成。
+> 具体演示内容、模型调用和结果以画面中的运行状态与来源标识为准。GIF 和下方截图由已有公开案例与核验结果生成。
 
 ## 一个案例：测试通过，说明与实现却不一致
 

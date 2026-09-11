@@ -268,7 +268,51 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .overview-extra b { color: var(--cyan); font-family: ui-monospace, monospace; }
 .disclaimer { margin: 16px 0 0; color: #718397; font-size: 13.5px; }
 
+/* 2026-09-10 latest supplementary validation card (scene 8) */
+.current-validation { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 22px; }
+.cv-card { margin-top: 14px; border: 1px solid var(--line); background: rgba(7,16,24,.45); padding: 14px 16px; }
+.cv-card h3 { margin: 0 0 6px; font-size: 16px; }
+.cv-card .fineprint { margin: 0; }
+.cv-lines { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 5px; color: #c7d3de; font-size: 14.5px; line-height: 1.55; }
+.cv-lines li::marker { color: var(--cyan); }
+.cv-limits { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 4px; color: #8a9bad; font-size: 12.5px; line-height: 1.5; }
+.cv-limits li::marker { color: var(--amber); }
+.overview-entry { margin: 16px 0 0; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.overview-entry .fineprint { margin: 0; }
+
+/* Five-repetition tally block on the ablation page (separate from the table) */
+.repetition-block { margin-top: 18px; border: 1px solid rgba(65,217,255,.28); background: rgba(65,217,255,.05); padding: 16px 18px; }
+.repetition-head h3 { margin: 6px 0 0; font-size: 17px; }
+
 .cases-page { padding: 34px 3.2vw 44px; }
+.featured-process { margin-bottom: 38px; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
+.featured-process h1 { font-size: clamp(24px, 3vw, 34px); }
+.featured-options { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+.featured-options button { text-align: left; white-space: normal; }
+.featured-options button[aria-pressed="true"] { border-color: var(--cyan); background: rgba(65,217,255,.09); }
+.featured-detail { margin-top: 16px; border: 1px solid var(--line); background: var(--surface); padding: 24px; min-width: 0; }
+.featured-detail h2 { margin: 10px 0; font-size: clamp(21px, 2vw, 29px); }
+.featured-conclusion { color: #d6e3ec; line-height: 1.7; }
+.featured-facts { display: flex; gap: 8px; flex-wrap: wrap; }
+.featured-facts span { border: 1px solid var(--line); padding: 8px 10px; font-size: 13px; }
+.featured-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 20px; }
+.featured-pair > section { min-width: 0; }
+.featured-original { white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.65 ui-monospace, monospace; background: #050c12; padding: 14px; }
+.featured-original .lineno { display: inline-block; width: 2em; color: #8499ae; user-select: none; }
+.featured-claim { line-height: 1.8; border-left: 3px solid var(--cyan); padding: 14px; margin-top: 0; }
+.featured-mark { background: #f2bb62; color: #071018; padding: 2px 3px; border-radius: 2px; font-weight: 700; }
+.featured-limits { padding-left: 22px; color: #b4c3d1; line-height: 1.7; font-size: 14px; }
+.featured-evidence { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; overflow-wrap: anywhere; }
+.featured-evidence summary { color: var(--cyan); cursor: pointer; }
+.featured-source { font: 13px/1.6 ui-monospace, monospace; }
+.featured-evidence blockquote { margin: 12px 0; padding-left: 15px; border-left: 2px solid var(--cyan); line-height: 1.7; }
+@media (max-width: 760px) {
+  .featured-pair { grid-template-columns: minmax(0, 1fr); }
+  .featured-detail { padding: 15px; }
+  .featured-options button { width: 100%; }
+  .featured-facts { display: grid; }
+  .featured-original { font-size: 12px; }
+}
 .cases-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .cases-hero > div:first-child { max-width: 780px; }
 .source-chip { color: var(--green); border: 1px solid rgba(86,216,160,.35); padding: 10px 14px; font: 12px/1.4 ui-monospace, monospace; }
@@ -439,3 +483,141 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--cyan); outline-
 .method-cost-heading { padding-top: 28px; margin-top: 24px; border-top: 1px solid #203442; }
 #card-costs { min-width: 0; }
 @media (max-width: 640px) { .cost-totals { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------ method comparison view */
+.compare-page { padding: 34px 3.2vw 44px; }
+.synthetic-banner {
+  margin-top: 18px; padding: 12px 16px;
+  border: 1px solid rgba(242,187,98,.55); background: rgba(242,187,98,.1);
+  color: var(--amber); font-weight: 650; font-size: 14px; line-height: 1.6;
+}
+.source-chip.synthetic { color: var(--amber); border-color: rgba(242,187,98,.5); }
+.compare-meta { margin-top: 20px; }
+.compare-meta-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.compare-meta-cell { background: var(--surface); padding: 14px 16px; min-width: 0; }
+.compare-meta-cell span { display: block; color: var(--muted); font-size: 12px; }
+.compare-meta-cell strong { display: block; margin-top: 7px; font-size: 14.5px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+.compare-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.compare-filter {
+  flex: none; display: flex; align-items: center; gap: 9px;
+  padding: 9px 14px; font-size: 13.5px;
+}
+.compare-filter b { font-family: ui-monospace, monospace; color: var(--cyan); }
+.compare-filter.active { border-color: var(--cyan); background: rgba(65,217,255,.1); }
+.compare-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; margin-top: 16px; align-items: start; }
+.compare-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.flag {
+  font: 700 11px/1 ui-monospace, monospace; font-style: normal;
+  border: 1px solid var(--line); color: var(--muted); padding: 4px 7px; white-space: nowrap;
+}
+.flag.good { color: var(--green); border-color: rgba(86,216,160,.4); }
+.flag.bad { color: var(--red); border-color: rgba(255,111,121,.45); }
+.flag.warn { color: var(--amber); border-color: rgba(242,187,98,.45); }
+.flag.muted { opacity: .8; }
+.compare-detail h2 { overflow-wrap: anywhere; }
+.shared-input { margin-top: 18px; border: 1px solid var(--line); background: rgba(7,16,24,.45); padding: 16px 18px; }
+.shared-input-head { margin-bottom: 6px; }
+.input-section { border-top: 1px solid rgba(33,50,68,.6); padding: 6px 0; }
+.input-section summary { cursor: pointer; padding: 8px 0; color: var(--cyan); font-weight: 650; font-size: 14.5px; }
+.input-body h3 { margin: 6px 0; font-size: 17px; }
+.input-body p { color: #c7d3de; font-size: 14.5px; line-height: 1.65; }
+.functional-strip { margin-top: 12px; border-top: 1px solid rgba(33,50,68,.6); padding-top: 12px; }
+.functional-strip .agg { margin: 10px 0 0; }
+.compare-section-title { margin: 22px 0 4px; font-size: 18px; }
+.compare-table-wrap { margin-top: 10px; }
+.compare-table th[scope="row"] { min-width: 130px; color: #d4edf5; font-weight: 600; }
+.compare-table tr.divergent td { background: rgba(242,187,98,.07); }
+.compare-table tr.divergent th[scope="row"] { box-shadow: inset 3px 0 var(--amber); }
+.compare-badge-cell { min-width: 76px; }
+.method-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.method-card { min-width: 0; border: 1px solid var(--line); background: rgba(7,16,24,.45); padding: 16px; }
+.method-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.method-card-head h3 { margin: 0; font-size: 15.5px; }
+.method-card .explanation { font-size: 14px; overflow-wrap: anywhere; }
+.method-mini { grid-template-columns: 110px 1fr; font-size: 13px; margin-top: 12px; }
+.ref-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.ref-list .fineprint { margin: 0; }
+.ref-button {
+  flex: none; padding: 7px 11px; font-size: 12.5px;
+  border-color: rgba(65,217,255,.35); color: var(--cyan); background: transparent;
+}
+.ref-button:hover { background: rgba(65,217,255,.08); }
+.ref-unverified { color: var(--red); font: 700 12px/1 ui-monospace, monospace; padding: 4px 7px; border: 1px solid rgba(255,111,121,.45); }
+.ref-flash { background: rgba(65,217,255,.16) !important; box-shadow: -3px 0 var(--cyan); transition: background .3s; }
+.human-ref { margin-top: 18px; border: 1px solid var(--line); background: rgba(9,20,30,.6); padding: 4px 16px 14px; }
+.human-ref summary { cursor: pointer; padding: 12px 0; color: var(--amber); font-weight: 650; font-size: 14px; }
+.human-ref-body { border-top: 1px solid rgba(33,50,68,.6); padding-top: 14px; }
+.compare-empty small { margin-top: 10px; }
+.compare-detail .compact-button { margin-top: 14px; }
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .compare-layout { grid-template-columns: 1fr; }
+  .compare-list { position: static; grid-template-columns: repeat(2, 1fr); }
+  .compare-meta-grid { grid-template-columns: repeat(2, 1fr); }
+  .method-cards { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+  .compare-list { grid-template-columns: 1fr; }
+  .compare-meta-grid { grid-template-columns: 1fr; }
+  .compare-table { min-width: 640px; }
+}
+
+.ablation-page { padding: 34px 3.2vw 44px; }
+.ablation-page .method-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.compare-cases { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+.compare-cases .fineprint { margin: 0; }
+.view-toggle { display: flex; gap: 8px; }
+.view-toggle .compare-filter { margin-top: 0; }
+.ablation-scores { margin-top: 18px; border: 1px solid var(--line); background: rgba(7,16,24,.45); padding: 16px 18px; }
+.ablation-scores-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ablation-scores-head h3 { margin: 0; font-size: 16px; }
+.ablation-paired { margin-top: 6px; }
+.ablation-paired h4 { margin: 12px 0 6px; font-size: 14px; color: #8facbd; font-weight: 600; }
+.case-note { margin-top: 16px; border: 1px solid rgba(242,187,98,.4); background: rgba(242,187,98,.06); padding: 14px 16px; }
+.case-note h3 { margin: 0; font-size: 15.5px; color: var(--amber); }
+.case-note-history { margin-top: 12px; border-top: 1px solid rgba(242,187,98,.25); padding-top: 10px; }
+.case-note-history b { color: var(--amber); font-size: 13px; }
+.case-note-history p { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.rule-box { margin-top: 12px; border: 1px solid var(--line); background: rgba(9,20,30,.6); padding: 10px 12px; }
+.rule-box .fineprint { margin: 0; }
+
+@media (max-width: 900px) {
+  .ablation-page .method-cards { grid-template-columns: 1fr; }
+}
+
+/* ------------------------- 60-second guided tour ------------------------- */
+.tour-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 12px 3.2vw;
+  background: rgba(7,16,24,.97);
+  border-top: 1px solid rgba(65,217,255,.55);
+}
+.tour-info { min-width: 0; }
+.tour-info h2 { margin: 4px 0; font-size: 17px; }
+.tour-info p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.tour-info .fineprint { margin: 4px 0 0; }
+.tour-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.tour-actions button { flex: none; padding: 9px 14px; font-size: 13.5px; }
+/* Keep page content clear of the fixed bar while the tour is open. */
+body.tour-active { padding-bottom: 132px; }
+.tour-target {
+  outline: 2px solid var(--cyan); outline-offset: 3px;
+  scroll-margin-top: 18px; scroll-margin-bottom: 150px;
+}
+/* In recording mode the scene CSS hides every non-active flow child; the tour
+   re-reveals only its own target section and never touches scene state. */
+body.recording.tour-active .flow > .tour-reveal { display: block !important; }
+
+@media (max-width: 620px) {
+  .tour-bar { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 14px; }
+  .tour-actions { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .tour-actions button { width: 100%; padding: 10px 6px; }
+  body.tour-active { padding-bottom: 230px; }
+  .tour-target { scroll-margin-bottom: 250px; }
+}

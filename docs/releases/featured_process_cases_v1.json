@@ -1,0 +1,285 @@
+{
+  "schema": "tracejudge-featured-process-cases-v1",
+  "date": "2026-09-10",
+  "sources": {
+    "tuple_input": {
+      "path": "artifacts/process-annotations/mbpp120-process-v1/development/annotator_a/items.jsonl",
+      "sha256": "8a3175a4b1da0b8f3c1edc4852e8a755dd6a06cdab5fb503f8032d0308515a0f",
+      "content_sha256": "b2b56a7c840430a5986aae3ba89f75c4664c9d4d05d925f17a4d4daec6ed596a"
+    },
+    "tuple_outcome": {
+      "path": "artifacts/process-annotations/mbpp120-process-v1/coordinator/identity_and_outcomes.jsonl",
+      "sha256": "25e94d06976c6ed3bdef780bf8c2feef3ac61d67eebead561b48317f29659b62",
+      "content_sha256": "8b01c7f2db9074d8aa7fd71802bfc7bdbf40507139a6008622c4aaae9975c0b1"
+    },
+    "tuple_revision": {
+      "path": "artifacts/annotation-development/mbpp36-dev-20260910-v2/revisions.jsonl",
+      "sha256": "8219eae5776aeb9eea52c7a83f277fbd62f604a4dabdd7858d7dff73baf51e6a",
+      "content_sha256": "9faa28e5300b9ac73809a775e0419d4321b9da9a8eb2f9da18bd155a1a805b5d"
+    },
+    "probe_input": {
+      "path": "data/process-eval/mbpp_process_counterfactuals_v1.json",
+      "sha256": "479ff1e8ae1d9e0966cbf0ea9d53532fd158dc1f77cf1f1436b788e283800d7f",
+      "content_sha256": "c093217d348e2925d8c2b89e91021236e4ad1cb7f4c93bf9a019ece2722aa54c"
+    },
+    "probe_baseline": {
+      "path": "artifacts/experiments/process-method-v2/probes3-baseline-location-20260910-v1/predictions.jsonl",
+      "sha256": "b501e131de1382dbfe11cca88e5c54518c4880d88d40a50bd753d64e783569fd",
+      "content_sha256": "2b0becdc9b09d34f910753375e4bf0afacecdff4db5b2b009f6a0f9fc3463a32"
+    },
+    "probe_audit": {
+      "path": "artifacts/experiments/process-method-v2/probes3-assumptions-location-20260910-v1/predictions.jsonl",
+      "sha256": "b5a261f441295c9039c86f78925190c525d318a273226299df8264fc499e6734",
+      "content_sha256": "a61d51ff67520816fd285763d1bc0cfe772d68a03415465c3f451ec6c69bac56"
+    }
+  },
+  "cases": [
+    {
+      "id": "tuple_str_int",
+      "item_id": "item-89cda539ad51dde89041",
+      "title": "官方测试通过，边界承诺仍有缺陷",
+      "kind": "MBPP 开发样本 · 预测后标签复核 v2",
+      "conclusion": "算法没有处理尾随逗号，无法兑现自己对单元素元组的承诺。代码与 S1/S2 一致，审核归为推理层算法错误。",
+      "problem": {
+        "function_signature": "def tuple_str_int(...):",
+        "requirement": "\"\"\"\nWrite a function to convert tuple string to integer tuple.\nassert tuple_str_int(\"(7, 8, 9)\") == (7, 8, 9)\n\"\"\"\n",
+        "requirements": [
+          {
+            "content": "\"\"\"\nWrite a function to convert tuple string to integer tuple.\nassert tuple_str_int(\"(7, 8, 9)\") == (7, 8, 9)\n\"\"\"\n",
+            "requirement_id": "R1"
+          }
+        ],
+        "title": "Mbpp/785: tuple_str_int"
+      },
+      "solution": {
+        "code": "def tuple_str_int(s):\n    inner = s.strip().strip('()')\n    if not inner:\n        return ()\n    return tuple(int(x.strip()) for x in inner.split(','))",
+        "declared_space_complexity": "O(n)，用于存储中间列表和结果元组",
+        "declared_time_complexity": "O(n)，其中 n 为字符串长度或元素数量",
+        "design_summary": "通过去除字符串两端的括号和空白，按逗号分割子串，对每个子串去除空白后使用 int() 转换，最后用 tuple() 包装返回。该方案能正确处理正数、负数及空格。",
+        "edge_cases_considered": [
+          "空元组字符串 \"()\" 应返回空元组",
+          "单元素元组如 \"(5,)\" 或 \"(5)\" 应返回 (5,)",
+          "元素间或括号内存在多余空格",
+          "负数如 \"(-3, 4)\" 应正确转换"
+        ],
+        "implementation_steps": [
+          {
+            "content": "预处理：去除输入字符串两端的空白字符以及首尾的小括号，得到纯数字和逗号分隔的内部内容。",
+            "expected_code_behavior": "使用 s.strip().strip('()') 得到内部字符串；若输入为 \"(7, 8, 9)\" 则得到 \"7, 8, 9\"。",
+            "related_requirements": [
+              "R1"
+            ],
+            "step_id": "S1"
+          },
+          {
+            "content": "判断内部内容是否为空，若为空直接返回空元组；否则按逗号分割，对每部分 strip 后转为 int，收集并转为 tuple 返回。",
+            "expected_code_behavior": "使用 split(',') 分割，生成整数列表，再调用 tuple()。对于 \"()\" 返回 ()。",
+            "related_requirements": [
+              "R1"
+            ],
+            "step_id": "S2"
+          }
+        ],
+        "requirement_understanding": "需要将形如 \"(7, 8, 9)\" 的元组字符串转换为对应的整数元组 (7, 8, 9)。输入是包含小括号和逗号分隔整数的字符串，输出为 int 元素组成的 tuple。"
+      },
+      "assessment": {
+        "reasoning_correct": false,
+        "plan_code_aligned": true,
+        "process_correct": false,
+        "error_type": "P01_ALGORITHM_ERROR",
+        "first_faulty_layer": "reasoning",
+        "first_faulty_step": null,
+        "first_faulty_location": {
+          "code_span": null,
+          "entry_index": 1,
+          "quote": "单元素元组如 \"(5,)\" 或 \"(5)\" 应返回 (5,)",
+          "source_field": "edge_cases_considered",
+          "step_id": null
+        }
+      },
+      "functional": {
+        "base_status": "pass",
+        "plus_status": "pass",
+        "run_id": "mbpp120-windows-20260908-v1",
+        "code_sha256": "221aaae11cf3416370f3e0b82316022b2d7dedca25d722c020502a70fa83ca86"
+      },
+      "claim": {
+        "label": "边界说明原文 · edge_cases_considered[1]",
+        "text": "单元素元组如 \"(5,)\" 或 \"(5)\" 应返回 (5,)",
+        "highlight": "(5,)"
+      },
+      "code_highlight": "int(x.strip())",
+      "code_line": 5,
+      "analysis": "静态推演（未执行）：\"(5,)\" → 内部字符串 \"5,\" → 按逗号分割为 \"5\" 和空字符串 → 空字符串不能转换为整数。历史官方测试通过只覆盖既有用例，不证明这个额外承诺。",
+      "limitations": [
+        "仅静态推演；未运行这个边界输入，没有新增功能测试或可重放错误证书。",
+        "标签经过预测后单人 AI 辅助复核，已接触两方法预测，供负责人审核；不是独立盲审或保留集金标。",
+        "首错位置是边界说明条目，首错步骤为 null；S2 与 L5 是相关实现依据，不是步骤首错命中。"
+      ],
+      "source_ids": [
+        "tuple_input",
+        "tuple_outcome",
+        "tuple_revision"
+      ],
+      "review_doc": "docs/experiments/process-method-validation-v2-repair.md",
+      "judgments": []
+    },
+    {
+      "id": "find_char_long",
+      "item_id": "probe-07c8d275bebcd1296b3c",
+      "title": "计划正确，代码收紧了长度边界",
+      "kind": "构造探针 · code_boundary_tightening",
+      "conclusion": "计划要求保留长度至少为 4 的词，代码只保留长度大于 4 的词。审核归为对齐层计划—代码失配，A01。",
+      "problem": {
+        "function_signature": "def find_char_long(...):",
+        "requirement": "\"\"\"\nWrite a function to find all words which are at least 4 characters long in a string.\nassert set(find_char_long('Please move back to stream')) == set(['Please', 'move', 'back', 'stream'])\n\"\"\"\n",
+        "requirements": [
+          {
+            "content": "\"\"\"\nWrite a function to find all words which are at least 4 characters long in a string.\nassert set(find_char_long('Please move back to stream')) == set(['Please', 'move', 'back', 'stream'])\n\"\"\"\n",
+            "requirement_id": "R1"
+          }
+        ],
+        "title": "Mbpp/7: find_char_long"
+      },
+      "solution": {
+        "code": "def find_char_long(s):\n    return [word for word in s.split() if len(word) > 4]",
+        "declared_space_complexity": "O(n) for storing the split words and the output list",
+        "declared_time_complexity": "O(n) where n is the length of the input string",
+        "design_summary": "Use `str.split()` to tokenize the input string by whitespace, then filter the tokens with a list comprehension keeping only those where `len(word) >= 4`, and return the resulting list.",
+        "edge_cases_considered": [
+          "Empty input string returns an empty list.",
+          "Input containing only short words (length < 4) returns an empty list.",
+          "Multiple or irregular whitespace characters are handled by `str.split()`.",
+          "Words exactly 4 characters long are included.",
+          "Leading/trailing whitespace does not produce empty tokens."
+        ],
+        "implementation_steps": [
+          {
+            "content": "Split the input string into a list of words using `s.split()` which handles arbitrary whitespace.",
+            "expected_code_behavior": "The function calls `s.split()` to obtain a list of word tokens without empty strings.",
+            "related_requirements": [
+              "R1"
+            ],
+            "step_id": "S1"
+          },
+          {
+            "content": "Filter the list of words to keep only those with length >= 4 via a list comprehension condition.",
+            "expected_code_behavior": "The comprehension evaluates `len(word) >= 4` for each token and includes it if true.",
+            "related_requirements": [
+              "R1"
+            ],
+            "step_id": "S2"
+          },
+          {
+            "content": "Return the filtered list as the function result.",
+            "expected_code_behavior": "The function returns the list constructed by the comprehension.",
+            "related_requirements": [
+              "R1"
+            ],
+            "step_id": "S3"
+          }
+        ],
+        "requirement_understanding": "The task requires implementing a function `find_char_long` that accepts a string and returns all words (substrings separated by whitespace) with a length of at least 4 characters. The example shows that for input 'Please move back to stream', the words 'Please', 'move', 'back', and 'stream' are returned."
+      },
+      "assessment": {
+        "reasoning_correct": true,
+        "plan_code_aligned": false,
+        "process_correct": false,
+        "error_type": "A01_PLAN_CODE_MISMATCH",
+        "first_faulty_layer": "alignment",
+        "first_faulty_step": "S2",
+        "first_faulty_location": {
+          "quote": "length >= 4",
+          "source_field": "implementation_steps",
+          "step_id": "S2"
+        }
+      },
+      "functional": {
+        "base_status": null,
+        "plus_status": null,
+        "run_id": null
+      },
+      "claim": {
+        "label": "计划原文 · S2",
+        "text": "Filter the list of words to keep only those with length >= 4 via a list comprehension condition.",
+        "highlight": ">= 4"
+      },
+      "code_highlight": "> 4",
+      "code_line": 2,
+      "analysis": "静态对照（未执行）：计划包含恰好 4 个字符的词；代码条件会排除它们，例如公开题面中的 \"move\" 和 \"back\"。唯一变异是代码从 >= 4 改为 > 4，计划保持不变。",
+      "limitations": [
+        "这是构造的能力探针，不是自然错误样本；变异代码从未执行，官方功能证据不可用。",
+        "冻结金标的 S2 表示发生失配的相关计划步骤，不表示计划自身推理错误。",
+        "新定位规范下两方法均引用代码 L2，首错步骤为 null。代码定位与步骤定位分开报告，不能据此声称精确位置命中。"
+      ],
+      "source_ids": [
+        "probe_input",
+        "probe_baseline",
+        "probe_audit"
+      ],
+      "review_doc": "docs/experiments/process-location-format-v2.md",
+      "judgments": [
+        {
+          "method": "基线",
+          "run_id": "probes3-baseline-location-20260910-v1",
+          "source": "probe_baseline",
+          "assessment": {
+            "affected_steps": [
+              "S2"
+            ],
+            "code_span": "L2",
+            "confidence": 0.95,
+            "error_type": "A01_PLAN_CODE_MISMATCH",
+            "explanation": "The requirement asks for words 'at least 4 characters long' (>=4). The requirement_understanding, design_summary, and implementation step S2 all correctly state the condition as len(word) >= 4. However, the code implements 'len(word) > 4', which would exclude words of exactly 4 characters (such as 'move' and 'back' from the example). This is a direct mismatch between the planned logic and the actual code, violating R1.",
+            "first_faulty_layer": "alignment",
+            "first_faulty_location": {
+              "code_span": "L2",
+              "entry_index": null,
+              "quote": "len(word) > 4",
+              "source_field": "code",
+              "step_id": null
+            },
+            "first_faulty_step": null,
+            "functional_correct": null,
+            "plan_code_aligned": false,
+            "process_correct": false,
+            "reasoning_correct": true,
+            "secondary_error_types": [],
+            "violated_requirement": "R1"
+          }
+        },
+        {
+          "method": "需求—假设核对",
+          "run_id": "probes3-assumptions-location-20260910-v1",
+          "source": "probe_audit",
+          "assessment": {
+            "affected_steps": [
+              "S2"
+            ],
+            "code_span": "L2",
+            "confidence": 0.99,
+            "error_type": "A01_PLAN_CODE_MISMATCH",
+            "explanation": "The reasoning (design_summary and implementation_steps S2) correctly specifies filtering with len(word) >= 4, matching requirement R1. However, the implemented code uses 'len(word) > 4', which excludes words of exactly 4 characters (e.g., 'move', 'back' from the example). This is a plan-code mismatch at the alignment layer and also a boundary error. Functional correctness is not assessed.",
+            "first_faulty_layer": "alignment",
+            "first_faulty_location": {
+              "code_span": "L2",
+              "entry_index": null,
+              "quote": "if len(word) > 4",
+              "source_field": "code",
+              "step_id": null
+            },
+            "first_faulty_step": null,
+            "functional_correct": null,
+            "plan_code_aligned": false,
+            "process_correct": false,
+            "reasoning_correct": true,
+            "secondary_error_types": [
+              "C01_BOUNDARY_ERROR"
+            ],
+            "violated_requirement": "R1"
+          }
+        }
+      ]
+    }
+  ]
+}

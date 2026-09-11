@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from tracejudge_hy3.schemas.location import FaultLocation
+from tracejudge_hy3.schemas.solution import SolutionTrace
 
 FaultyLayer = Literal[
     "requirement",
@@ -51,10 +54,11 @@ class ProcessAssessment(BaseModel):
 
     reasoning_correct: bool | None = None
     plan_code_aligned: bool | None = None
-    functional_correct: bool
+    functional_correct: bool | None
     process_correct: bool | None = None
     first_faulty_layer: FaultyLayer | None = None
     first_faulty_step: str | None = None
+    first_faulty_location: FaultLocation | None = None
     affected_steps: list[str] = Field(default_factory=list)
     violated_requirement: str | None = None
     code_span: str | None = None
@@ -62,6 +66,25 @@ class ProcessAssessment(BaseModel):
     secondary_error_types: list[ErrorType] = Field(default_factory=list)
     explanation: str
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def check_location(self) -> Self:
+        if self.first_faulty_location is not None:
+            if self.first_faulty_step != self.first_faulty_location.step_id:
+                raise ValueError("first_faulty_step conflicts with structured location")
+            if (
+                self.error_type is None
+                or self.first_faulty_layer is None
+                or self.process_correct is True
+            ):
+                raise ValueError("an error location requires an error assessment")
+        return self
+
+    def validate_location_against(self, solution: SolutionTrace) -> None:
+        # Revalidate even model_copy(update=...) objects supplied by local providers.
+        self.check_location()
+        if self.first_faulty_location is not None:
+            self.first_faulty_location.validate_against(solution)
 
 
 class Counterexample(BaseModel):

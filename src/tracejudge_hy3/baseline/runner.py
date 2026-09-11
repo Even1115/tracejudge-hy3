@@ -1055,6 +1055,12 @@ def _load_mbppplus_provenance(
     return experiment_label, identity
 
 
+# Generous bound for identity reads: on slow mounts (e.g. WSL 9P over a large
+# dirty tree) `git diff --binary HEAD` alone can take ~7s; a short timeout would
+# silently degrade to "fingerprint unavailable" and fail dirty-tree resumes.
+_GIT_COMMAND_TIMEOUT_SECONDS = 30
+
+
 def _git_command(repository_hint: Path, *arguments: str) -> str | None:
     try:
         completed = subprocess.run(
@@ -1062,7 +1068,7 @@ def _git_command(repository_hint: Path, *arguments: str) -> str | None:
             check=True,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=_GIT_COMMAND_TIMEOUT_SECONDS,
         )
     except (FileNotFoundError, subprocess.SubprocessError):
         return None
@@ -1075,7 +1081,7 @@ def _git_command_bytes(repository_hint: Path, *arguments: str) -> bytes | None:
             ["git", "-C", str(repository_hint), *arguments],
             check=True,
             capture_output=True,
-            timeout=5,
+            timeout=_GIT_COMMAND_TIMEOUT_SECONDS,
         )
     except (FileNotFoundError, subprocess.SubprocessError):
         return None

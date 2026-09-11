@@ -17,9 +17,13 @@ from tracejudge_hy3.schemas.problem import ProblemSpec
 from tracejudge_hy3.schemas.solution import SolutionTrace
 
 
-def _functional_correct(execution_result: ExecutionSummary) -> bool:
+def _functional_correct(execution_result: ExecutionSummary) -> bool | None:
+    if execution_result.runtime_status == "backend_error":
+        return None
     if execution_result.runtime_status != "completed":
         return False
+    if not execution_result.results:
+        return None
     return execution_result.all_passed()
 
 
@@ -47,7 +51,11 @@ def combine_assessment(
         explanation += (
             "全部测试通过，但不能仅据此推断 reasoning 或计划—代码对齐正确。"
             if functional_correct
-            else "存在未通过的测试，且过程层结论不可计算。"
+            else (
+                "存在未通过的测试，且过程层结论不可计算。"
+                if functional_correct is False
+                else "没有可用功能测试证据，功能与过程结论均不可计算。"
+            )
         )
         return ProcessAssessment(
             reasoning_correct=None,
@@ -90,10 +98,10 @@ def combine_assessment(
             confidence = round(min(1.0, (confidence or 0.5) + 0.05), 2)
 
     process_correct: bool | None
-    if reasoning_correct is not None and plan_code_aligned is not None:
-        process_correct = bool(reasoning_correct and plan_code_aligned and functional_correct)
-    elif not functional_correct:
+    if any(value is False for value in (reasoning_correct, plan_code_aligned, functional_correct)):
         process_correct = False
+    elif all(value is True for value in (reasoning_correct, plan_code_aligned, functional_correct)):
+        process_correct = True
     else:
         process_correct = None
 
@@ -104,6 +112,7 @@ def combine_assessment(
         process_correct=process_correct,
         first_faulty_layer=primary.first_faulty_layer,
         first_faulty_step=primary.first_faulty_step,
+        first_faulty_location=primary.first_faulty_location,
         affected_steps=primary.affected_steps,
         violated_requirement=primary.violated_requirement,
         code_span=primary.code_span,

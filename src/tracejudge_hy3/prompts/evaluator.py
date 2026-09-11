@@ -25,6 +25,11 @@ EVALUATOR_SYSTEM_PROMPT = """\
 9. 你的结论由哪些具体证据支持（引用静态证据字段或测试用例结果，而不是凭空猜测）。
 
 重要约束：
+- first_faulty_location 可引用 requirement_understanding、design_summary、edge_cases_considered、
+  implementation_steps、复杂度声明或 code。quote 必须逐字来自该字段；不能编造或改写引用。
+  implementation_steps 必须指定真实 step_id；edge_cases_considered 必须指定从 0 开始的 entry_index。
+  其他字段的 step_id 为 null；设计摘要有错不意味着 S1 有错。无法定位时整个 location 为 null。
+  first_faulty_step 必须与 location.step_id 一致。找到引用只证明出处，不自动证明主张错误。
 - 不要仅因为代码与你设想的实现方式不同就判定为错误；只要代码满足需求条款且执行结果正确，
   应视为合法的等价实现。
 - 你的判断应尽量引用 static_evidence 或 execution_result 中的具体字段作为依据，

@@ -38,6 +38,14 @@ def is_sensitive_key(key: str) -> bool:
 
 
 def _redact_patterns(value: str) -> str:
+    # Scrub schemes before the generic assignment matcher can consume only
+    # "Bearer"/"Basic" and leave the actual credential behind.
+    value = re.sub(
+        r"(?i)\b((?:authorization\s*[:=]?\s*)?(?:bearer|basic)\s+)"
+        r"[A-Za-z0-9._~+/=-]{4,}",
+        r"\1<redacted>",
+        value,
+    )
     # Quoted assignment/JSON values, including short passwords.
     redacted = re.sub(
         rf"(?i)([\"']?{_CREDENTIAL_LABEL}[\"']?\s*[:=]\s*)([\"'])[^\"'\r\n]*\2",

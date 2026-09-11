@@ -7,7 +7,20 @@ API surface is deliberately tiny and allowlisted:
 - ``GET /api/status`` -- per-mode availability and the public problem card.
 - ``GET /api/overview`` -- public aggregate numbers (see ``overview.py``).
 - ``GET /api/showcase`` -- three hash-checked public mechanism cases.
+- ``GET /api/featured-process-cases`` -- two published, hash-bound excerpts.
+- ``GET /docs/featured-process/{tuple_str_int,find_char_long}`` -- allowlisted
+  review notes served as plain text.
 - ``GET /api/regression`` -- the versioned public-fixture regression card.
+- ``GET /api/method-comparison`` -- the read-only three-method process-pilot
+  comparison view (see ``comparison.py``); ``?fixture=synthetic`` serves a
+  clearly labelled UI-test payload and is the only accepted query parameter.
+- ``GET /api/ablation-comparison`` -- the read-only 2x2 evidence-ablation
+  comparison view (see ``ablation_view.py``); same allowlisted query rules.
+- ``GET /api/current-validation-summary`` -- the 2026-09-10 latest
+  supplementary validation card (see ``current_validation.py``).
+- ``GET /docs/contest-results-overview`` -- the published contest results
+  overview Markdown, served read-only as plain text so the in-page entry
+  never 404s.
 - ``POST /api/run`` with ``{"mode": "fixture" | "hy3"}`` -- starts one real
   pipeline run in a worker thread and returns a run id.
 - ``GET /api/run/<id>`` -- poll that run's status/result.
@@ -35,11 +48,32 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from tracejudge_hy3.demo_app.ablation_view import (
+    load_ablation_comparison,
+    synthetic_ablation_comparison,
+)
+from tracejudge_hy3.demo_app.comparison import (
+    ComparisonSourceError,
+    synthetic_method_comparison,
+)
+from tracejudge_hy3.demo_app.comparison import (
+    load_method_comparison as load_pilot_comparison,
+)
 from tracejudge_hy3.demo_app.costs import load_method_comparison
+from tracejudge_hy3.demo_app.current_validation import (
+    CONTEST_OVERVIEW_DOC,
+    CurrentValidationError,
+    load_current_validation_summary,
+)
 from tracejudge_hy3.demo_app.exports import (
     certificate_export_payload,
     render_result_html,
     result_export_payload,
+)
+from tracejudge_hy3.demo_app.featured_cases import (
+    FeaturedCaseError,
+    load_featured_cases,
+    read_review_doc,
 )
 from tracejudge_hy3.demo_app.overview import OverviewSourceError, load_public_overview
 from tracejudge_hy3.demo_app.regression import RegressionCardError, build_regression_card
@@ -245,6 +279,47 @@ class DemoHTTPRequestHandler(BaseHTTPRequestHandler):
             content_security_policy="default-src 'none'; style-src 'unsafe-inline'; sandbox",
         )
 
+    def _send_method_comparison(self, query: str) -> None:
+        # Allowlisted query surface: only `fixture=synthetic` is meaningful;
+        # anything else (including any path-like parameter) is rejected.
+        if query:
+            if query != "fixture=synthetic":
+                self._send_json({"error": "unsupported query"}, HTTPStatus.BAD_REQUEST)
+                return
+            self._send_json(synthetic_method_comparison())
+            return
+        try:
+            self._send_json(load_pilot_comparison(self.repo_root))
+        except ComparisonSourceError as exc:
+            self._send_json(
+                {
+                    "ok": False,
+                    "error": f"实验结果尚未就绪：{exc}",
+                    "error_type": "ComparisonSourceError",
+                },
+                HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+
+    def _send_ablation_comparison(self, query: str) -> None:
+        # Same allowlisted query surface as the three-method view.
+        if query:
+            if query != "fixture=synthetic":
+                self._send_json({"error": "unsupported query"}, HTTPStatus.BAD_REQUEST)
+                return
+            self._send_json(synthetic_ablation_comparison())
+            return
+        try:
+            self._send_json(load_ablation_comparison(self.repo_root))
+        except ComparisonSourceError as exc:
+            self._send_json(
+                {
+                    "ok": False,
+                    "error": f"实验结果尚未就绪：{exc}",
+                    "error_type": "ComparisonSourceError",
+                },
+                HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
         # Keep request logs minimal and free of query strings.
         return
@@ -252,7 +327,40 @@ class DemoHTTPRequestHandler(BaseHTTPRequestHandler):
     # -- routes ----------------------------------------------------------
 
     def do_GET(self) -> None:
-        path = self.path.split("?", 1)[0]
+        path, _, query = self.path.partition("?")
+        if path == "/api/featured-process-cases":
+            if query:
+                self._send_json({"error": "unsupported query"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(load_featured_cases(self.repo_root))
+            except FeaturedCaseError:
+                self._send_json(
+                    {"ok": False, "error": "重点案例来源暂不可用或校验未通过"},
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                )
+            return
+        if path.startswith("/docs/featured-process/"):
+            if query:
+                self._send_json({"error": "unsupported query"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                raw = read_review_doc(self.repo_root, path.removeprefix("/docs/featured-process/"))
+            except FeaturedCaseError:
+                self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_bytes(
+                raw,
+                content_type="text/plain; charset=utf-8",
+                content_security_policy="default-src 'none'; base-uri 'none'",
+            )
+            return
+        if path == "/api/method-comparison":
+            self._send_method_comparison(query)
+            return
+        if path == "/api/ablation-comparison":
+            self._send_ablation_comparison(query)
+            return
         if path == "/api/method-costs":
             try:
                 self._send_json(load_method_comparison(self.repo_root))
@@ -260,6 +368,36 @@ class DemoHTTPRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(
                     {"error": "published method costs unavailable"}, HTTPStatus.SERVICE_UNAVAILABLE
                 )
+            return
+        if path == "/api/current-validation-summary":
+            if query:
+                self._send_json({"error": "unsupported query"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(load_current_validation_summary(self.repo_root))
+            except CurrentValidationError:
+                self._send_json(
+                    {
+                        "ok": False,
+                        "error": "最新补充验证暂不可用；历史冻结结果仍可查看",
+                        "error_type": "CurrentValidationError",
+                    },
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                )
+            return
+        if path == "/docs/contest-results-overview":
+            if query:
+                self._send_json({"error": "unsupported query"}, HTTPStatus.BAD_REQUEST)
+                return
+            doc = self.repo_root / CONTEST_OVERVIEW_DOC
+            if doc.is_symlink() or not doc.is_file():
+                self._send_json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_bytes(
+                doc.read_bytes(),
+                content_type="text/plain; charset=utf-8",
+                content_security_policy="default-src 'none'; base-uri 'none'",
+            )
             return
         if path in _STATIC_FILES:
             filename, content_type = _STATIC_FILES[path]

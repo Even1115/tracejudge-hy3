@@ -116,6 +116,48 @@ def test_replacing_readiness_archives_exact_previous_bytes(scripts, tmp_path):
     assert json.loads(path.read_text()) == {"ready": True}
 
 
+def test_smoke_main_uses_explicit_native_work_root(scripts, monkeypatch, tmp_path):
+    project = tmp_path / "project"
+    work_root = tmp_path / "wsl-native"
+    project.mkdir()
+    work_root.mkdir()
+    observed = {}
+
+    class TemporaryDirectory:
+        def __init__(self, *, prefix, dir):
+            observed.update(prefix=prefix, parent=dir)
+
+        def __enter__(self):
+            folder = work_root / "smoke"
+            folder.mkdir()
+            return str(folder)
+
+        def __exit__(self, *_):
+            return False
+
+    monkeypatch.setattr(scripts, "require_idle_benchmark_containers", lambda: None)
+    monkeypatch.setattr(scripts.tempfile, "TemporaryDirectory", TemporaryDirectory)
+    monkeypatch.setattr(scripts, "mbpp", lambda project, work: {"ready": True})
+    monkeypatch.setattr(scripts, "execution_identity", lambda *_: {})
+    monkeypatch.setattr(scripts, "now", lambda: "now")
+    monkeypatch.setattr(scripts, "save_readiness", lambda *_: None)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "smoke_external_benchmarks.py",
+            "--dataset",
+            "mbpp",
+            "--project-root",
+            str(project),
+            "--work-root",
+            str(work_root),
+        ],
+    )
+
+    assert scripts.main() == 0
+    assert observed == {"prefix": ".mbpp-smoke-", "parent": work_root.resolve()}
+
+
 def test_mbpp_only_preparation_does_not_touch_lcb_or_call_model(monkeypatch, tmp_path):
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
     prepare = importlib.import_module("prepare_external_benchmarks")

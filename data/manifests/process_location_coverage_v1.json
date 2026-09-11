@@ -1,0 +1,16 @@
+{
+  "schema": "tracejudge-location-coverage-policy-v1",
+  "metric": "same_source_gold_quote_coverage_v1",
+  "registration": "post_hoc_after_observing_probes3_20260910_v2",
+  "eligible": "supported error gold with a structured location and a unique verbatim gold quote in its source field",
+  "hit": "successful public-process error prediction, matching first layer and source_field/step_id/entry_index, whose bound quote contains the full gold quote verbatim",
+  "cross_source_credit": false,
+  "missing_failed_abstained": "remain in eligible denominator; not hits",
+  "empty_denominator": "null",
+  "limitations": [
+    "Mechanical citation coverage, not semantic correctness, precise first-error localization, or a replacement for exact match",
+    "Longer quotes can increase coverage; report quote lengths and retain original exact-match scores",
+    "Code and step locations are different sources; no inference from affected_steps or explanations",
+    "Constructed probes remain separate from development and held-out statistics"
+  ]
+}

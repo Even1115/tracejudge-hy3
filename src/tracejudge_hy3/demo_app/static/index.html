@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="data:," />
   <title>TraceJudge-Hy3 · 过程评估工作台</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
@@ -18,10 +19,14 @@
       </div>
       <div class="header-actions">
         <a class="recording-link" href="/?recording=1">全流程录制</a>
+        <button class="compact-button" id="open-tour">60 秒看懂项目</button>
+        <button class="compact-button" id="open-featured">重点案例</button>
         <button class="compact-button" id="open-costs">效果与成本</button>
         <nav class="view-switch" aria-label="页面切换">
           <button class="view-button active" data-view="demo" aria-pressed="true">评估演示</button>
           <button class="view-button" data-view="cases" aria-pressed="false">典型案例</button>
+          <button class="view-button" data-view="compare" aria-pressed="false">方法对比</button>
+          <button class="view-button" data-view="ablation" aria-pressed="false">证据消融</button>
         </nav>
         <div class="mode-badge" id="mode-badge">待开始</div>
       </div>
@@ -173,16 +178,40 @@
 
     <section class="overview" id="overview" hidden>
       <div class="overview-head">
-        <h2>已发布结果总览</h2>
+        <div>
+          <span class="eyebrow">HISTORICAL FROZEN STUDY · 历史冻结</span>
+          <h2>历史阶段四冻结研究 · 57 条轨迹</h2>
+        </div>
         <span id="overview-source"></span>
       </div>
       <div class="overview-grid" id="overview-grid"></div>
       <div class="overview-extra" id="overview-extra"></div>
       <p class="disclaimer" id="overview-disclaimer"></p>
+      <section class="current-validation" aria-labelledby="current-validation-title">
+        <div class="overview-head">
+          <div>
+            <span class="eyebrow">LATEST SUPPLEMENTARY · 最新补充</span>
+            <h2 id="current-validation-title">2026-09-10 最新补充验证</h2>
+          </div>
+          <span id="current-validation-source"></span>
+        </div>
+        <div id="current-validation-body"><p class="placeholder">正在校验最新补充验证…</p></div>
+      </section>
     </section>
     </section>
 
     <section class="page-view cases-page" id="page-cases" hidden>
+      <section class="featured-process" aria-labelledby="featured-title">
+        <span class="eyebrow">PROCESS CASE STUDIES · 补充案例</span>
+        <h1 id="featured-title">从具体承诺与边界，看见过程问题</h1>
+        <p class="fineprint">一个开发样本与一个构造探针，独立于下方三个公开 Fixture 的统计。点击只读取已有材料，不调用模型、不执行候选。</p>
+        <div class="featured-options" role="group" aria-label="重点案例选择">
+          <button data-featured-case="tuple_str_int" aria-pressed="false">tuple_str_int · 测试通过，边界承诺有缺陷</button>
+          <button data-featured-case="find_char_long" aria-pressed="false">find_char_long · 计划正确，代码边界失配</button>
+        </div>
+        <p id="featured-status" class="fineprint" role="status">选择案例后核验材料。</p>
+        <article id="featured-detail" class="featured-detail" hidden aria-labelledby="featured-case-title"></article>
+      </section>
       <div class="cases-hero">
         <div>
           <span class="eyebrow">PUBLIC CASE EXPLORER</span>
@@ -207,6 +236,63 @@
         <p class="disclaimer" id="regression-boundary"></p>
       </section>
       <p class="disclaimer cases-disclaimer" id="cases-disclaimer"></p>
+    </section>
+
+    <section class="page-view compare-page" id="page-compare" hidden>
+      <div class="cases-hero">
+        <div>
+          <span class="eyebrow">METHOD COMPARISON</span>
+          <h1>同一道题、同一个冻结候选，三种评估方法</h1>
+          <p>只读取已落盘并哈希验证的 pilot 运行记录；浏览、筛选与展开证据不会发起模型请求、不运行 Solver、不执行候选代码。</p>
+        </div>
+        <div class="source-chip" id="compare-source">正在校验实验结果…</div>
+      </div>
+      <div class="synthetic-banner" id="compare-synthetic-banner" hidden>界面测试数据：以下内容为合成示例，仅用于验证页面状态，不是实验结果，不得计入任何成绩。</div>
+      <div class="compare-meta" id="compare-meta"></div>
+      <div class="compare-filters" id="compare-filters" role="group" aria-label="样本筛选"></div>
+      <p class="fineprint" id="compare-filter-note"></p>
+      <div class="compare-layout">
+        <aside class="case-list compare-list" id="compare-list" aria-label="样本列表"></aside>
+        <article class="case-detail compare-detail" id="compare-detail"><p class="placeholder">正在载入实验结果…</p></article>
+      </div>
+      <p class="disclaimer" id="compare-notes"></p>
+      <div class="visually-hidden" aria-live="polite" id="compare-live"></div>
+    </section>
+
+    <section class="page-view ablation-page" id="page-ablation" hidden>
+      <div class="cases-hero">
+        <div>
+          <span class="eyebrow">EVIDENCE ABLATION · 2×2</span>
+          <h1>统一提示下的四条件证据消融</h1>
+          <p>同一批冻结候选、同一提示与输出契约，只有进入 Judge 的证据不同。与“方法对比”页的历史三方法运行是两个独立实验，不合并排名。浏览、筛选与展开证据不会发起模型请求、不运行 Solver、不执行候选代码。</p>
+        </div>
+        <div class="source-chip" id="ablation-source">正在校验实验结果…</div>
+      </div>
+      <div class="synthetic-banner" id="ablation-synthetic-banner" hidden>界面测试数据：以下内容为合成示例，仅用于验证页面状态，不是实验结果，不得计入任何成绩。</div>
+      <div class="compare-meta" id="ablation-meta"></div>
+      <div class="compare-filters" id="ablation-filters" role="group" aria-label="样本筛选"></div>
+      <p class="fineprint" id="ablation-filter-note"></p>
+      <div class="compare-cases" id="ablation-cases" role="group" aria-label="重点案例"></div>
+      <div class="compare-layout">
+        <aside class="case-list compare-list" id="ablation-list" aria-label="样本列表"></aside>
+        <article class="case-detail compare-detail" id="ablation-detail"><p class="placeholder">正在载入实验结果…</p></article>
+      </div>
+      <p class="disclaimer" id="ablation-notes"></p>
+      <div class="visually-hidden" aria-live="polite" id="ablation-live"></div>
+    </section>
+
+    <section class="tour-bar" id="tour-bar" hidden role="region" aria-label="60 秒看懂项目导览">
+      <div class="tour-info">
+        <span class="eyebrow" id="tour-progress">1 / 4 · 60 秒看懂项目</span>
+        <h2 id="tour-title" tabindex="-1"></h2>
+        <p id="tour-note"></p>
+        <p class="fineprint" id="tour-status" role="status"></p>
+      </div>
+      <div class="tour-actions">
+        <button id="tour-prev" class="compact-button">上一步</button>
+        <button id="tour-next" class="compact-button">下一步</button>
+        <button id="tour-exit" class="compact-button">退出导览</button>
+      </div>
     </section>
 
     <footer>

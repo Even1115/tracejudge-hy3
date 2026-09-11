@@ -16,12 +16,34 @@ from tracejudge_hy3.evaluator.claims import claims_explicit_empty_input_branch
 from tracejudge_hy3.evaluator.code_location import best_available_code_span, function_code_span
 from tracejudge_hy3.schemas.evaluation import ErrorType, ProcessAssessment
 from tracejudge_hy3.schemas.execution import ExecutionSummary, StaticEvidence, TestExecutionResult
+from tracejudge_hy3.schemas.location import FaultLocation
 from tracejudge_hy3.schemas.problem import ProblemSpec, TestCase
 from tracejudge_hy3.schemas.solution import SolutionTrace
+from tracejudge_hy3.static_analysis.loop_proof import simple_full_scans
 
 _SET_KEYWORDS = ("集合", "使用 set", "使用set", "hash set", "哈希集合")
 _SINGLE_PASS_KEYWORDS = ("单次遍历", "一次遍历", "一遍遍历", "single pass", "one pass")
 _BOUNDARY_EXCEPTIONS = {"ZeroDivisionError", "IndexError", "KeyError", "StopIteration"}
+
+
+def _claims_single_pass(text: str) -> bool:
+    lowered = text.lower()
+    # A keyword inside a denial/comparison is not an affirmative claim.
+    if any(
+        marker in lowered
+        for marker in (
+            "not ",
+            "rather than",
+            "不是",
+            "并非",
+            "不采用",
+            "无需",
+            "不保证",
+            "避免",
+        )
+    ):
+        return False
+    return any(keyword in lowered for keyword in _SINGLE_PASS_KEYWORDS)
 
 
 def _is_empty_like(value: Any) -> bool:
@@ -51,10 +73,15 @@ def check_empty_input_claim(
     return ProcessAssessment(
         reasoning_correct=None,
         plan_code_aligned=False,
-        functional_correct=False,
+        functional_correct=None,
         process_correct=False,
         first_faulty_layer="alignment",
         first_faulty_step=step.step_id,
+        first_faulty_location=FaultLocation(
+            source_field="implementation_steps",
+            step_id=step.step_id,
+            quote=step.content,
+        ),
         affected_steps=[s.step_id for s in solution.implementation_steps[idx:]],
         violated_requirement=violated,
         code_span=function_code_span(static_evidence),
@@ -86,10 +113,15 @@ def check_set_usage_claim(
     return ProcessAssessment(
         reasoning_correct=None,
         plan_code_aligned=False,
-        functional_correct=False,
+        functional_correct=None,
         process_correct=False,
         first_faulty_layer="alignment",
         first_faulty_step=step.step_id,
+        first_faulty_location=FaultLocation(
+            source_field="implementation_steps",
+            step_id=step.step_id,
+            quote=step.content,
+        ),
         affected_steps=[step.step_id],
         violated_requirement=violated,
         code_span=function_code_span(static_evidence),
@@ -109,12 +141,17 @@ def check_single_pass_claim(
     if not static_evidence.ast_parse_ok:
         return None
     claim_steps = [
-        step
-        for step in [*solution.implementation_steps]
-        if any(k in step.content for k in _SINGLE_PASS_KEYWORDS)
+        step for step in [*solution.implementation_steps] if _claims_single_pass(step.content)
     ]
-    claims_in_summary = any(k in solution.design_summary for k in _SINGLE_PASS_KEYWORDS)
-    if (not claim_steps and not claims_in_summary) or static_evidence.max_loop_nesting_depth < 2:
+    claims_in_summary = _claims_single_pass(solution.design_summary)
+    if not claim_steps and not claims_in_summary:
+        return None
+    indexed_scans = [
+        line
+        for line, indexed in simple_full_scans(solution.code, static_evidence.function_name)
+        if indexed
+    ]
+    if len(indexed_scans) < 2:
         return None
 
     step_id = claim_steps[0].step_id if claim_steps else None
@@ -126,18 +163,24 @@ def check_single_pass_claim(
     return ProcessAssessment(
         reasoning_correct=None,
         plan_code_aligned=False,
-        functional_correct=False,
+        functional_correct=None,
         process_correct=False,
         first_faulty_layer="alignment",
         first_faulty_step=step_id,
+        first_faulty_location=FaultLocation(
+            source_field="implementation_steps" if claim_steps else "design_summary",
+            step_id=step_id,
+            quote=claim_steps[0].content if claim_steps else solution.design_summary,
+        ),
         affected_steps=[step_id] if step_id else [],
         violated_requirement=violated,
-        code_span=function_code_span(static_evidence),
+        code_span=f"L{indexed_scans[0]}-L{indexed_scans[-1]}",
         error_type=ErrorType.A01_PLAN_CODE_MISMATCH,
         secondary_error_types=[],
         explanation=(
-            "[rule] reasoning 声称采用单次遍历（O(n)）方法，"
-            f"但静态分析检测到 {static_evidence.max_loop_nesting_depth} 层嵌套循环。"
+            "[rule] 说明声称单次遍历，但代码对同一未修改输入重复执行完整的 "
+            f"range(len(input)) 索引扫描（行 {indexed_scans}）。"
+            "这是扫描结构失配，不据此推断功能失败或一般时间复杂度。"
         ),
         confidence=0.7,
     )
@@ -152,15 +195,16 @@ def check_complexity_declaration(
     if not declared:
         return None
     declared_lower = declared.lower().replace(" ", "")
-    claims_constant_time = any(
-        marker in declared_lower for marker in ("o(1)", "常数时间", "constanttime")
-    )
+    claims_constant_time = declared_lower in {"o(1)", "常数时间", "constanttime"}
     if not claims_constant_time or static_evidence.input_dependent_loop_count == 0:
+        return None
+    scans = simple_full_scans(solution.code, static_evidence.function_name)
+    if not scans:
         return None
     return ProcessAssessment(
         reasoning_correct=False,
         plan_code_aligned=None,
-        functional_correct=False,
+        functional_correct=None,
         process_correct=False,
         first_faulty_layer="reasoning",
         first_faulty_step=None,
@@ -168,11 +212,15 @@ def check_complexity_declaration(
         violated_requirement=None,
         code_span=function_code_span(static_evidence),
         error_type=ErrorType.P03_COMPLEXITY_MISMATCH,
+        first_faulty_location=FaultLocation(
+            source_field="declared_time_complexity", quote=declared
+        ),
         secondary_error_types=[],
         explanation=(
             f"[rule] 声明时间复杂度为 {declared}，"
-            f"但代码中检测到 {static_evidence.input_dependent_loop_count} 个输入相关循环，"
-            "与声明的复杂度不一致。"
+            f"但代码中检测到 {len(scans)} 个输入相关循环，"
+            "在无提前退出或输入修改的结构中完整扫描输入；"
+            "在普通可变长序列的成本模型下与常数时间声明不一致。"
         ),
         confidence=0.65,
     )
@@ -308,6 +356,13 @@ def evaluate_alignment_rules(
         )
     )
     primary = findings[0]
+    # Static claims cannot establish functional failure.
+    primary.functional_correct = (
+        None
+        if execution_result.runtime_status == "backend_error"
+        or (execution_result.runtime_status == "completed" and not execution_result.results)
+        else execution_result.runtime_status == "completed" and execution_result.all_passed()
+    )
     for additional in findings[1:]:
         if additional.error_type and additional.error_type != primary.error_type:
             if additional.error_type not in primary.secondary_error_types:

@@ -45,7 +45,7 @@ from tracejudge_hy3.providers.base import (
     SolutionGeneration,
     validate_solution_for_problem,
 )
-from tracejudge_hy3.providers.telemetry import observe_request
+from tracejudge_hy3.providers.telemetry import failure_observer, observe_request
 from tracejudge_hy3.redaction import redact_sensitive_text
 from tracejudge_hy3.schemas.evaluation import ProcessAssessment
 from tracejudge_hy3.schemas.execution import ExecutionSummary, StaticEvidence
@@ -162,6 +162,31 @@ class Hy3OpenAIProvider(LLMProvider):
             raise ProviderResponseError("Hy3 response contained no text message content")
         return content
 
+    def _diagnose_failure(
+        self, attempt: int, stage: str, error: Exception, raw: str | None = None
+    ) -> None:
+        observer = failure_observer.get()
+        if observer is None:
+            return
+        # Redact the complete text before hashing, truncating, or persisting.
+        safe = self._artifact_safe_model_text(raw) if raw is not None else None
+        safe_error = self._artifact_safe_model_text(str(error))
+        observer(
+            {
+                "schema": "tracejudge-judge-failure-diagnostic-v1",
+                "attempt_in_call": attempt,
+                "stage": stage,
+                "error_type": type(error).__name__,
+                "error_message_redacted": safe_error[:4000],
+                "error_truncated": len(safe_error) > 4000,
+                "response_redacted": safe[:24000] if safe is not None else None,
+                "response_truncated": safe is not None and len(safe) > 24000,
+                "response_redacted_sha256": (
+                    hashlib.sha256(safe.encode("utf-8")).hexdigest() if safe is not None else None
+                ),
+            }
+        )
+
     async def _call_with_retries(
         self,
         system_prompt: str,
@@ -182,13 +207,16 @@ class Hy3OpenAIProvider(LLMProvider):
             try:
                 raw = await self._call_model(messages)
             except ProviderTimeoutError as exc:
+                self._diagnose_failure(attempt, "provider", exc)
                 last_error = exc
                 last_was_timeout = True
                 logger.warning("Hy3 call attempt %d/%d timed out", attempt, attempts)
                 continue
-            except ProviderAuthError:
+            except ProviderAuthError as exc:
+                self._diagnose_failure(attempt, "provider", exc)
                 raise
             except ProviderResponseError as exc:
+                self._diagnose_failure(attempt, "provider", exc)
                 last_error = exc
                 last_was_timeout = False
                 logger.warning(
@@ -201,12 +229,15 @@ class Hy3OpenAIProvider(LLMProvider):
 
             parse_raw = self._redact_configured_secret(raw)
             artifact_raw = self._artifact_safe_model_text(parse_raw)
+            stage = "schema"
             try:
                 parsed = parse_structured_output(parse_raw, model_cls)
                 if extra_check is not None:
+                    stage = "context_consistency"
                     extra_check(parsed)
                 return parsed
             except (ParsingError, ValueError) as exc:
+                self._diagnose_failure(attempt, stage, exc, parse_raw)
                 safe_error = self._artifact_safe_model_text(str(exc))
                 last_error = ParsingError(safe_error)
                 last_was_timeout = False
@@ -402,6 +433,7 @@ class Hy3OpenAIProvider(LLMProvider):
         valid_requirement_ids = {requirement.requirement_id for requirement in problem.requirements}
 
         def _check_context_references(assessment: ProcessAssessment) -> None:
+            assessment.validate_location_against(solution)
             referenced_step_ids = set(assessment.affected_steps)
             if assessment.first_faulty_step is not None:
                 referenced_step_ids.add(assessment.first_faulty_step)

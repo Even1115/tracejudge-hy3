@@ -1,0 +1,24 @@
+{
+  "schema": "tracejudge-process-pilot-config-v1",
+  "label_stage": "post_feedback_development_consensus",
+  "annotation_provenance": "authorship_and_human_independence_not_verified",
+  "packet_manifest": {
+    "path": "artifacts/process-annotations/mbpp120-process-v1/manifest.json",
+    "sha256": "f1d6733de1e6c8f9de8bf1f01a18c004848973dc2f085ed1acd5d59be1b003da"
+  },
+  "review_audit": {
+    "path": "artifacts/annotation-audit/mbpp-pilot-20260909-v2/structural-audit.json",
+    "sha256": "d25382633251d81f016999fca50c9b4a8bfff202954c992cd63a1528c637dec5"
+  },
+  "annotations": {
+    "a": {
+      "path": "artifacts/annotation-audit/mbpp-pilot-20260909-v2/submitted_a.jsonl",
+      "sha256": "7dd40bdbdb4f960a5074d715e04f785c650433aa2510c95d0dec92ac58a4dbd5"
+    },
+    "b": {
+      "path": "artifacts/annotation-audit/mbpp-pilot-20260909-v2/submitted_b.jsonl",
+      "sha256": "d009168b0959f874e730c250335b23d332606ec806bac5af5879a157cc29571a"
+    }
+  },
+  "benchmark_registry": "data/manifests/benchmark_sources_v1.json"
+}

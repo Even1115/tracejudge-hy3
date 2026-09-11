@@ -1,5 +1,12 @@
 # TraceJudge-Hy3
 
+[![Version](https://img.shields.io/badge/version-v0.1.0-blue)](#)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/github/license/Even1115/tracejudge-hy3)](LICENSE)
+[![Task](https://img.shields.io/badge/Task-Code%20Process%20Evaluation-purple)](#)
+[![Judge](https://img.shields.io/badge/Judge-Hy3-orange)](#)
+[![Method](https://img.shields.io/badge/Method-Four--Layer%20Alignment-green)](#)
+
 **基于 Hy3 的代码生成过程评估工作台：检查解题说明与代码是否一致，定位首个可观察的错误步骤，并用执行证据复核判断。**
 
 犀牛鸟开源实战任务 2「可验证场景：过程评估与错误定位」个人／活动作品。项目由参与者独立实现，非腾讯官方发布。
